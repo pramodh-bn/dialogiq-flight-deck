@@ -1,25 +1,48 @@
-from fastapi import Depends, FastAPI, status
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 # Import local database dependency & models (CS-29 & CS-30)
-from database import Base, engine, get_db
+from database import Base, SessionLocal, engine, get_db
 from models import ConversationNode, Scenario, User  # noqa: F401
+from models import Session as PracticeSession
+from seed import get_or_create_demo_user, seed_scenarios
 
-# Initialize database tables on startup (or via migration tool)
-Base.metadata.create_all(bind=engine)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Create tables and seed demo scenarios when the server starts.
+
+    Kept out of import time so tests never touch the on-disk dialogiq.db.
+    """
+    Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        seed_scenarios(db)
+    yield
+
 
 app = FastAPI(
     title="DialogIQ API",
     description="Backend API for Meta Hackathon Conversation Sparring Platform",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
-# Configure CORS middleware for Vite frontend (CS-25 / local dev)
+# The Lovable/TanStack dev server is pinned to port 8080; 5173 covers plain Vite.
+# Override with a comma-separated DIALOGIQ_CORS_ORIGINS.
+DEFAULT_ORIGINS = (
+    "http://localhost:8080,http://127.0.0.1:8080,"
+    "http://localhost:5173,http://127.0.0.1:5173"
+)
 origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    o.strip()
+    for o in os.environ.get("DIALOGIQ_CORS_ORIGINS", DEFAULT_ORIGINS).split(",")
+    if o.strip()
 ]
 
 app.add_middleware(
@@ -36,6 +59,18 @@ class ScenarioResponse(BaseModel):
     id: int
     title: str
     description: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SessionCreateRequest(BaseModel):
+    scenario_id: int
+
+
+class SessionResponse(BaseModel):
+    id: int
+    scenario_id: int
+    score: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -66,6 +101,25 @@ def get_scenarios(db: Session = Depends(get_db)):  # noqa: B008
     """Fetch all available conversation sparring scenarios."""
     scenarios = db.query(Scenario).all()
     return scenarios
+
+
+@app.post(
+    "/api/sessions",
+    response_model=SessionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_session(
+    payload: SessionCreateRequest, db: Session = Depends(get_db)  # noqa: B008
+) -> PracticeSession:
+    """Start a practice run of a scenario for the Sprint 1 demo user."""
+    if db.get(Scenario, payload.scenario_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Scenario not found")
+    user = get_or_create_demo_user(db)
+    session = PracticeSession(user_id=user.id, scenario_id=payload.scenario_id)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session
 
 
 @app.post("/api/chat/turn", response_model=ChatTurnResponse)
