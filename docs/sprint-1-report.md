@@ -1,6 +1,11 @@
-# DialogIQ ? Sprint 1 delivery and integration report
+# DialogIQ - Sprint 1 delivery and integration report
 
 Reviewed by Codex on October 29, 2026, under CS-33.
+
+Integration completed through [PR #1](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/1)
+into dev at 259e8ff. main was not changed. The merged source tree matches the
+verified review branch. No automated GitHub status checks were configured for
+this PR; the verification below was run locally by Codex.
 
 ## Outcome
 
