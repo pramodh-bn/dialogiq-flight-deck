@@ -99,7 +99,7 @@ function Arena() {
     if (!w.length) w.push({ kind: "tip", text: "Statement detected. Follow up with a question to keep Bob talking." });
     setWhispers((prev) => [...w, ...prev].slice(0, 6));
     const pool = isEmp ? bobReplies.empathy : isOpen ? bobReplies.open : bobReplies.closed;
-    setTimeout(() => streamBob(pool[Math.floor(Math.random() * pool.length)]), 500);
+    setTimeout(() => streamBob(pool[Math.floor(Math.random() * pool.length)] ?? pool[0]!), 500);
   }
 
   const asked = counts.open + counts.closed;
