@@ -18,7 +18,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 class Base(DeclarativeBase):
     """Declarative base for all DialogIQ ORM models."""
 
-    pass
 
 
 def get_db() -> Generator[Session, None, None]:

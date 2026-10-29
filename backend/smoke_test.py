@@ -1,19 +1,20 @@
-import sys
 import os
+import sys
 
 # Ensure backend directory is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy.orm import Session
-from database import SessionLocal, engine, Base
+
+from database import Base, SessionLocal, engine
 from models import Scenario, User
-from models import ConversationNode, Session as ChatSession  # noqa: F401
+
 
 def run_smoke_test():
-    print("--- Starting Sprint 1 Backend & Database Smoke Test ---")
+    print("--- Starting Sprint 1 Backend & Database Smoke Test (CS-30) ---")
     
     # 1. Initialize Database Tables (CS-30)
-    print("[1/4] Creating database tables from SQLAlchemy models...")
+    print("[1/4] Creating database tables from SQLAlchemy models (CS-30)...")
     Base.metadata.create_all(bind=engine)
     print("      SUCCESS: Tables created / verified.")
 
@@ -21,14 +22,12 @@ def run_smoke_test():
     print("[2/4] Testing database session write (User & Scenario)...")
     db: Session = SessionLocal()
     try:
-        # Create a test user
         test_user = User(username="test_challenger", email="challenger@dialogiq.test")
         db.add(test_user)
         db.commit()
         db.refresh(test_user)
         print(f"      SUCCESS: Created test user with ID {test_user.id}")
 
-        # Create a test scenario
         test_scenario = Scenario(
             title="Difficult Q4 Budget Review",
             description="Convince the stakeholder to reallocate engineering resources.",
@@ -39,7 +38,7 @@ def run_smoke_test():
         db.refresh(test_scenario)
         print(f"      SUCCESS: Created test scenario '{test_scenario.title}' with ID {test_scenario.id}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         db.rollback()
         print(f"      FAILED: Database write error -> {e}")
         sys.exit(1)
@@ -59,7 +58,7 @@ def run_smoke_test():
     finally:
         db.close()
 
-    print("[4/4] Smoke test complete! SQLAlchemy ORM and SQLite session wiring are fully functional.")
+    print("[4/4] Smoke test complete! SQLAlchemy ORM (CS-30) and session wiring (CS-29) are fully functional.")
     print("--- Sprint 1 Vertical Slice Verified Successfully ---")
 
 if __name__ == "__main__":

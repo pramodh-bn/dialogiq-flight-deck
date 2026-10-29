@@ -1,13 +1,11 @@
 from fastapi import Depends, FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
+from sqlalchemy.orm import Session
 
 # Import local database dependency & models (CS-29 & CS-30)
 from database import Base, engine, get_db
-from models import Scenario
-from models import ConversationNode, Session as ChatSession, User  # noqa: F401
+from models import ConversationNode, Scenario, User  # noqa: F401
 
 # Initialize database tables on startup (or via migration tool)
 Base.metadata.create_all(bind=engine)
@@ -37,7 +35,7 @@ app.add_middleware(
 class ScenarioResponse(BaseModel):
     id: int
     title: str
-    description: Optional[str] = None
+    description: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,7 +50,7 @@ class ChatTurnRequest(BaseModel):
 class ChatTurnResponse(BaseModel):
     turn_id: int
     character_response: str
-    revealed_node_score: Optional[int] = None
+    revealed_node_score: int | None = None
 
 
 # --- API Endpoints ---
@@ -63,19 +61,24 @@ def health_check():
     return {"status": "healthy", "service": "dialogiq-backend"}
 
 
-@app.get("/api/scenarios", response_model=List[ScenarioResponse])
-def get_scenarios(db: Session = Depends(get_db)):
+@app.get("/api/scenarios", response_model=list[ScenarioResponse])
+def get_scenarios(db: Session = Depends(get_db)):  # noqa: B008
     """Fetch all available conversation sparring scenarios."""
     scenarios = db.query(Scenario).all()
     return scenarios
 
 
 @app.post("/api/chat/turn", response_model=ChatTurnResponse)
-def submit_chat_turn(payload: ChatTurnRequest, db: Session = Depends(get_db)):
+def submit_chat_turn(
+    payload: ChatTurnRequest, db: Session = Depends(get_db)  # noqa: B008
+):
     """Submit a chat turn, process response, and evaluate against hidden need graph."""
     # Stub response for Sprint 1 foundation validation
     return ChatTurnResponse(
         turn_id=1,
-        character_response="I understand your point on budget, but I need to know our delivery timeline won't slip.",
+        character_response=(
+            "I understand your point on budget, but I need to know "
+            "our delivery timeline won't slip."
+        ),
         revealed_node_score=3
     )

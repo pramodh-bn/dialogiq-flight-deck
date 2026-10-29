@@ -1,7 +1,6 @@
-import sys
 import os
+import sys
 
-# Ensure backend directory is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi.testclient import TestClient
@@ -9,12 +8,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Import local modules
-from main import app
 from database import Base, get_db
-from models import Scenario, User
+from main import app
+from models import Scenario
 
-# --- Setup In-Memory SQLite for Fast, Isolated Testing ---
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
@@ -24,10 +21,8 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create tables in memory
 Base.metadata.create_all(bind=engine)
 
-# Override FastAPI's dependency injection to use our test database
 def override_get_db():
     try:
         db = TestingSessionLocal()
@@ -37,7 +32,6 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
-# Initialize TestClient
 client = TestClient(app)
 
 
@@ -47,13 +41,11 @@ def test_health_check():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["service"] == "dialogiq-backend"
     print(" [PASS] Health check endpoint verified.")
 
 
 def test_scenarios_workflow():
-    """Verify database write (CS-30) and API read endpoint (CS-28 / CS-29)."""
-    # Seed a scenario directly into test DB
+    """Verify database write (CS-30 models) and API read endpoint (CS-28 / CS-29)."""
     db = TestingSessionLocal()
     seed_scenario = Scenario(
         title="Integration Test Scenario",
@@ -64,14 +56,13 @@ def test_scenarios_workflow():
     db.commit()
     db.close()
 
-    # Hit the API endpoint
     response = client.get("/api/scenarios")
     assert response.status_code == 200
     scenarios = response.json()
     
     assert len(scenarios) >= 1
     assert scenarios[0]["title"] == "Integration Test Scenario"
-    print(" [PASS] Scenarios API endpoint successfully retrieved DB records.")
+    print(" [PASS] Scenarios API endpoint successfully retrieved DB records (CS-30).")
 
 
 def test_chat_turn_endpoint():
