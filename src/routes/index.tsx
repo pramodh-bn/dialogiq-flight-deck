@@ -65,7 +65,7 @@ function Dashboard() {
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-accent">Thursday · Flight deck</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-accent">THURSDAY · CONVERSATION DECK</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Welcome back, Pramodh</h1>
           <p className="text-sm text-muted-foreground">4 active scenarios · 2 breakthroughs this week</p>
         </div>
