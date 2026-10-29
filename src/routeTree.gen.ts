@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as FlightRecorderRouteImport } from './routes/flight-recorder'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArenaRoute = ArenaRouteImport.update({
@@ -31,30 +37,34 @@ const FlightRecorderRoute = FlightRecorderRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/arena' | '/flight-recorder'
+  fullPaths: '/' | '/analytics' | '/arena' | '/flight-recorder'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/arena' | '/flight-recorder'
-  id: '__root__' | '/' | '/arena' | '/flight-recorder'
+  to: '/' | '/analytics' | '/arena' | '/flight-recorder'
+  id: '__root__' | '/' | '/analytics' | '/arena' | '/flight-recorder'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnalyticsRoute: typeof AnalyticsRoute
   ArenaRoute: typeof ArenaRoute
   FlightRecorderRoute: typeof FlightRecorderRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/arena': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnalyticsRoute: AnalyticsRoute,
   ArenaRoute: ArenaRoute,
   FlightRecorderRoute: FlightRecorderRoute,
 }

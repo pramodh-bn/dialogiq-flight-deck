@@ -50,7 +50,9 @@ function Dashboard() {
           </div>
           <nav className="mx-auto hidden gap-1 rounded-full border border-border bg-secondary/50 p-1 md:flex">
             {tabs.map((t) => (
-              <button key={t} onClick={() => setTab(t)}
+              t === "Skill Analytics" ? (
+              <Link key={t} to="/analytics" className="rounded-full px-4 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:text-foreground">{t}</Link>
+              ) : <button key={t} onClick={() => setTab(t)}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${tab === t ? "bg-card text-foreground shadow ring-1 ring-border" : "text-muted-foreground hover:text-foreground"}`}>
                 {t}
               </button>
