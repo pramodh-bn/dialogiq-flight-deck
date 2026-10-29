@@ -7,7 +7,7 @@ export type Scenario = {
   description: string | null;
 };
 
-// Proposed for CS-28: the backend has a Session model but no create endpoint yet.
+// POST /api/sessions starts a run for the Sprint 1 demo user.
 export type CreateSessionRequest = { scenario_id: number };
 
 export type PracticeSession = {

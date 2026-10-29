@@ -4,6 +4,7 @@ No live calls: the OpenAI library class is replaced with fakes, prompt
 builders are pure functions, and Baseten/Meta env vars are cleared for
 every test. Run: pytest backend/test_persona.py
 """
+
 import os
 import sys
 from typing import ClassVar
@@ -185,9 +186,7 @@ def test_respond_request_shape_and_reply():
 def test_respond_strips_reply():
     FakeOpenAI.reply = "\n  Mocked persona reply.  \n"
     client = BasetenPersonaClient(api_key="test-key")
-    assert client.respond(system_prompt="s", messages=[]) == (
-        "Mocked persona reply."
-    )
+    assert client.respond(system_prompt="s", messages=[]) == ("Mocked persona reply.")
 
 
 def test_respond_inert_without_key():

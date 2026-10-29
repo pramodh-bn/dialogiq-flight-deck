@@ -16,13 +16,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(80), unique=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    sessions: Mapped[list["Session"]] = relationship(
-        "Session", back_populates="user"
-    )
+    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="user")
 
 
 class Scenario(Base):
@@ -51,14 +47,10 @@ class Session(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     scenario_id: Mapped[int] = mapped_column(ForeignKey("scenarios.id"))
     score: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="sessions")
-    scenario: Mapped["Scenario"] = relationship(
-        "Scenario", back_populates="sessions"
-    )
+    scenario: Mapped["Scenario"] = relationship("Scenario", back_populates="sessions")
     nodes: Mapped[list["ConversationNode"]] = relationship(
         "ConversationNode", back_populates="session"
     )
