@@ -96,7 +96,7 @@ function Analytics() {
             <h2 className="font-semibold">Open vs. Closed Questions</h2>
             <p className="mb-4 text-xs text-muted-foreground">Share of questions asked per day</p>
             <div className="h-64">
-              <ResponsiveContainer>
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={days}>
                   <defs>
                     <linearGradient id="gOpen" x1="0" y1="0" x2="0" y2="1">
@@ -123,7 +123,7 @@ function Analytics() {
             <h2 className="font-semibold">De-escalation Success Rate</h2>
             <p className="mb-4 text-xs text-muted-foreground">Simulations where persona resistance dropped below 30%</p>
             <div className="h-64">
-              <ResponsiveContainer>
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={days}>
                   <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={11} interval={6} tickLine={false} />
