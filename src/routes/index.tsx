@@ -130,7 +130,7 @@ function Dashboard() {
 
           <section className="bento overflow-hidden lg:col-span-3">
             <div className="flex items-center justify-between p-5 pb-3">
-              <h2 className="font-semibold">Recent Flight History</h2>
+              <h2 className="font-semibold">Recent Conversation History</h2>
               <button className="text-xs text-accent hover:underline">View all</button>
             </div>
             <div className="overflow-x-auto">
