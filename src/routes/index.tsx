@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 export const Route = createFileRoute("/")({
@@ -97,8 +97,8 @@ function Dashboard() {
                   </div>
                   <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground"><span>{s.progress}% mapped</span><span>{s.last}</span></div>
                   <div className="mt-4 flex gap-2">
-                    <button className="flex-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/85">Resume Practice</button>
-                    <button className="flex-1 rounded-lg border border-border px-3 py-2 text-xs font-medium text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent">View Branch Tree</button>
+                    <Link to="/arena" className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/85">Resume Practice</Link>
+                    <Link to="/flight-recorder" className="flex-1 rounded-lg border border-border px-3 py-2 text-center text-xs font-medium text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent">View Branch Tree</Link>
                   </div>
                 </article>
               ))}
