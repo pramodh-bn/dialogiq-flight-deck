@@ -1,7 +1,17 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
+import { api } from "@/lib/api";
+import { classifyTurn } from "@/lib/classify";
+
+type ArenaSearch = { scenarioId?: number };
+
 export const Route = createFileRoute("/arena")({
+  validateSearch: (search: Record<string, unknown>): ArenaSearch => {
+    const id = Number(search["scenarioId"]);
+    return Number.isInteger(id) && id > 0 ? { scenarioId: id } : {};
+  },
   head: () => ({
     meta: [
       { title: "Simulation Arena — DialogIQ" },
@@ -18,26 +28,8 @@ export const Route = createFileRoute("/arena")({
 type Msg = { from: "bob" | "you"; text: string };
 type Whisper = { kind: "warn" | "good" | "tip"; text: string };
 
-const CLOSED = /^(do|does|did|is|are|was|were|can|could|will|would|should|have|has|had|won't|don't|isn't|aren't)\b/i;
-const OPEN = /^(what|how|why|tell me|help me|walk me|describe|in what)\b/i;
-const EMPATHY = /(understand|sounds like|i hear|feel|frustrat|appreciate|makes sense|tough|hard)/i;
-
-const bobReplies = {
-  closed: [
-    "Yeah. I guess. Is that all?",
-    "No. I already told you it wasn't my fault.",
-    "Sure, fine. Whatever you think.",
-  ],
-  open: [
-    "Honestly? The design team kept changing specs and I was the one left holding the bag.",
-    "I don't know… I felt like nobody noticed how much I was juggling until it fell apart.",
-    "If I'm being real, I stopped asking for help because it never came.",
-  ],
-  empathy: [
-    "…Yeah. It's been rough. Thanks for actually saying that.",
-    "I appreciate that. I didn't think you'd see it that way.",
-  ],
-};
+const DEFAULT_SCENARIO_ID = 1;
+const UNREACHABLE: Whisper = { kind: "warn", text: "⚠️ Couldn't reach the simulator. Try again." };
 
 const hints = [
   "Try: “What's been the hardest part of this quarter for you?”",
@@ -46,6 +38,11 @@ const hints = [
 ];
 
 function Arena() {
+  const { scenarioId = DEFAULT_SCENARIO_ID } = Route.useSearch();
+  const { data: scenarios } = useQuery({ queryKey: ["scenarios"], queryFn: () => api.listScenarios() });
+  const scenario = scenarios?.find((s) => s.id === scenarioId);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [pending, setPending] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
     { from: "bob", text: "You wanted to see me? If this is about the Q3 thing, I already sent the update." },
   ]);
@@ -63,7 +60,19 @@ function Arena() {
     feed.current?.scrollTo({ top: feed.current.scrollHeight, behavior: "smooth" });
   }, [msgs, streaming]);
 
-  const busy = streaming !== "";
+  useEffect(() => {
+    let live = true;
+    setSessionId(null);
+    api.createSession({ scenario_id: scenarioId }).then(
+      (s) => live && setSessionId(s.id),
+      () => live && setWhispers((p) => [UNREACHABLE, ...p].slice(0, 6)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [scenarioId]);
+
+  const busy = pending || streaming !== "";
 
   function streamBob(text: string) {
     let i = 0;
@@ -73,19 +82,19 @@ function Arena() {
       if (i >= text.length) {
         clearInterval(id);
         setStreaming("");
+        setPending(false);
         setMsgs((m) => [...m, { from: "bob", text }]);
       }
     }, 25);
   }
 
-  function send() {
+  async function send() {
     const t = input.trim();
-    if (!t || busy) return;
+    if (!t || busy || sessionId === null) return;
     setInput("");
+    setPending(true);
     setMsgs((m) => [...m, { from: "you", text: t }]);
-    const isOpen = OPEN.test(t);
-    const isClosed = !isOpen && CLOSED.test(t);
-    const isEmp = EMPATHY.test(t);
+    const { open: isOpen, closed: isClosed, empathy: isEmp } = classifyTurn(t);
     setCounts((c) => ({
       open: c.open + (isOpen ? 1 : 0),
       closed: c.closed + (isClosed ? 1 : 0),
@@ -98,8 +107,13 @@ function Arena() {
     if (isEmp) w.push({ kind: "good", text: "✓ Empathy marker used. Trust +1." });
     if (!w.length) w.push({ kind: "tip", text: "Statement detected. Follow up with a question to keep Bob talking." });
     setWhispers((prev) => [...w, ...prev].slice(0, 6));
-    const pool = isEmp ? bobReplies.empathy : isOpen ? bobReplies.open : bobReplies.closed;
-    setTimeout(() => streamBob(pool[Math.floor(Math.random() * pool.length)] ?? pool[0]!), 500);
+    try {
+      const res = await api.sendTurn({ session_id: sessionId, user_message: t });
+      streamBob(res.character_response);
+    } catch {
+      setPending(false);
+      setWhispers((prev) => [UNREACHABLE, ...prev].slice(0, 6));
+    }
   }
 
   const asked = counts.open + counts.closed;
@@ -114,7 +128,7 @@ function Arena() {
           <Link to="/" className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">← Dashboard</Link>
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-widest text-accent">Simulation Arena · Live</p>
-            <h1 className="truncate font-semibold">Performance Review: Missed Q3 Deadlines</h1>
+            <h1 className="truncate font-semibold">{scenario?.title ?? "Performance Review: Missed Q3 Deadlines"}</h1>
           </div>
           <Link to="/flight-recorder" className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5">
             End Simulation &amp; View Flight Tree
@@ -159,7 +173,7 @@ function Arena() {
                 className="h-10 shrink-0 rounded-lg border border-border px-3 text-sm text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent">
                 Get Hint
               </button>
-              <button onClick={send} disabled={!input.trim() || busy}
+              <button onClick={send} disabled={!input.trim() || busy || sessionId === null}
                 className="h-10 shrink-0 rounded-lg bg-brand px-4 text-sm font-semibold text-primary-foreground glow transition-opacity disabled:opacity-40">
                 Send Response
               </button>

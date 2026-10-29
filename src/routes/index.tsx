@@ -1,5 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+
+import { api, type Scenario } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,12 +18,28 @@ export const Route = createFileRoute("/")({
 
 const tabs = ["Active Scenarios", "Skill Analytics", "Past Simulations"];
 
-const scenarios = [
-  { name: "Bob: Defensive Team Member", ctx: "Performance review · missed Q3 deadlines", tags: ["Avoidant", "High Resistance"], score: 6, total: 7, progress: 86, last: "2h ago", initials: "B" },
-  { name: "Teenage Daughter: Homework Friction", ctx: "Evening check-in · phone boundaries", tags: ["Withdrawn", "Sarcastic"], score: 4, total: 7, progress: 57, last: "Yesterday", initials: "T" },
-  { name: "Priya: Burnout Disclosure", ctx: "1:1 · workload renegotiation", tags: ["Guarded", "Emotional"], score: 5, total: 7, progress: 71, last: "3d ago", initials: "P" },
-  { name: "Vendor: Contract Pushback", ctx: "Negotiation · price increase", tags: ["Assertive", "Data-driven"], score: 3, total: 7, progress: 43, last: "5d ago", initials: "V" },
-];
+// Archetypes and progress are not served by the API yet; keep the mock stats keyed by
+// scenario title so cards for unknown scenarios still render with neutral defaults.
+type CardStats = { tags: string[]; score: number; progress: number; last: string };
+const statsByTitle: Record<string, CardStats> = {
+  "Bob: Defensive Team Member": { tags: ["Avoidant", "High Resistance"], score: 6, progress: 86, last: "2h ago" },
+  "Teenage Daughter: Homework Friction": { tags: ["Withdrawn", "Sarcastic"], score: 4, progress: 57, last: "Yesterday" },
+  "Priya: Burnout Disclosure": { tags: ["Guarded", "Emotional"], score: 5, progress: 71, last: "3d ago" },
+  "Vendor: Contract Pushback": { tags: ["Assertive", "Data-driven"], score: 3, progress: 43, last: "5d ago" },
+};
+const newStats: CardStats = { tags: [], score: 0, progress: 0, last: "Not started" };
+const TOTAL_NODES = 7;
+
+function toCard(s: Scenario) {
+  return {
+    id: s.id,
+    name: s.title,
+    ctx: s.description ?? "",
+    initials: s.title.charAt(0).toUpperCase(),
+    total: TOTAL_NODES,
+    ...(statsByTitle[s.title] ?? newStats),
+  };
+}
 
 const history = [
   { name: "Bob: Defensive Team Member", date: "Oct 29, 2026", branches: 12, score: "6/7", status: "Breakthrough" },
@@ -39,6 +58,8 @@ const statusStyle: Record<string, string> = {
 
 function Dashboard() {
   const [tab, setTab] = useState(tabs[0]);
+  const { data, isPending, isError } = useQuery({ queryKey: ["scenarios"], queryFn: () => api.listScenarios() });
+  const scenarios = (data ?? []).map(toCard);
   return (
     <div className="min-h-screen bg-background bg-ambient">
       <header className="sticky top-0 z-20 border-b border-border bg-background/70 backdrop-blur-xl">
@@ -69,7 +90,7 @@ function Dashboard() {
         <div className="mb-6">
           <p className="font-mono text-xs uppercase tracking-widest text-accent">THURSDAY · CONVERSATION DECK</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Welcome back, Pramodh</h1>
-          <p className="text-sm text-muted-foreground">4 active scenarios · 2 breakthroughs this week</p>
+          <p className="text-sm text-muted-foreground">{scenarios.length} active scenarios · 2 breakthroughs this week</p>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-3">
@@ -78,9 +99,11 @@ function Dashboard() {
               <h2 className="font-semibold">Active Practice Scenarios</h2>
               <span className="text-xs text-muted-foreground">Sorted by recent</span>
             </div>
+            {isPending && <p className="text-sm text-muted-foreground">Loading scenarios…</p>}
+            {isError && <p className="text-sm text-destructive">Couldn't load scenarios from the simulator.</p>}
             <div className="grid gap-4 sm:grid-cols-2">
               {scenarios.map((s) => (
-                <article key={s.name} className="group rounded-xl border border-border bg-secondary/40 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:bg-secondary/70 hover:shadow-[var(--shadow-glow)]">
+                <article key={s.id} className="group rounded-xl border border-border bg-secondary/40 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:bg-secondary/70 hover:shadow-[var(--shadow-glow)]">
                   <div className="flex items-start gap-3">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/15 font-bold text-primary ring-1 ring-primary/30">{s.initials}</div>
                     <div className="min-w-0 flex-1">
@@ -99,7 +122,7 @@ function Dashboard() {
                   </div>
                   <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground"><span>{s.progress}% mapped</span><span>{s.last}</span></div>
                   <div className="mt-4 flex gap-2">
-                    <Link to="/arena" className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/85">Resume Practice</Link>
+                    <Link to="/arena" search={{ scenarioId: s.id }} className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/85">Resume Practice</Link>
                     <Link to="/flight-recorder" className="flex-1 rounded-lg border border-border px-3 py-2 text-center text-xs font-medium text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent">View Branch Tree</Link>
                   </div>
                 </article>
