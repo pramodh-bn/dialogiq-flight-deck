@@ -97,9 +97,7 @@ def build_persona_system_prompt(
         )
     parts.append(resistance_instruction(resistance))
     if revealed_titles:
-        parts.append(
-            "Topics already out in the open: " + ", ".join(revealed_titles)
-        )
+        parts.append("Topics already out in the open: " + ", ".join(revealed_titles))
     else:
         parts.append("Nothing personal has come up yet in this session.")
     return "\n\n".join(parts)
@@ -113,7 +111,12 @@ class BasetenPersonaClient:
     stays inert even if ``META_MODEL_API_KEY`` is set.
     """
 
-    def __init__(self, base_url=None, model=None, api_key=None):
+    def __init__(
+        self,
+        base_url: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
         self.base_url = (
             base_url
             if base_url is not None
@@ -127,9 +130,7 @@ class BasetenPersonaClient:
         # Passing "" (not None) stops any fallback to another backend's
         # key when no Baseten key is set.
         self.api_key = (
-            api_key
-            if api_key is not None
-            else os.environ.get("BASETEN_API_KEY", "")
+            api_key if api_key is not None else os.environ.get("BASETEN_API_KEY", "")
         )
 
     @property
@@ -166,21 +167,17 @@ class BasetenPersonaClient:
         # never reaches the library (which would otherwise raise, or
         # fall back to OPENAI_API_KEY). max_retries=0 keeps one request
         # per call.
-        client = OpenAI(
-            base_url=self.base_url, api_key=self.api_key, max_retries=0
-        )
+        client = OpenAI(base_url=self.base_url, api_key=self.api_key, max_retries=0)
         completion = client.chat.completions.create(
             model=self.model,
-            messages=[{"role": "system", "content": system_prompt}]
-            + list(messages),
+            messages=[{"role": "system", "content": system_prompt}] + list(messages),
             temperature=temperature,
             timeout=timeout,
         )
         content = completion.choices[0].message.content
         if not content or not content.strip():
             raise RuntimeError(
-                "BasetenPersonaClient received an empty reply from "
-                f"model {self.model}."
+                f"BasetenPersonaClient received an empty reply from model {self.model}."
             )
         return content.strip()
 

@@ -90,14 +90,15 @@ class ChatTurnResponse(BaseModel):
 
 # --- API Endpoints ---
 
+
 @app.get("/health", status_code=status.HTTP_200_OK)
-def health_check():
+def health_check() -> dict[str, str]:
     """Health check endpoint to verify server is up."""
     return {"status": "healthy", "service": "dialogiq-backend"}
 
 
 @app.get("/api/scenarios", response_model=list[ScenarioResponse])
-def get_scenarios(db: Session = Depends(get_db)):  # noqa: B008
+def get_scenarios(db: Session = Depends(get_db)) -> list[Scenario]:  # noqa: B008
     """Fetch all available conversation sparring scenarios."""
     scenarios = db.query(Scenario).all()
     return scenarios
@@ -109,7 +110,8 @@ def get_scenarios(db: Session = Depends(get_db)):  # noqa: B008
     status_code=status.HTTP_201_CREATED,
 )
 def create_session(
-    payload: SessionCreateRequest, db: Session = Depends(get_db)  # noqa: B008
+    payload: SessionCreateRequest,
+    db: Session = Depends(get_db),  # noqa: B008
 ) -> PracticeSession:
     """Start a practice run of a scenario for the Sprint 1 demo user."""
     if db.get(Scenario, payload.scenario_id) is None:
@@ -124,8 +126,9 @@ def create_session(
 
 @app.post("/api/chat/turn", response_model=ChatTurnResponse)
 def submit_chat_turn(
-    payload: ChatTurnRequest, db: Session = Depends(get_db)  # noqa: B008
-):
+    payload: ChatTurnRequest,
+    db: Session = Depends(get_db),  # noqa: B008
+) -> ChatTurnResponse:
     """Submit a chat turn, process response, and evaluate against hidden need graph."""
     # Stub response for Sprint 1 foundation validation
     return ChatTurnResponse(
@@ -134,5 +137,5 @@ def submit_chat_turn(
             "I understand your point on budget, but I need to know "
             "our delivery timeline won't slip."
         ),
-        revealed_node_score=3
+        revealed_node_score=3,
     )
