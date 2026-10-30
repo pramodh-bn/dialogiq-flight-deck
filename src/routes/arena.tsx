@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { getScenario } from "@/lib/scenarios";
 
 export const Route = createFileRoute("/arena")({
   head: () => ({
@@ -11,6 +12,10 @@ export const Route = createFileRoute("/arena")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
+  }),
+  validateSearch: (s: Record<string, unknown>): { scenario?: string; session?: string } => ({
+    scenario: typeof s.scenario === "string" ? s.scenario : undefined,
+    session: typeof s.session === "string" ? s.session : undefined,
   }),
   component: Arena,
 });
@@ -46,9 +51,9 @@ const hints = [
 ];
 
 function Arena() {
-  const [msgs, setMsgs] = useState<Msg[]>([
-    { from: "bob", text: "You wanted to see me? If this is about the Q3 thing, I already sent the update." },
-  ]);
+  const { scenario: scenarioId } = Route.useSearch();
+  const sc = getScenario(scenarioId);
+  const [msgs, setMsgs] = useState<Msg[]>([{ from: "bob", text: sc.opener }]);
   const [streaming, setStreaming] = useState("");
   const [input, setInput] = useState("");
   const [mic, setMic] = useState(false);
@@ -114,7 +119,7 @@ function Arena() {
           <Link to="/" className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">← Dashboard</Link>
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-widest text-accent">Simulation Arena · Live</p>
-            <h1 className="truncate font-semibold">Performance Review: Missed Q3 Deadlines</h1>
+            <h1 className="truncate font-semibold">{sc.title}</h1>
           </div>
           <Link to="/flight-recorder" className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5">
             End Simulation &amp; View Flight Tree
@@ -125,11 +130,11 @@ function Arena() {
       <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
         <section className="bento flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center gap-3 border-b border-border p-4">
-            <div className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-lg font-bold ring-2 ring-accent/40">B</div>
+            <div className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-lg font-bold ring-2 ring-accent/40">{sc.persona.name[0]}</div>
             <div>
-              <p className="font-semibold">Bob <span className="font-normal text-muted-foreground">· Defensive Team Member</span></p>
+              <p className="font-semibold">{sc.persona.name} <span className="font-normal text-muted-foreground">· {sc.persona.role}</span></p>
               <div className="mt-1 flex gap-1.5">
-                {["Avoidant", "High Resistance"].map((t) => (
+                {sc.persona.traits.map((t) => (
                   <span key={t} className="rounded-md border border-border bg-secondary/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{t}</span>
                 ))}
               </div>
