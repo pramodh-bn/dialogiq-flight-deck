@@ -1,16 +1,37 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { api } from "@/lib/api";
-import { classifyTurn } from "@/lib/classify";
+import { api, ApiError, type Resistance, type Whisper } from "@/lib/api";
+import {
+  applyTurn,
+  branchChain,
+  failureAction,
+  failureMessage,
+  refreshSession,
+  scenarioQuery,
+  sessionQuery,
+  storeSession,
+  treeQuery,
+  useActionKeys,
+} from "@/lib/practice";
 
-type ArenaSearch = { scenarioId?: number };
+type ArenaSearch = { sessionId?: number | undefined; scenarioId?: number | undefined };
+
+function positiveId(value: unknown): number | undefined {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
 
 export const Route = createFileRoute("/arena")({
-  validateSearch: (search: Record<string, unknown>): ArenaSearch => {
-    const id = Number(search["scenarioId"]);
-    return Number.isInteger(id) && id > 0 ? { scenarioId: id } : {};
+  // Explicit undefined: the router keeps the raw value of any key left out here.
+  validateSearch: (search: Record<string, unknown>): ArenaSearch => ({
+    sessionId: positiveId(search["sessionId"]),
+    scenarioId: positiveId(search["scenarioId"]),
+  }),
+  // Only the Hub starts a run, so there is nothing to show without a session.
+  beforeLoad: ({ search }) => {
+    if (!search.sessionId) throw redirect({ to: "/" });
   },
   head: () => ({
     meta: [
@@ -31,117 +52,197 @@ export const Route = createFileRoute("/arena")({
   component: Arena,
 });
 
-type Msg = { from: "bob" | "you"; text: string };
-type Whisper = { kind: "warn" | "good" | "tip"; text: string };
+type Msg = { from: "persona" | "you"; text: string };
 
-const DEFAULT_SCENARIO_ID = 1;
-const UNREACHABLE: Whisper = { kind: "warn", text: "⚠️ Couldn't reach the simulator. Try again." };
-
-const hints = [
-  "Try: “What's been the hardest part of this quarter for you?”",
-  "Name the emotion: “It sounds like you've felt stretched thin.”",
-  "Invite ownership: “What would a good next step look like from your side?”",
-];
+const RESISTANCE: Record<Resistance, { value: number; label: string }> = {
+  guarded: { value: 90, label: "Guarded" },
+  warming: { value: 55, label: "Warming" },
+  open: { value: 20, label: "Open" },
+};
 
 function Arena() {
-  const { scenarioId = DEFAULT_SCENARIO_ID } = Route.useSearch();
-  const { data: scenarios } = useQuery({
-    queryKey: ["scenarios"],
-    queryFn: () => api.listScenarios(),
+  const { sessionId, scenarioId } = Route.useSearch();
+  if (!sessionId) return null;
+  // Keyed so that switching sessions cannot carry over a draft, reply or whisper.
+  return <ArenaSession key={sessionId} sessionId={sessionId} scenarioId={scenarioId} />;
+}
+
+function ArenaSession({
+  sessionId,
+  scenarioId,
+}: {
+  sessionId: number;
+  scenarioId: number | undefined;
+}) {
+  const client = useQueryClient();
+  const session = useQuery(sessionQuery(sessionId));
+  const tree = useQuery(treeQuery(sessionId));
+  const scenario = useQuery({
+    ...scenarioQuery(session.data?.scenario_id ?? 0),
+    enabled: session.data !== undefined,
   });
-  const scenario = scenarios?.find((s) => s.id === scenarioId);
-  const [sessionId, setSessionId] = useState<number | null>(null);
-  const [pending, setPending] = useState(false);
-  const [msgs, setMsgs] = useState<Msg[]>([
-    {
-      from: "bob",
-      text: "You wanted to see me? If this is about the Q3 thing, I already sent the update.",
-    },
-  ]);
-  const [streaming, setStreaming] = useState("");
+  const keys = useActionKeys();
+  const sending = useRef(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const [typing, setTyping] = useState<{ nodeId: number; text: string; shown: number } | null>(
+    null,
+  );
   const [input, setInput] = useState("");
   const [mic, setMic] = useState(false);
-  const [counts, setCounts] = useState({ open: 0, closed: 0, empathy: 0, turns: 0 });
-  const [whispers, setWhispers] = useState<Whisper[]>([
-    { kind: "tip", text: "Bob is avoidant. Lead with curiosity, not accusations." },
-  ]);
+  const [notes, setNotes] = useState<Whisper[]>([]);
   const [hintIdx, setHintIdx] = useState(0);
   const feed = useRef<HTMLDivElement>(null);
 
+  const typingNodeId = typing?.nodeId;
+  useEffect(() => {
+    if (typingNodeId === undefined) return;
+    const id = setInterval(() => {
+      setTyping((t) => (!t || t.shown + 2 >= t.text.length ? null : { ...t, shown: t.shown + 2 }));
+    }, 25);
+    return () => clearInterval(id);
+  }, [typingNodeId]);
+
+  // The two reads can straddle a change made elsewhere; never render a mix of them.
+  const sessionRevision = session.data?.revision;
+  const treeRevision = tree.data?.revision;
+  const fetching = session.isFetching || tree.isFetching;
+  useEffect(() => {
+    if (sessionRevision === undefined || treeRevision === undefined) return;
+    if (sessionRevision !== treeRevision && !fetching && !sending.current) {
+      void refreshSession(client, sessionId);
+    }
+  }, [client, fetching, sessionId, sessionRevision, treeRevision]);
+
+  const chain = useMemo(() => {
+    if (!tree.data) return [];
+    const branch = tree.data.branches.find((b) => b.id === tree.data.active_branch_id);
+    return branchChain(tree.data.nodes, branch?.head_node_id ?? null);
+  }, [tree.data]);
+
+  const persona = scenario.data?.persona;
+  const msgs: Msg[] = useMemo(() => {
+    const opening: Msg[] = persona ? [{ from: "persona", text: persona.opening_message }] : [];
+    const turns = chain.flatMap((n): Msg[] => [
+      { from: "you", text: n.user_text },
+      {
+        from: "persona",
+        text:
+          n.id === typing?.nodeId
+            ? n.character_text.slice(0, typing.shown) + "▍"
+            : n.character_text,
+      },
+    ]);
+    return [...opening, ...turns];
+  }, [chain, persona, typing]);
+
   useEffect(() => {
     feed.current?.scrollTo({ top: feed.current.scrollHeight, behavior: "smooth" });
-  }, [msgs, streaming]);
+  }, [msgs, pending]);
 
-  useEffect(() => {
-    let live = true;
-    setSessionId(null);
-    api.createSession({ scenario_id: scenarioId }).then(
-      (s) => live && setSessionId(s.id),
-      () => live && setWhispers((p) => [UNREACHABLE, ...p].slice(0, 6)),
-    );
-    return () => {
-      live = false;
-    };
-  }, [scenarioId]);
-
-  const busy = pending || streaming !== "";
-
-  function streamBob(text: string) {
-    let i = 0;
-    const id = setInterval(() => {
-      i += 2;
-      setStreaming(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(id);
-        setStreaming("");
-        setPending(false);
-        setMsgs((m) => [...m, { from: "bob", text }]);
-      }
-    }, 25);
-  }
+  const busy = pending !== null || typing !== null;
+  const ready = session.data !== undefined && tree.data !== undefined && persona !== undefined;
 
   async function send() {
-    const t = input.trim();
-    if (!t || busy || sessionId === null) return;
+    const text = input.trim();
+    if (!text || busy || sending.current || !session.data) return;
+    sending.current = true;
+    const action = `turn:${text}`;
     setInput("");
-    setPending(true);
-    setMsgs((m) => [...m, { from: "you", text: t }]);
-    const { open: isOpen, closed: isClosed, empathy: isEmp } = classifyTurn(t);
-    setCounts((c) => ({
-      open: c.open + (isOpen ? 1 : 0),
-      closed: c.closed + (isClosed ? 1 : 0),
-      empathy: c.empathy + (isEmp ? 1 : 0),
-      turns: c.turns + 1,
-    }));
-    const w: Whisper[] = [];
-    if (isClosed)
-      w.push({
-        kind: "warn",
-        text: "⚠️ Closed question detected. Try rephrasing as an open invitation.",
-      });
-    if (isOpen) w.push({ kind: "good", text: "✓ Open question — Bob's resistance is dropping." });
-    if (isEmp) w.push({ kind: "good", text: "✓ Empathy marker used. Trust +1." });
-    if (!w.length)
-      w.push({
-        kind: "tip",
-        text: "Statement detected. Follow up with a question to keep Bob talking.",
-      });
-    setWhispers((prev) => [...w, ...prev].slice(0, 6));
+    setPending(text);
+    setNotes([]);
     try {
-      const res = await api.sendTurn({ session_id: sessionId, user_message: t });
-      streamBob(res.character_response);
-    } catch {
-      setPending(false);
-      setWhispers((prev) => [UNREACHABLE, ...prev].slice(0, 6));
+      const res = await api.sendTurn(
+        {
+          session_id: sessionId,
+          branch_id: session.data.active_branch_id,
+          parent_node_id: session.data.active_head_node_id,
+          expected_revision: session.data.revision,
+          user_message: text,
+        },
+        keys.keyFor(action),
+      );
+      keys.release(action);
+      storeSession(client, res.session);
+      client.setQueryData(["tree", sessionId], (prev: typeof tree.data) =>
+        prev ? applyTurn(prev, res) : prev,
+      );
+      setTyping({ nodeId: res.turn_id, text: res.character_response, shown: 0 });
+      void refreshSession(client, sessionId);
+    } catch (error) {
+      // The outcome may be unknown, so restore the draft and read the truth back. A
+      // resend of the same text keeps its key, which replays a turn that did commit.
+      if (failureAction(error) !== "retry") keys.release(action);
+      setInput(text);
+      setNotes([{ kind: "warn", text: failureMessage(error) }]);
+      void refreshSession(client, sessionId);
+    } finally {
+      sending.current = false;
+      setPending(null);
     }
   }
 
-  const asked = counts.open + counts.closed;
-  const openPct = asked ? Math.round((counts.open / asked) * 100) : 0;
-  const empathy = counts.turns
-    ? Math.min(100, Math.round((counts.empathy / counts.turns) * 100 + counts.open * 5))
-    : 0;
-  const resistance = Math.max(10, 90 - counts.open * 15 - counts.empathy * 12 + counts.closed * 8);
+  if (session.error || tree.error) {
+    const missing = session.error instanceof ApiError && session.error.status === 404;
+    return (
+      <ArenaMessage
+        title={missing ? "Session not found" : "Couldn't reach the simulator"}
+        detail={
+          missing
+            ? "This session no longer exists. Start a new one from the dashboard."
+            : "Check that the simulator is running, then try again."
+        }
+      >
+        {!missing && (
+          <button
+            onClick={() => void refreshSession(client, sessionId)}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow"
+          >
+            Try again
+          </button>
+        )}
+      </ArenaMessage>
+    );
+  }
+
+  if (scenarioId && session.data && session.data.scenario_id !== scenarioId) {
+    return (
+      <ArenaMessage
+        title="This link points at a different scenario"
+        detail="The session belongs to another scenario, so it was not opened here."
+      >
+        <Link
+          to="/arena"
+          search={{ sessionId }}
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow"
+        >
+          Open the session
+        </Link>
+      </ArenaMessage>
+    );
+  }
+
+  if (scenario.error) {
+    return (
+      <ArenaMessage
+        title="Couldn't load this scenario"
+        detail="The persona details are unavailable, so the session was not opened."
+      />
+    );
+  }
+
+  const metrics = session.data?.metrics;
+  const asked = metrics ? metrics.open_questions + metrics.closed_questions : 0;
+  const openPct = metrics ? Math.round(metrics.open_question_ratio * 100) : 0;
+  const empathy = metrics?.turns ? Math.round((metrics.empathy_turns / metrics.turns) * 100) : 0;
+  const resistance = RESISTANCE[session.data?.resistance ?? "guarded"];
+  const score = session.data?.score ?? 0;
+  const total = session.data?.total_needs ?? 7;
+
+  const whispers: Whisper[] = [
+    ...notes,
+    ...[...chain].reverse().flatMap((n) => n.coaching.whispers),
+    ...(persona ? [{ kind: "tip" as const, text: persona.public_context }] : []),
+  ].slice(0, 6);
 
   return (
     <div className="flex h-screen flex-col bg-background bg-ambient">
@@ -157,12 +258,11 @@ function Arena() {
             <p className="font-mono text-[10px] uppercase tracking-widest text-accent">
               Simulation Arena · Live
             </p>
-            <h1 className="truncate font-semibold">
-              {scenario?.title ?? "Performance Review: Missed Q3 Deadlines"}
-            </h1>
+            <h1 className="truncate font-semibold">{scenario.data?.title ?? "Loading session…"}</h1>
           </div>
           <Link
             to="/flight-recorder"
+            search={{ sessionId }}
             className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5"
           >
             End Simulation &amp; View Flight Tree
@@ -174,15 +274,17 @@ function Arena() {
         <section className="bento flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center gap-3 border-b border-border p-4">
             <div className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-lg font-bold ring-2 ring-accent/40">
-              B
+              {persona?.initials ?? "…"}
             </div>
             <div>
               <p className="font-semibold">
-                Bob{" "}
-                <span className="font-normal text-muted-foreground">· Defensive Team Member</span>
+                {persona?.name ?? "Loading…"}{" "}
+                {persona && (
+                  <span className="font-normal text-muted-foreground">· {persona.role}</span>
+                )}
               </p>
               <div className="mt-1 flex gap-1.5">
-                {["Avoidant", "High Resistance"].map((t) => (
+                {(persona?.tags ?? []).map((t) => (
                   <span
                     key={t}
                     className="rounded-md border border-border bg-secondary/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
@@ -194,17 +296,23 @@ function Arena() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Wave active={busy || mic} />
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {busy ? "BOB SPEAKING" : mic ? "LISTENING" : "IDLE"}
+              <span className="font-mono text-[10px] uppercase text-muted-foreground">
+                {busy ? `${persona?.name ?? "Persona"} speaking` : mic ? "Listening" : "Idle"}
               </span>
             </div>
           </div>
 
           <div ref={feed} className="flex-1 space-y-4 overflow-y-auto p-5">
+            {!ready && <p className="text-sm text-muted-foreground">Loading session…</p>}
             {msgs.map((m, i) => (
               <Bubble key={i} m={m} />
             ))}
-            {busy && <Bubble m={{ from: "bob", text: streaming + "▍" }} />}
+            {pending !== null && (
+              <>
+                <Bubble m={{ from: "you", text: pending }} />
+                <Bubble m={{ from: "persona", text: "▍" }} />
+              </>
+            )}
           </div>
 
           <div className="border-t border-border p-3">
@@ -220,32 +328,32 @@ function Arena() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 rows={1}
+                maxLength={4000}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    send();
+                    void send();
                   }
                 }}
-                placeholder="Respond to Bob…"
+                placeholder={`Respond to ${persona?.name ?? "the persona"}…`}
                 className="max-h-32 min-h-10 flex-1 resize-none rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-primary/60"
               />
               <button
+                disabled={!persona?.practice_hints.length}
                 onClick={() => {
-                  setWhispers((p) =>
-                    [
-                      { kind: "tip" as const, text: "💡 " + hints[hintIdx % hints.length] },
-                      ...p,
-                    ].slice(0, 6),
-                  );
+                  const hints = persona?.practice_hints ?? [];
+                  const hint = hints[hintIdx % hints.length];
+                  if (!hint) return;
+                  setNotes((p) => [{ kind: "tip" as const, text: "💡 " + hint }, ...p].slice(0, 6));
                   setHintIdx((h) => h + 1);
                 }}
-                className="h-10 shrink-0 rounded-lg border border-border px-3 text-sm text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent"
+                className="h-10 shrink-0 rounded-lg border border-border px-3 text-sm text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40"
               >
                 Get Hint
               </button>
               <button
-                onClick={send}
-                disabled={!input.trim() || busy || sessionId === null}
+                onClick={() => void send()}
+                disabled={!input.trim() || busy || !ready}
                 className="h-10 shrink-0 rounded-lg bg-brand px-4 text-sm font-semibold text-primary-foreground glow transition-opacity disabled:opacity-40"
               >
                 Send Response
@@ -263,20 +371,32 @@ function Arena() {
           </div>
           <div className="space-y-4 p-4">
             <Meter
+              label="Needs Uncovered"
+              value={Math.round((score / total) * 100)}
+              display={`${score}/${total}`}
+              hint="Scored by the judge on this branch"
+              tone="accent"
+            />
+            <Meter
               label="Open vs. Closed Ratio"
               value={openPct}
-              hint={`${counts.open} open · ${counts.closed} closed`}
+              hint={
+                asked
+                  ? `${metrics?.open_questions} open · ${metrics?.closed_questions} closed`
+                  : "No questions yet"
+              }
               tone="accent"
             />
             <Meter
               label="Empathy Index"
               value={empathy}
-              hint={`${counts.empathy} empathy markers`}
+              hint={`${metrics?.empathy_turns ?? 0} empathy markers`}
               tone="primary"
             />
             <Meter
-              label="Bob's Resistance"
-              value={resistance}
+              label={`${persona?.name ?? "Persona"}'s Resistance`}
+              value={resistance.value}
+              display={resistance.label}
               hint="Lower is better"
               tone="warning"
             />
@@ -303,6 +423,34 @@ function Arena() {
   );
 }
 
+function ArenaMessage({
+  title,
+  detail,
+  children,
+}: {
+  title: string;
+  detail: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="grid h-screen place-items-center bg-background bg-ambient p-6">
+      <div className="bento max-w-md space-y-3 p-6 text-center">
+        <h1 className="font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+        <div className="flex justify-center gap-2">
+          {children}
+          <Link
+            to="/"
+            className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            ← Dashboard
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Bubble({ m }: { m: Msg }) {
   const you = m.from === "you";
   return (
@@ -319,11 +467,13 @@ function Bubble({ m }: { m: Msg }) {
 function Meter({
   label,
   value,
+  display,
   hint,
   tone,
 }: {
   label: string;
   value: number;
+  display?: string;
   hint: string;
   tone: "accent" | "primary" | "warning";
 }) {
@@ -332,7 +482,7 @@ function Meter({
     <div>
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono font-semibold">{value}%</span>
+        <span className="font-mono font-semibold">{display ?? `${value}%`}</span>
       </div>
       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
         <div
