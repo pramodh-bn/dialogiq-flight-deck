@@ -41,6 +41,30 @@ LEADING = (
     "your fault",
     "just admit",
     "obviously",
+    "why did you",
+    "why didn't you",
+    "why can't you",
+    "why do you always",
+    "how could you",
+    "what were you thinking",
+    "what's wrong with you",
+    "you always",
+    "you never",
+)
+FILLERS = (
+    "so",
+    "and",
+    "but",
+    "okay",
+    "ok",
+    "well",
+    "um",
+    "uh",
+    "hey",
+    "then",
+    "alright",
+    "right",
+    "now",
 )
 
 
@@ -69,7 +93,15 @@ def starts_with(sentence: str, prefixes: tuple[str, ...]) -> bool:
 def decide(text: str, revealed: set[str], stems: dict[str, list[str]]) -> Decision:
     """Apply the document's rules independently of the future backend judge."""
     value = normalize(text)
-    sentences = [s.lstrip(" \"'“”‘’") for s in re.split(r"[.!?]+", value) if s.strip()]
+    sentences = []
+    for segment in re.split(r"[.!?,;:]+", value):
+        sentence = segment.lstrip(" \"'“”‘’")
+        for filler in FILLERS:
+            if re.match(re.escape(filler) + r"(?![a-z0-9])", sentence):
+                sentence = sentence[len(filler) :].lstrip(" \"'“”‘’")
+                break
+        if sentence:
+            sentences.append(sentence)
     if any(starts_with(sentence, OPEN) for sentence in sentences):
         question_type = "open"
     elif any(starts_with(sentence, CLOSED) for sentence in sentences):
