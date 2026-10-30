@@ -59,7 +59,7 @@ function Dashboard() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 md:ml-0">
-            <button className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5">+ New Scenario</button>
+            <Link to="/scenarios" className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5">+ New Scenario</Link>
             <div className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-sm font-semibold ring-2 ring-primary/40">PN</div>
           </div>
         </div>
