@@ -14,6 +14,13 @@
 Read this file before working in this repository. These rules apply to all
 agents, regardless of the tool used. Explicit user instructions take precedence.
 
+## Core Operating Principles (Sprint 2 Retrospective Mandate)
+
+- **Empirical Verification Over Claims:** "Tests pass" and "feature delivered" are claims, not proof. Every delivery must be verified by running the real server, invoked by the real client, from the correct port (`8080` backend / `5173` frontend), in a clean environment.
+- **Upfront API & Port Contracts:** All endpoint paths, payload schemas, and port bindings must be documented in `docs/api_contract.md` before parallel coding begins. No unilateral changes to ports or routes.
+- **Toolchain Preflight:** Always verify the active toolchain (Python virtual environment, Node/npm PATH, environment variables) before writing or testing code.
+- **Strict Worktree Hygiene:** Maintain separate git worktrees per agent. Codex acts as the sole integration gatekeeper merging via clean PRs into `dev`.
+
 ## Isolate each agent's work
 
 - Use a separate Git worktree and task branch for each agent. Separate branches
