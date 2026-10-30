@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts";
 
+import { DemoBadge } from "@/components/DemoBadge";
+
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
@@ -77,8 +79,11 @@ function Analytics() {
       <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-accent">Last 30 days</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Skill Analytics</h1>
-          <p className="text-sm text-muted-foreground">Your communication mastery, measured across every simulation.</p>
+          <div className="mt-1 flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">Skill Analytics</h1>
+            <DemoBadge />
+          </div>
+          <p className="text-sm text-muted-foreground">Sample figures that show this page's design. They are not measured from your simulations.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

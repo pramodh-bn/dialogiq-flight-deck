@@ -1,8 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { api, type Scenario } from "@/lib/api";
+import { DemoBadge } from "@/components/DemoBadge";
+import { api, type PracticeSession, type Scenario } from "@/lib/api";
+import {
+  failureAction,
+  failureMessage,
+  scenariosQuery,
+  sessionsQuery,
+  storeSession,
+  useActionKeys,
+} from "@/lib/practice";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,46 +34,24 @@ export const Route = createFileRoute("/")({
 
 const tabs = ["Active Scenarios", "Skill Analytics", "Past Simulations"];
 
-// Archetypes and progress are not served by the API yet; keep the mock stats keyed by
-// scenario title so cards for unknown scenarios still render with neutral defaults.
-type CardStats = { tags: string[]; score: number; progress: number; last: string };
-const statsByTitle: Record<string, CardStats> = {
-  "Bob: Defensive Team Member": {
-    tags: ["Avoidant", "High Resistance"],
-    score: 6,
-    progress: 86,
-    last: "2h ago",
-  },
-  "Teenage Daughter: Homework Friction": {
-    tags: ["Withdrawn", "Sarcastic"],
-    score: 4,
-    progress: 57,
-    last: "Yesterday",
-  },
-  "Priya: Burnout Disclosure": {
-    tags: ["Guarded", "Emotional"],
-    score: 5,
-    progress: 71,
-    last: "3d ago",
-  },
-  "Vendor: Contract Pushback": {
-    tags: ["Assertive", "Data-driven"],
-    score: 3,
-    progress: 43,
-    last: "5d ago",
-  },
-};
-const newStats: CardStats = { tags: [], score: 0, progress: 0, last: "Not started" };
 const TOTAL_NODES = 7;
 
-function toCard(s: Scenario) {
+// Each card reflects the scenario's latest real session, or nothing yet.
+function toCard(s: Scenario, latest: PracticeSession | undefined) {
+  const score = latest?.score ?? 0;
+  const total = latest?.total_needs ?? TOTAL_NODES;
+  const turns = latest?.metrics.turns ?? 0;
   return {
     id: s.id,
     name: s.title,
     ctx: s.description ?? "",
-    initials: s.title.charAt(0).toUpperCase(),
-    total: TOTAL_NODES,
-    ...(statsByTitle[s.title] ?? newStats),
+    initials: s.persona.initials,
+    tags: s.persona.tags,
+    score,
+    total,
+    progress: Math.round((score / total) * 100),
+    last: !latest ? "Not started" : turns === 1 ? "1 turn" : `${turns} turns`,
+    sessionId: latest?.id,
   };
 }
 
@@ -121,11 +108,36 @@ const statusStyle: Record<string, string> = {
 
 function Dashboard() {
   const [tab, setTab] = useState(tabs[0]);
-  const { data, isPending, isError } = useQuery({
-    queryKey: ["scenarios"],
-    queryFn: () => api.listScenarios(),
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  const keys = useActionKeys();
+  const [starting, setStarting] = useState<number | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const { data, isPending, isError } = useQuery(scenariosQuery());
+  const sessionLists = useQueries({
+    queries: (data ?? []).map((s) => sessionsQuery(s.id)),
   });
-  const scenarios = (data ?? []).map(toCard);
+  const scenarios = (data ?? []).map((s, i) => toCard(s, sessionLists[i]?.data?.[0]));
+
+  async function startSession(scenarioId: number) {
+    if (starting !== null) return;
+    const action = `new:${scenarioId}`;
+    setStarting(scenarioId);
+    setStartError(null);
+    try {
+      const session = await api.createSession({ scenario_id: scenarioId }, keys.keyFor(action));
+      keys.release(action);
+      storeSession(client, session);
+      void client.invalidateQueries({ queryKey: ["sessions", scenarioId] });
+      await navigate({ to: "/arena", search: { sessionId: session.id } });
+    } catch (error) {
+      if (failureAction(error) !== "retry") keys.release(action);
+      setStartError(failureMessage(error));
+    } finally {
+      setStarting(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background bg-ambient">
       <header className="sticky top-0 z-20 border-b border-border bg-background/70 backdrop-blur-xl">
@@ -179,9 +191,7 @@ function Dashboard() {
             THURSDAY · CONVERSATION DECK
           </p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Welcome back, Pramodh</h1>
-          <p className="text-sm text-muted-foreground">
-            {scenarios.length} active scenarios · 2 breakthroughs this week
-          </p>
+          <p className="text-sm text-muted-foreground">{scenarios.length} active scenarios</p>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-3">
@@ -196,6 +206,7 @@ function Dashboard() {
                 Couldn't load scenarios from the simulator.
               </p>
             )}
+            {startError && <p className="mb-3 text-sm text-destructive">{startError}</p>}
             <div className="grid gap-4 sm:grid-cols-2">
               {scenarios.map((s) => (
                 <article
@@ -235,19 +246,40 @@ function Dashboard() {
                     <span>{s.last}</span>
                   </div>
                   <div className="mt-4 flex gap-2">
-                    <Link
-                      to="/arena"
-                      search={{ scenarioId: s.id }}
-                      className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
+                    <button
+                      onClick={() => void startSession(s.id)}
+                      disabled={starting !== null}
+                      className="flex-1 rounded-lg border border-primary/40 px-3 py-2 text-center text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
                     >
-                      Resume Practice
-                    </Link>
-                    <Link
-                      to="/flight-recorder"
-                      className="flex-1 rounded-lg border border-border px-3 py-2 text-center text-xs font-medium text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent"
-                    >
-                      View Branch Tree
-                    </Link>
+                      {starting === s.id ? "Starting…" : "New Session"}
+                    </button>
+                    {s.sessionId ? (
+                      <>
+                        <Link
+                          to="/arena"
+                          search={{ sessionId: s.sessionId }}
+                          className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
+                        >
+                          Resume Practice
+                        </Link>
+                        <Link
+                          to="/flight-recorder"
+                          search={{ sessionId: s.sessionId }}
+                          className="flex-1 rounded-lg border border-border px-3 py-2 text-center text-xs font-medium text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent"
+                        >
+                          View Branch Tree
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 cursor-not-allowed rounded-lg bg-primary/40 px-3 py-2 text-center text-xs font-semibold text-primary-foreground/70">
+                          Resume Practice
+                        </span>
+                        <span className="flex-1 cursor-not-allowed rounded-lg border border-border px-3 py-2 text-center text-xs font-medium text-muted-foreground">
+                          View Branch Tree
+                        </span>
+                      </>
+                    )}
                   </div>
                 </article>
               ))}
@@ -255,7 +287,10 @@ function Dashboard() {
           </section>
 
           <section className="bento flex flex-col p-5">
-            <h2 className="font-semibold">Conversational Competency</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">Conversational Competency</h2>
+              <DemoBadge />
+            </div>
             <p className="text-xs text-muted-foreground">Open-ended question ratio · today</p>
             <div className="relative mx-auto my-6 h-44 w-44">
               <svg viewBox="0 0 100 100" className="-rotate-90">
@@ -304,7 +339,10 @@ function Dashboard() {
 
           <section className="bento overflow-hidden lg:col-span-3">
             <div className="flex items-center justify-between p-5 pb-3">
-              <h2 className="font-semibold">Recent Conversation History</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold">Recent Conversation History</h2>
+                <DemoBadge />
+              </div>
               <button className="text-xs text-accent hover:underline">View all</button>
             </div>
             <div className="overflow-x-auto">
