@@ -1,0 +1,578 @@
+{
+  "revision": "cs36-r2",
+  "note": "Contract reference fixtures only. Codex-authored examples are regression coverage, not independent calibration or runtime proof.",
+  "cases": [
+    {
+      "name": "natural-bob",
+      "scenario": "Bob",
+      "turns": [
+        {
+          "text": "What's been going on with the Q3 deadlines?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What has made it so tough to keep up?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "That sounds really frustrating. How have you felt about bringing this up?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How has this affected the rest of your week?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What would make the priorities feel fair to you?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How could I support you when two requests collide?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What would you like to try first?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "natural-daughter",
+      "scenario": "Daughter",
+      "turns": [
+        {
+          "text": "How was school today?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What parts have been stressing you out?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How's it felt when we argue about your phone?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What is the toll of these arguments on your evenings?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What would feel fair for both of us?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What could we do differently when homework runs late?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What would you like to try for a week?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "natural-priya",
+      "scenario": "Priya",
+      "turns": [
+        {
+          "text": "What's a normal week looking like right now?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What commitments are you struggling to juggle?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How have you been feeling before work?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What has this been costing you outside work?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What needs to be protected for this to feel sustainable?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "That sounds exhausting. How could I help take something off your plate?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What first step would make tomorrow easier?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "natural-vendor",
+      "scenario": "Vendor",
+      "turns": [
+        {
+          "text": "How are you seeing the current contract conversation?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What pressure are the delivery commitments putting on your team?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How worried are you about us reading the price change as bad faith?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What consequences would keeping the current terms have for the partnership?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What would make the revised terms fair to both sides?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What options would help us keep working together?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What can we agree to try before the next check-in?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "scripted",
+      "scenario": "Bob",
+      "turns": [
+        {
+          "text": "What has this situation been like for you?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What has been the hardest part?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How does that make you feel?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How does that affect you?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What matters most to you here?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What support would help?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What next step could we agree on?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "poor-closed",
+      "scenario": "Bob",
+      "turns": [
+        {
+          "text": "Did you finish it?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "Did you finish it?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "Did you finish it?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "Did you finish it?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "Did you finish it?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "Did you finish it?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "Did you finish it?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "repeated-opener",
+      "scenario": "Daughter",
+      "turns": [
+        {
+          "text": "What happened?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What happened?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What happened?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What happened?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What happened?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What happened?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What happened?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "closed-cues-and-blame",
+      "scenario": "Priya",
+      "turns": [
+        {
+          "text": "Did the work get done?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "Did that affect you?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": false
+        },
+        {
+          "text": "You must feel worried.",
+          "new_need": null,
+          "question_type": "statement",
+          "leading": true
+        },
+        {
+          "text": "What's obviously your fault?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "Don't you need support?",
+          "new_need": null,
+          "question_type": "closed",
+          "leading": true
+        },
+        {
+          "text": "What do you think you should do?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        }
+      ]
+    },
+    {
+      "name": "out-of-order",
+      "scenario": "Vendor",
+      "turns": [
+        {
+          "text": "What happened?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How could we support you?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How has that affected you?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What is hardest?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "How have you felt?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What needs attention?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What plan could work?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "contractions-and-sentences",
+      "scenario": "Daughter",
+      "turns": [
+        {
+          "text": "“What’s been going on?”",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "That sounds frustrating. How could I support you?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "Did it happen? How's it felt?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "That's difficult. What's been hardest?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "inflection-affected",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What affected would you like to talk about?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "inflection-felt",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What felt would you like to talk about?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "inflection-needs",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What needs would you like to talk about?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "inflection-costing",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What costing would you like to talk about?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "inflection-helped",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What helped would you like to talk about?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "inflection-struggling",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What struggling would you like to talk about?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "inflection-plans",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What plans would you like to talk about?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "prefix-and-unrelated",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What happened?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "Whatification is not a question.",
+          "new_need": null,
+          "question_type": "statement",
+          "leading": false
+        },
+        {
+          "text": "Somewhat difficult.",
+          "new_need": null,
+          "question_type": "statement",
+          "leading": false
+        }
+      ]
+    }
+  ]
+}

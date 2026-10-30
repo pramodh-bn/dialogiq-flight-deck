@@ -6,7 +6,9 @@ Run by Codex on 2026-10-30, task branch `codex/cs36-api-contract`, based on
 ## Environment and setup
 
 - Own worktree: `D:/Workspace/meta-hackathon/dialogiq-flight-deck/.worktrees/cs36`.
-- Own fresh Python environment: backend/.venv, Python 3.15.1.
+- Own fresh Python environment: backend/.venv, Python 3.15.0 (rechecked during r2).
+  The original checkout's environment reported 3.15.1; r1 mistakenly attributed
+  that patch version to this worktree. This corrects the environment record.
 - Explicit installed Node v26.13.0 / npm 11.20.0. Default NVM shim had no active
   version; no global environment change was made.
 - `pip install -r backend/requirements.txt` succeeded. Direct dependencies are
@@ -72,3 +74,22 @@ were made, and no browser interaction was performed.
 The contract marks all new endpoints and extended DTOs planned. Claude and Muse
 review/ownership acknowledgment remain required. No approval, integration or
 CS-36 delivery is claimed by these checks.
+
+## Revision 2 reference checks
+
+After Muse CS-C139 and Claude CS-C140/141, r2 changes only contract material;
+the prior real baseline was not repeated against its now-existing database.
+The reference interpreter at scripts/check_cs36_contract.py reads the revised
+stem table from the contract and checks docs/cs36-judge-fixtures.json.
+
+Initial reference run passed: 8 JSON examples, 18 cases, 76 turns. Codex-authored
+natural transcripts for Bob, Daughter, Priya and Vendor each reached 7/7 with
+expected per-turn discoveries. Other cases cover contractions, acknowledgment
+then question, out-of-order discoveries, inflections, repeated generic opener,
+closed turns containing cues, statements, and leading/blaming turns. These are
+regression examples, not Claude's original transcripts or independent scoring
+calibration. The reference interpreter is not the application judge.
+
+Initial checker lint flagged the re.S alias and formatting; corrected before
+final checks. Exact final check results and re-review handoff are in the journal.
+No app suites, paid calls, browser interaction, or new runtime behavior claimed.

@@ -6,12 +6,13 @@ Date: 2026-10-30. Agent: Codex. Task: CS-36 (active, not delivered).
 
 - Worktree: `D:/Workspace/meta-hackathon/dialogiq-flight-deck/.worktrees/cs36`.
 - Branch: `codex/cs36-api-contract`, based on `dev` commit `0ed9284`.
-- Draft: `docs/api_contract.md`, revision 1, pending Claude/Muse review.
+- Draft: `docs/api_contract.md`, revision 2, pending Claude/Muse re-review.
 - No runtime application changes. No live model calls. Draft is prepared for
   review; inspect task branch history/Megillah for its eventual commit reference.
 - Baseline and document checks passed; evidence: `docs/cs36-evidence.md`.
-- Next: Claude and Muse review the full contract and acknowledge file ownership.
-  Resolve their findings, then record acceptance and deliver CS-36 separately
+- Next: Claude and Muse re-review r2's resolutions of CS-C139/140/141. Ownership
+  was acknowledged with file corrections; r1 was not accepted. Resolve findings,
+  then record acceptance and deliver CS-36 separately
   from PR integration. Do not infer approval or deliver because the draft exists.
 - Replay this worktree only after reading its journal/evidence: its ignored
   database now exists, so the fresh-baseline checker intentionally refuses a
@@ -59,7 +60,8 @@ was inspected. Existing sibling Codex Sprint 1 worktree was not modified.
    regex classifier, Vite config, database path, baseline verifier and ignore rules.
 5. Toolchain preflight: NVM `.nodejs` shim reports no active version, npm absent
    from default PATH. Explicit installed path works: Node v26.13.0, npm 11.20.0;
-   Python 3.15.1. Do not change machine-wide Node configuration.
+   Python 3.15.1 in the original checkout. R2 rechecked the new task venv as
+   Python 3.15.0 and corrected its evidence record. Do not change global tools.
 6. Sandbox denied creation of this worktree's venv/node_modules; approved
    escalation installed a fresh backend/.venv from backend/requirements.txt and
    ran npm ci --ignore-scripts. Both completed successfully. npm reported two
@@ -96,7 +98,7 @@ was inspected. Existing sibling Codex Sprint 1 worktree was not modified.
 
 ## Review handoff
 
-Read `docs/api_contract.md` (draft revision 1), then `docs/cs36-evidence.md`.
+Read `docs/api_contract.md` (draft revision 2), then `docs/cs36-evidence.md`.
 Files in this task: those documents, this journal, and the focused baseline
 checker. Review decisions must be explicit comments on CS-36. Claude should
 check UI/DTO completeness, resume URL, duplicate actions and stale/replayed state.
@@ -106,6 +108,47 @@ Both should review deterministic lexical rules/fixtures and ownership. They are
 proposals, not reviewer-approved product behavior. No dependent runtime coding
 has begun here. No PR merge/main change is authorized or claimed by this journal.
 
+## Revision 2 work and handoff
+
+R1 was committed/pushed as f54fdef33a511a0688a82eb3e92ccd5aa45620bf and draft
+PR #3 opened into dev: https://github.com/pramodh-bn/dialogiq-flight-deck/pull/3.
+Megillah attachments CS-A14/15/16 preserve r1 contract/evidence/journal; claim
+CS-C136, path correction CS-C137, review handoff CS-C138. Parent Oct 30 journal
+also records the initial work, commit/PR/attachments and claim clarification.
+
+User sent validation requests. Read the full reviews: Muse CS-C139 conditional
+approval requires F1–F4; Claude CS-C140 requests changes, CS-C141 corrects timing
+and the classifier-boundary difference. User forwarded both reviews and asked
+status; stated honestly r2 was in progress and CS-36 not done. No dependent work
+was started. Rechecked own branch/status/worktree list and toolchain before r2.
+
+R2 decisions: retain generic cues for Sprint 2 as an explicit limited category
+heuristic; support contractions and questions after acknowledgments; open-only
+eligibility; n1 any eligible open; inflected stem matching; no enforced need
+prerequisites; maximum one reveal/turn. Add one natural transcript per scenario
+plus negative, repeated-opener and out-of-order regression fixtures. These are
+Codex-authored examples, not independent calibration or Claude's test transcripts.
+
+Added public persona tags; scenario session-list endpoint for clean-browser Hub
+resume; actual /flight-recorder route/file; deterministic outcome/leading/
+alternatives; explicit include-versus-retry mapping for both recorder buttons.
+Kept the reviewed idempotency/revision/atomic-turn/HTTP error policy unchanged.
+
+Muse boundaries resolved in draft: backward-compatible newly_revealed_titles
+and timeout keywords; Codex owns conversation_context.py node→message assembly;
+Muse owns prompt construction and typed PersonaError subclasses; route maps
+those types to safe errors. Muse authors persona_fixtures.json wording; Codex
+reviews/loads it and owns fixed needs. Claude file ownership now includes
+flight-recorder.tsx, classify.ts and analytics.tsx demo-only labeling.
+
+Added docs/cs36-judge-fixtures.json and scripts/check_cs36_contract.py (reference
+interpreter, not runtime judge). First run: 8 JSON blocks, 18 cases, 76 turns,
+all four natural examples 7/7, each expected per-turn reveal/class/leading match.
+Initial lint flagged re.S alias/format; corrected before final validation.
+Corrected r1 environment attribution: fresh task venv is Python3.15.0; initial
+3.15.1 output was the original checkout's venv. Do not rewrite published commits;
+r2 is a follow-up commit, same unmerged draft PR. Re-review still required.
+
 ## Boundaries and outstanding acceptance
 
 Do not expand into CS-39/41/42 runtime implementation under CS-36. Preserve
@@ -113,10 +156,18 @@ Lovable history/UI. Separate worktrees and local environments are mandatory.
 Codex owns backend foundation/integration; Muse owns persona module/provider
 tests; Claude owns frontend/typed API/mock. No parallel edits to shared files.
 
-Actual Claude and Muse contract reviews are mandatory and have not occurred in
-this session. No subagents have been spawned. Record a review handoff rather
-than inventing reviewer feedback. CS-36 delivery is separate from integration;
-never mark delivered while this acceptance remains unsatisfied.
+Actual Claude and Muse reviews occurred on r1; neither gave unconditional
+approval. Their re-review of r2 remains mandatory. No subagents have been
+spawned. Record actual findings rather than inventing feedback. CS-36 delivery
+is separate from integration; never mark delivered with acceptance outstanding.
 
 Keep future consequential results below and in Megillah. Record only checks
 actually run, and distinguish the real HTTP adapter from visual browser QA.
+
+Final r2 checks: scripts/check_cs36_contract.py passed all 18 cases/76 turns
+and 8 JSON examples after formatting; Ruff lint and format checks passed for
+both added scripts; Prettier check passed all four documents/fixture files;
+git diff --check passed. Reviewed full contract diff; no runtime app files
+changed. No new server/browser/model/app-suite run. Next: publish this follow-up
+and attach r2 contract/fixtures/reference source/evidence/journal to CS-36 for
+explicit Claude/Muse re-review. Do not mark delivered until findings are resolved.

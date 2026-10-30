@@ -1,6 +1,6 @@
 # DialogIQ V2 API contract
 
-CS-36 · Codex · 2026-10-30 · revision 1, **draft pending Claude/Muse review**.
+CS-36 · Codex · 2026-10-30 · revision 2, **draft pending Claude/Muse re-review**.
 
 This document is the proposed Sprint 2 implementation agreement for CS-39,
 CS-41 and CS-42. It supersedes the port examples in the Sprint 1 report and
@@ -18,6 +18,7 @@ Baseline inspected: `dev` at `0ed9284`. Current behavior:
 | `GET /api/scenarios`                   | Public id/title/description array                                     | Add public persona fields                             |
 | `GET /api/scenarios/{id}`              | Absent                                                                | Public scenario detail                                |
 | `POST /api/sessions`                   | Creates demo-user session; score 0                                    | Idempotent creation and snapshot                      |
+| `GET /api/sessions?scenario_id={id}`   | Absent                                                                | List scenario sessions for Hub resume                 |
 | `GET /api/sessions/{id}`               | Absent                                                                | Resume persisted active branch                        |
 | `POST /api/chat/turn`                  | Fixed reply, turn_id 1, score 3; no session validation or persistence | Atomic persisted persona turn and deterministic judge |
 | `GET /api/sessions/{id}/tree`          | Absent                                                                | Real persisted tree and all branches                  |
@@ -48,7 +49,7 @@ node --version
 npm.cmd --version
 py -3.15 -m venv backend/.venv
 backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
-npm.cmd ci
+npm.cmd ci --ignore-scripts
 ```
 
 Backend terminal, from root:
@@ -122,22 +123,23 @@ in Sprint 3 and does not block deterministic Sprint 2 coaching.
 The following field lists are exhaustive; each listed field is required.
 Arrays may be empty. Objects must not expose ORM rows wholesale.
 
-| DTO          | Fields and meanings                                                                                                                                                           |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scenario     | `id`, `title` string, `description` string or null, `persona` Persona                                                                                                         |
-| Persona      | `name`, `role`, `initials`, `opening_message`, `public_context` (strings); `practice_hints` string array of generic communication advice                                      |
-| RevealedNeed | `id` string (scenario-local `n1`…`n7`), `title` string, `description` string; only actually revealed entries                                                                  |
-| Metrics      | `turns`, `open_questions`, `closed_questions`, `empathy_turns` (nonnegative integers); `open_question_ratio` number 0–1, open/(open+closed), 0 when denominator is 0          |
-| Coaching     | `source` literal `deterministic`; `question_type` `open`/`closed`/`statement`; `empathy` boolean; `whispers` array of Whisper                                                 |
-| Whisper      | `kind` `good`/`warn`/`tip`, `text` string                                                                                                                                     |
-| State        | `score` integer 0–7, `total_needs` literal 7, `revealed_needs` RevealedNeed array in n1…n7 order, `resistance` `guarded`/`warming`/`open`, `metrics` Metrics                  |
-| Session      | `id`, `scenario_id`, `active_branch_id`, `active_head_node_id` (node ID or null), `revision`, plus all State fields                                                           |
-| Node         | `id`, `session_id`, `parent_id` (node ID or null), `turn_number` (chain depth, starts 1), `user_text`, `character_text` (strings), `coaching` Coaching, plus all State fields |
-| Branch       | `id`, `session_id`, `fork_node_id` (node ID or null), `head_node_id` (node ID or null), plus all State fields                                                                 |
-| Tree         | `session_id`, `revision`, `active_branch_id`, `branches` Branch array, `nodes` Node array                                                                                     |
+| DTO          | Fields and meanings                                                                                                                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scenario     | `id`, `title` string, `description` string or null, `persona` Persona                                                                                                                                                |
+| Persona      | `name`, `role`, `initials`, `opening_message`, `public_context` (strings); `tags` string array of public display traits; `practice_hints` string array of generic communication advice                               |
+| RevealedNeed | `id` string (scenario-local `n1`…`n7`), `title` string, `description` string; only actually revealed entries                                                                                                         |
+| Metrics      | `turns`, `open_questions`, `closed_questions`, `empathy_turns` (nonnegative integers); `open_question_ratio` number 0–1, open/(open+closed), 0 when denominator is 0                                                 |
+| Coaching     | `source` literal `deterministic`; `question_type` `open`/`closed`/`statement`; `empathy` and `leading` booleans; `outcome` `breakthrough`/`deadend`/`neutral`; `alternatives` string array; `whispers` Whisper array |
+| Whisper      | `kind` `good`/`warn`/`tip`, `text` string                                                                                                                                                                            |
+| State        | `score` integer 0–7, `total_needs` literal 7, `revealed_needs` RevealedNeed array in n1…n7 order, `resistance` `guarded`/`warming`/`open`, `metrics` Metrics                                                         |
+| Session      | `id`, `scenario_id`, `active_branch_id`, `active_head_node_id` (node ID or null), `revision`, plus all State fields                                                                                                  |
+| Node         | `id`, `session_id`, `parent_id` (node ID or null), `turn_number` (chain depth, starts 1), `user_text`, `character_text` (strings), `coaching` Coaching, plus all State fields                                        |
+| Branch       | `id`, `session_id`, `fork_node_id` (node ID or null), `head_node_id` (node ID or null), plus all State fields                                                                                                        |
+| Tree         | `session_id`, `revision`, `active_branch_id`, `branches` Branch array, `nodes` Node array                                                                                                                            |
 
-No timestamps, branch names, arbitrary tags, resistance percentages or empathy
-percentages are required by the UI. Use actual metrics and resistance enum
+Persona.tags is required display data, never private personality instructions.
+No timestamps, branch names, resistance percentages or empathy percentages
+are required in the DTOs. Use actual metrics and resistance enum
 instead of inventing numeric model outputs. Node and branch State snapshots
 reflect only their prefix and must survive reload unchanged.
 
@@ -159,6 +161,7 @@ Example detail (illustrative ID; use returned IDs):
     "name": "Bob",
     "role": "Team member",
     "initials": "B",
+    "tags": ["Guarded", "Performance review"],
     "opening_message": "You wanted to see me? If this is about Q3, I already sent the update.",
     "public_context": "You are meeting to discuss missed deadlines.",
     "practice_hints": ["Invite their perspective before proposing a solution."]
@@ -168,7 +171,10 @@ Example detail (illustrative ID; use returned IDs):
 
 Each seeded scenario must have a matching public persona and distinct opening;
 do not substitute Bob for Daughter, Priya or Vendor. Private seed content is
-specified below; persona wording beyond the example belongs to CS-39/42.
+specified below. Muse authors per-scenario public/private persona wording in
+`backend/persona_fixtures.json` under CS-39; Codex loads the fixture in seed.py
+under CS-42. The public example illustrates shape, not frozen copy. See the
+persona handoff below for the exact fixture fields and ownership.
 
 ### Create and resume
 
@@ -181,14 +187,26 @@ specified below; persona wording beyond the example belongs to CS-39/42.
 → 201 Session, also on replay. Create exactly one initial branch with null fork
 and head, score 0, no revealed needs, guarded resistance, zero metrics, revision 0.
 Unknown scenario → 404. Explicit New Session is the only UI action that creates
-a run. Keep one key for duplicate StrictMode mounts/retries; navigation alone
-must not create sessions. Client stores returned session ID in the Arena URL
+a run. The Hub action creates it with one key retained across retries/double
+submissions; Arena only resumes by GET, never POST on mount. Navigation or
+StrictMode remounts must not create sessions. Client stores returned session
+ID in the Arena URL
 `/arena?sessionId=12`, with optional scenarioId only as a consistency check.
 
 `GET /api/sessions/12` → 200 Session; 404 if absent. No side effects.
 Resume by GET, then get tree to render the selected branch's ancestor chain
 and prepend scenario.opening_message. A scenarioId mismatch must show an error
 or redirect to the session's actual scenario, never silently mix personas.
+
+Hub data source: `GET /api/sessions?scenario_id=1` → 200 Session array for the
+local demo user and selected scenario, newest first by created_at descending
+then id descending. The required query scenario_id is a positive safe integer;
+missing/invalid or unknown query fields → 422 validation_error. Unknown scenario
+→ 404 scenario_not_found; known scenario with no runs → `[]`. No side effects,
+pagination or authentication addition. Each item reflects its persisted active
+branch State. The Hub uses the first item for Resume Practice and View Branch
+Tree, or disables those actions when empty; New Session remains explicit.
+A clean browser can resume without invented localStorage/session caches.
 
 Initial Session example:
 
@@ -270,6 +288,9 @@ Complete success example:
       "source": "deterministic",
       "question_type": "open",
       "empathy": false,
+      "leading": false,
+      "outcome": "breakthrough",
+      "alternatives": ["What else would you like to share?"],
       "whispers": [{ "kind": "good", "text": "Open invitation: leave room for their perspective." }]
     },
     "score": 1,
@@ -344,6 +365,13 @@ To retry node 81's question, rewind to its parent, not 81. Null target starts
 before every user turn, retaining only public opening dialogue and zero State.
 Rewinding the current head still creates a new branch, as explicitly requested.
 
+UI mapping is explicit: **Branch from here** sends the selected node ID as
+rewind_to_node_id (include this exchange; continue after it). **Rewind to this
+node** sends its parent_id (exclude/retry this exchange; null for turn 1).
+Both use a source branch whose ancestor chain contains the selected node,
+preferring the active branch; otherwise choose the lowest-id containing branch.
+Disable actions until the real tree is loaded. Do not invent a second endpoint.
+
 Example: old path 81→82→83, rewind inclusive to 81, submit alternate turn 84:
 old branch remains headed at 83; new branch heads at 84 with parent_id 81.
 No reveal from 82 or 83 may appear on 84 unless earned again by its own path.
@@ -356,7 +384,8 @@ No reveal from 82 or 83 may appear on 84 unless earned again by its own path.
 
 → 200 Session; selecting an existing branch resumes at its stored head and State.
 No node/branch is created and no model call occurs. Revision becomes 6 unless
-already active. `/recorder?sessionId=12` identifies the real session. Arena resume
+already active. `/flight-recorder?sessionId=12` identifies the real session.
+Arena resume
 uses the persisted active branch after selection; never navigate with mock data.
 
 ## Duplicate requests, conflicts and error responses
@@ -417,46 +446,65 @@ Mutation responses have no hidden key/ref reveal in error messages.
 
 ## Deterministic judge and proof fixtures
 
-Sprint 2 uses a fixed chain of seven scorable needs for each scenario: n1 has
-no prerequisite; n2 requires n1; …; n7 requires n6. The model never creates,
-reorders, deletes or scores needs. No semantic model classifier is required.
-This is a deliberately limited, reproducible lexical baseline, not a claim
-to understand every meaningful paraphrase.
+Sprint 2 uses seven fixed scorable needs per scenario, with **no prerequisite
+edges or enforced reveal order**. n1 is an initial invitation; n2…n7 are distinct
+need categories. The model never creates, reorders, deletes or scores needs.
+Generic cues are an explicit Sprint 2 scope decision: the same eligible
+questions can earn all seven categories in each scenario, revealing that
+scenario's different fixed content. This is not scenario-specific semantic
+understanding. Do not add a model judge or scenario-specific cue calibration
+under CS-36; disclose this limitation in demo evidence.
 
-Normalize judge input by Unicode NFKC, lowercase, convert curly apostrophes to
-ASCII, collapse whitespace, strip surrounding whitespace. Match phrases with
-word boundaries (ASCII letters/digits/apostrophes count as word characters).
-Classify in this order:
+Normalize input by Unicode NFKC, lowercase, convert curly apostrophes to ASCII,
+collapse whitespace and strip surrounding whitespace. Classify each nonempty
+sentence after splitting on one or more of `.`, `!`, `?`; trim whitespace and
+leading straight or curly single/double quotation marks on each sentence.
 
-1. `open`: starts with one of `what`, `how`, `why`, `tell me`, `help me`,
-   `walk me`, `describe`, `in what` at a word boundary.
-2. Otherwise `closed`: starts with `do`, `does`, `did`, `is`, `are`, `was`,
-   `were`, `can`, `could`, `will`, `would`, `should`, `have`, `has`, `had`,
-   `won't`, `don't`, `isn't`, `aren't` at a word boundary.
-3. Otherwise `statement`. A question mark alone does not determine the class.
+A sentence is open if it begins with `what`, `how`, `why`, `tell me`,
+`help me`, `walk me`, `describe`, or `in what`. Otherwise it is closed if
+it begins with `do`, `does`, `did`, `is`, `are`, `was`, `were`,
+`can`, `could`, `will`, `would`, `should`, `have`, `has`, `had`,
+`won't`, `don't`, `isn't`, or `aren't`. Prefixes must end at the end of
+the sentence or before a non-ASCII-letter/digit character; apostrophes are
+boundaries **for classification**, so "What's" and "How's" are open. This
+intentionally fixes r1's contraction regression. A turn is open if any sentence
+is open, else closed if any is closed, else statement. A question mark alone
+does not determine class. "That sounds frustrating. How could I support you?"
+is open. No requirement to reorder an acknowledgment before a question.
 
-An open turn is ineligible for a reveal if it contains a bounded phrase
-`don't you`, `isn't it`, `you should`, `you must`, `your fault`, `just admit`,
-or `obviously`. This is the deterministic leading/blame filter. It does not
-change question_type or metric counts. No empathy prerequisite is imposed.
+`leading` is true if the normalized whole turn contains a bounded phrase
+`don't you`, `isn't it`, `you should`, `you must`, `your fault`,
+`just admit`, or `obviously`. At each phrase edge, ASCII letters/digits/
+apostrophes count as word characters. This bounded-phrase rule applies only
+to the leading filter, not the different classifier/stem boundary rules.
+Set leading on **all** turn classes; it does not alter question_type or
+metric counts.
 
-Find the first unrevealed need in n1…n7 order whose prerequisite was revealed
-**before** this turn. Reveal it only if the turn is eligible and contains at
-least one of that need's cue phrases below. Maximum one reveal per turn.
-Do not skip it to reveal a later need. Otherwise reveal nothing. Once at 7,
-continue conversation/coaching with score 7. Score is independent of persona
-wording, model availability and repeated cue occurrences; a provider failure
-does not commit a candidate reveal.
+A turn is eligible **only if question_type is open and leading is false**.
+Closed and statement turns reveal nothing even when they contain a cue.
+No empathy prerequisite is imposed. Select at most one new need:
+if n1 is unrevealed, any eligible open turn reveals n1 and no other need.
+Otherwise choose the lowest-numbered unrevealed n2…n7 matching at least one
+stem below anywhere in the normalized turn. Skip unmatched/revealed needs;
+there is no prerequisite chain. A stem matches the beginning of an ASCII
+alphabetic token (tokens are maximal runs of a–z); no suffix restriction.
+Thus affected→affect, felt→felt, needs→need, costing→cost, helped→help.
+A turn containing several stems still earns at most one need.
 
-| Need | Matching cues (any one)                                       | Proof question, in order                   |
-| ---- | ------------------------------------------------------------- | ------------------------------------------ |
-| n1   | `quarter`, `day`, `work`, `situation`, `experience`, `lately` | What has this situation been like for you? |
-| n2   | `hardest`, `difficult`, `challenge`, `pressure`               | What has been the hardest part?            |
-| n3   | `feel`, `feeling`, `worry`, `worried`                         | How does that make you feel?               |
-| n4   | `impact`, `affect`, `cost`, `consequence`                     | How does that affect you?                  |
-| n5   | `need`, `matter`, `matters`, `important`, `value`             | What matters most to you here?             |
-| n6   | `support`, `help`, `change`, `different`                      | What support would help?                   |
-| n7   | `next`, `step`, `plan`, `agree`                               | What next step could we agree on?          |
+Otherwise reveal nothing. At 7 continue dialogue/coaching with score 7.
+Score is independent of model wording and repeated cues. A provider failure
+does not commit a candidate reveal. Returned revealed_needs remain sorted
+by ID, even if discovery happened out of order.
+
+| Need | Matching stems (any one)                                                  | Proof question, in order                   |
+| ---- | ------------------------------------------------------------------------- | ------------------------------------------ |
+| n1   | Any eligible open turn                                                    | What has this situation been like for you? |
+| n2   | `hard`, `difficult`, `challeng`, `pressure`, `tough`, `struggl`, `stress` | What has been the hardest part?            |
+| n3   | `feel`, `felt`, `worr`, `afraid`, `scared`                                | How does that make you feel?               |
+| n4   | `impact`, `affect`, `cost`, `consequence`, `toll`                         | How does that affect you?                  |
+| n5   | `need`, `matter`, `important`, `value`, `fair`                            | What matters most to you here?             |
+| n6   | `support`, `help`, `change`, `different`, `option`                        | What support would help?                   |
+| n7   | `next`, `step`, `plan`, `agree`, `try`, `first`                           | What next step could we agree on?          |
 
 The seven fixed private seed needs use these exact titles and descriptions.
 They are design fixtures, not secrets or client-side seed data. Only earned
@@ -485,46 +533,127 @@ normalized text contains any substring `understand`, `sounds like`, `i hear`,
 `feel`, `frustrat`, `appreciate`, `makes sense`, `tough`, `hard` (matching the
 existing simple empathy heuristic). Counts and ratios are computed server-side.
 
+Known heuristic limits: "hardest" counts as empathy through substring "hard",
+and "Do you understand?" counts through "understand"; do not interpret the
+empathy counter as measured understanding. "What do you think you should do?"
+is leading by this rule and can be a false warning.
+
+Coaching outcome is breakthrough if this turn committed a new reveal, else
+deadend if question_type is closed or leading is true, else neutral.
+The UI derives its pedagogical tag from question_type/empathy and blind spots
+from leading/question_type across the selected chain. No hidden-state inference.
+
+Alternatives are fixed generic templates, independent of scenario, cues,
+candidate/hidden needs or sibling dialogue. Return exactly a one-string array,
+with precedence: leading → "How are you seeing this situation?"; otherwise
+closed → "What would you like me to understand?"; otherwise statement →
+"How has this been for you?"; otherwise open → "What else would you like to share?".
+These are deterministic suggestions, not a paid AI feature.
+
 Coaching whispers are deterministic, in this order, with exact text:
 
 - Open: good, "Open invitation: leave room for their perspective."
 - Closed: warn, "Closed question detected. Try an open invitation."
 - Statement: tip, "Follow up with a question that invites their perspective."
 - If empathy: append good, "You acknowledged emotion or difficulty."
-- If the leading/blame filter matched: append warn,
+- If the leading/blame filter matched (open, closed or statement): append warn,
   "Try a question without blame or an assumed answer."
 
 Do not mention a hidden need, next cue, candidate reveal or a future answer in
 coaching. Provider-neutral means a later provider may replace coaching internals
 without altering the DTO; Sprint 2 source is always deterministic.
 
-Required executable proofs in CS-42/40 (not implemented by this document):
+Contract-only reference fixtures are in `docs/cs36-judge-fixtures.json`.
+Run `backend/.venv/Scripts/python.exe scripts/check_cs36_contract.py` to
+check the draft rules against these examples. This reference checker is not
+the application judge and proves no model/persistence integration. Each
+natural conversation names a scenario and expected new need per turn.
 
-1. Poor run: seven repetitions of "Did you finish it?" → 0/7 (therefore ≤3).
-2. Good run: seven proof questions in the table → scores 1…7 (therefore ≥6).
-   Repeating n1's question at score 1 reveals nothing else. An unrelated open
-   question and leading "What is obviously your fault?" reveal nothing.
-3. At good node 3 rewind inclusive to node 1: new State score 1 and turns 1.
-   A closed alternate remains 1; the original branch remains score 3. Re-select
-   original and reload after process restart: exact IDs/state are preserved.
-4. Duplicate POST key returns the original IDs/body and creates no extra turn or
-   session. Changed body/key reuse is 409. Concurrent stale turn is not committed.
-5. Test cross-session parent/branch, sibling rewind target, inactive branch,
-   stale revision, whitespace text, 4001 characters and provider failures.
-6. Sentinel tests show private prompts/unrevealed needs absent from every public
-   DTO, error and coach input, including sibling branch leakage after rewind.
+Required executable runtime proofs in CS-42/40:
+
+1. Poor run: seven repetitions of "Did you finish it?" → 0/7. Closed-with-cue
+   "Did the work get done?" and "Did that affect you?" reveal nothing.
+2. Scripted table questions → 1…7. Natural good transcript for each of Bob,
+   Daughter, Priya and Vendor → the fixture's per-turn reveals and final score.
+   These examples protect regressions, not broad calibration claims.
+3. "What happened?" repeated seven times → 1,1,1,1,1,1,1. An unrelated open
+   turn reveals nothing **after n1**. A leading open turn reveals nothing even
+   before n1. "What's…" / "How's…" classify as open; acknowledgment followed by
+   an open sentence is open. Inflected cues and out-of-order discovery work:
+   n1 then support earns n6 without earning n2…n5.
+4. At scripted good node 3 rewind inclusive to node 1: new score 1 and turns 1.
+   A closed alternate remains 1; original branch remains 3. Re-select original
+   and reload after restart: exact IDs/state persist.
+5. Duplicate POST key returns original IDs/body with no extra node/session.
+   Changed-body key reuse is 409. Concurrent stale turn never commits.
+6. Cross-session parent/branch, sibling rewind, inactive branch, stale revision,
+   whitespace, 4001 characters and each typed provider failure are tested.
+7. Sentinel tests exclude private prompts/unrevealed needs from public DTOs,
+   errors and coach input, including sibling leakage after rewind. A new
+   candidate reaches persona only; coaching templates never consume it.
 
 ## Persona and coach privacy boundary
 
-Muse owns persona prompt construction and provider behavior; Codex routes supply
-`PersonaBrief`, branch-local history, revealed_titles and resistance to the
-existing generate_persona_reply interface. Keep this interface unless a jointly
-recorded revision requires a change. The private brief may include all seven
-needs so the persona can roleplay; the request must explicitly distinguish
-already revealed and newly permitted content from unrevealed content. Do not
-return the brief or judge cues to the browser. Model instructions alone cannot
-prove that generated dialogue never leaks; record live adversarial probe results
-and limitations rather than claiming absolute prevention.
+### Python persona-to-route handoff (planned)
+
+Muse owns `backend/persona.py`; Codex owns conversion of selected database
+nodes into messages in `backend/conversation_context.py` under CS-42. This
+is the sole node→message assembly location. It validates same-session ancestry,
+orders the selected parent chain, prepends opening assistant dialogue, and
+returns `list[dict[str, str]]` with role/content only. It excludes the current
+pending user turn. Muse consumes these messages unchanged, constructs the
+system prompt and appends the current user text exactly once. No ORM/tree
+traversal in persona.py; Muse tests supplied history with message fixtures.
+
+Keep existing `generate_persona_reply(client, brief, user_text, *, ...)`
+calls working; this is **backward-compatible**, not a frozen signature.
+CS-39 adds keyword-only `newly_revealed_titles: list[str] | tuple[str, ...] = ()`
+and `timeout: float = 30.0`, forwarding timeout to client.respond.
+Existing revealed_titles means previously committed selected-branch titles
+only; newly_revealed_titles holds zero or one judge-authorized candidate title.
+They must be disjoint and belong to the fixed scenario brief. Codex validates
+this before calling; Muse's prompt labels already public / permitted this
+reply / still private separately. Resistance uses the candidate post-turn
+score; history uses only previously committed messages. Default temperature
+remains 0.7; routes explicitly pass timeout=30.0. No automatic provider retry.
+
+The brief may contain all seven needs for roleplay, but no prompt/need table
+is returned to the browser. Failed generation commits neither candidate nor
+turn. Model instructions do not prove generated dialogue never leaks; record
+live adversarial probe results and limitations.
+
+CS-39 defines `PersonaError(Exception)` with these concrete subclasses in
+persona.py. Routes depend on these types, never on OpenAI SDK classes or
+exception text. Exceptions carry no raw response/prompt/key in their public
+message; routes use the fixed safe envelope messages below.
+
+| Python type                 | Provider/config cause                                                                              | HTTP / code / safe message                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| PersonaUnavailableError     | Missing key/base URL; connection failure; upstream HTTP 401/403/429 or 5xx except 504              | 503 / persona_unavailable / "Persona service is unavailable."               |
+| PersonaTimeoutError         | SDK/request timeout; upstream HTTP 408 or 504                                                      | 504 / persona_timeout / "Persona response timed out."                       |
+| PersonaInvalidResponseError | Empty/malformed result; context-window rejection; other upstream 4xx or provider failure not above | 502 / persona_invalid_response / "Persona response could not be generated." |
+
+Map timeouts/status exceptions inside persona.py before the generic provider
+failure catch. Existing unconfigured/empty RuntimeErrors become these typed
+errors (subclassing RuntimeError as well is optional for compatibility).
+Catch provider errors around the provider operation; programming/invariant
+errors must not be broadly disguised as provider failures and reach the
+route's safe internal_error handler. Context overflow is only known when the
+provider rejects it; use PersonaInvalidResponseError, no silent truncation.
+Client-error mapping tests stay mocked; CS-42 adds HTTP/atomic rollback tests.
+
+### Persona wording fixture ownership
+
+Muse authors `backend/persona_fixtures.json` and its provider/prompt tests.
+It has `revision` string and `scenarios` array; each item has `scenario_title`
+(exact existing seed title), `persona` (all public Persona fields, including
+tags), `persona_traits` string and `system_prompt` string. Exactly the four
+seed scenarios appear once each. Public traits/tags/hints must not embed private
+need text or reveal cues. Codex reviews and loads it into seed.py, owns the
+structured fixed seven-need data and builds brief.hidden_need from that data.
+Muse does not edit seed.py/routes/models; Codex does not concurrently edit the
+persona module or wording fixture. Schema/fixture version is pinned per session.
+Existing system prompts/traits are not public persona fields.
 
 Coach input is limited to the current user's text, prior committed selected
 chain dialogue and its already-public State. Exclude private persona_traits,
@@ -537,16 +666,18 @@ must not flow into active-branch generation or coaching.
 
 ## Ownership, review and implementation sequence
 
-| Owner/task   | Owned files/scope                                                                                     | Coordination rule                                                                                |
-| ------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Codex CS-36  | docs/api_contract.md, focused contract evidence                                                       | Record review decisions before marking delivered                                                 |
-| Muse CS-39   | backend/persona.py, provider unit tests/prompt fixtures                                               | No route/model/seed edits without handoff; review persona history/privacy/error mapping          |
-| Claude CS-41 | src/routes/index.tsx, arena.tsx, recorder.tsx; src/lib/api; associated UI/tests                       | Own all API wire types/HTTP/mock changes; review DTO/UI completeness/idempotency                 |
-| Codex CS-42  | backend/main.py, models.py, database.py, seed.py; migrations/judge/coaching/backend integration tests | Sole owner of shared backend foundation; wire Muse's interface after handoff                     |
-| Codex CS-40  | integration report, scripts/demo_run.py, integration verification                                     | Integrate via PRs into dev; run real 8080/5173 loop, live persona probe and branch/reload proofs |
+| Owner/task   | Owned files/scope                                                                                                                             | Coordination rule                                                                      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Codex CS-36  | docs/api_contract.md, contract fixtures/reference checker, evidence/journal                                                                   | Record both re-reviews before delivery                                                 |
+| Muse CS-39   | backend/persona.py, backend/test_persona.py, backend/persona_fixtures.json and prompt/provider fixtures                                       | Own optional parameters, typed errors and wording; no route/model/seed edits           |
+| Claude CS-41 | src/routes/index.tsx, arena.tsx, flight-recorder.tsx, analytics.tsx (demo labels only); src/lib/api, src/lib/classify.ts, associated UI/tests | Own typed HTTP/mock/classifier updates; preserve Lovable UI                            |
+| Codex CS-42  | backend/main.py, models.py, database.py, seed.py, conversation_context.py; migrations/judge/coaching/integration tests                        | Own node→message conversion, fixture loader and route/error integration                |
+| Codex CS-40  | integration report, scripts/demo_run.py and integration verification                                                                          | PR integration into dev; real 8080/5173 browser loop/live persona/branch/reload proofs |
 
-This ownership proposal is recorded in Megillah; affected owners must acknowledge
-or correct it in review. Backend integration tests touching persona calls belong
+Ownership is acknowledged by Muse in CS-C139 and Claude in CS-C140, with
+Claude's file-list corrections incorporated above. The new persona boundary
+choices in r2 need re-review; acknowledgments alone are not contract approval.
+Backend integration tests touching persona calls belong
 to Codex; Muse owns provider-focused tests. If a change needs both scopes,
 coordinate sequential edits, not concurrent changes to the same file.
 
@@ -562,3 +693,30 @@ Source inspection establishes only the baseline table above. Real server/client
 evidence and documentation checks are recorded in `docs/cs36-evidence.md` when
 run. Planned branch/judge/provider proofs remain CS-39/41/42/40 work. CS-36
 does not certify a live model, a working recorder or a completed Sprint 2 loop.
+
+## Revision 2 decisions and review status
+
+R1 is f54fdef / CS-A14. Muse CS-C139 conditionally approved; Claude CS-C140
+requested changes and CS-C141 corrected the review timing/boundary distinction.
+R2 resolves their findings as follows, pending actual re-review:
+
+- Muse F1: optional newly_revealed_titles and timeout preserve old call shape.
+- Muse F2: Codex owns node→message conversion; Muse owns prompt assembly only.
+- Muse F3: three typed persona errors map to safe route errors, including context.
+- Muse F4: Muse authors persona_fixtures.json; Codex reviews/loads and owns needs.
+- Claude 1: contractions/multiple sentences, explicit open-only eligibility,
+  stems, n1 any open and no need prerequisites; four natural fixtures added.
+- Claude 2–6: real flight-recorder route/file, Hub session listing, public tags,
+  outcome/leading/templates and both branch-button mappings are explicit.
+- Generic cues retained for Sprint 2; score is a limited category-coverage
+  heuristic, not calibrated semantic understanding. Identical generic probes
+  may reach 7/7 across scenarios. Fixed revealed contents remain scenario-specific.
+- Muse N1 and Claude setup note: setup now matches npm ci --ignore-scripts.
+  Baseline invoked vite.js directly; CS-40 must additionally verify the
+  documented npm.cmd run dev invocation verbatim. No claim that this ran yet.
+- Muse N2/N3 and Claude whisper note: boundaries, context overflow and leading
+  feedback for all turn classes are explicit.
+
+No runtime judge/persona/frontend changes are introduced by r2. CS-36 remains
+active, CS-39/41/42 blocked, and PR #3 an unmerged draft until re-review resolves
+all findings. The earlier baseline proof is still a proof of the Sprint 1 stub.
