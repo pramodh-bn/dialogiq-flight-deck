@@ -22,6 +22,10 @@ Briefing vs. leaking: the hidden need graph briefs THIS persona model
 it is always wrapped in explicit non-disclosure instructions. The
 coach/whisper path is a separate client and must never receive
 unrevealed text or gates.
+
+Sprint 2 (CS-39, contract R2 04af9aa) adds ``newly_revealed_titles``
+(candidate labeling), ``timeout`` forwarding, and ``PersonaError``
+typed failures mapped from the SDK surface.
 """
 
 from __future__ import annotations
@@ -29,7 +33,13 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    OpenAI,
+    OpenAIError,
+)
 
 DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
 DEFAULT_MODEL = "meta-models/muse-spark-open-1026"
@@ -37,6 +47,26 @@ DEFAULT_MODEL = "meta-models/muse-spark-open-1026"
 RESISTANCE_GUARDED = "guarded"
 RESISTANCE_WARMING = "warming"
 RESISTANCE_OPEN = "open"
+
+
+class PersonaError(Exception):
+    """Base class for persona provider and configuration failures.
+
+    Routes catch these types (Sprint 2 contract R2); messages carry no
+    prompts, raw responses, or credentials.
+    """
+
+
+class PersonaUnavailableError(PersonaError, RuntimeError):
+    """Missing config, connection failure, upstream 401/403/429/5xx."""
+
+
+class PersonaTimeoutError(PersonaError, RuntimeError):
+    """Upstream request exceeded its timeout (HTTP 408/504 included)."""
+
+
+class PersonaInvalidResponseError(PersonaError, RuntimeError):
+    """Empty/malformed result, context rejection, other 4xx/failure."""
 
 
 @dataclass(frozen=True)
@@ -75,12 +105,14 @@ def build_persona_system_prompt(
     brief: PersonaBrief,
     *,
     revealed_titles: list[str] | tuple[str, ...] = (),
+    newly_revealed_titles: list[str] | tuple[str, ...] = (),
     resistance: str = RESISTANCE_GUARDED,
 ) -> str:
     """Compose the system prompt for one persona turn.
 
-    ``revealed_titles`` holds titles already out in the open; the hidden
-    need below is the private brief, never to be stated outright.
+    ``revealed_titles`` holds previously committed selected-branch titles;
+    ``newly_revealed_titles`` holds zero or one judge-authorized candidate.
+    The route guarantees both disjoint and within the scenario brief.
     """
     parts = []
     if brief.system_prompt:
@@ -100,7 +132,41 @@ def build_persona_system_prompt(
         parts.append("Topics already out in the open: " + ", ".join(revealed_titles))
     else:
         parts.append("Nothing personal has come up yet in this session.")
+    if newly_revealed_titles:
+        parts.append(
+            "Newly permitted this reply (you may speak to this now): "
+            + ", ".join(newly_revealed_titles)
+        )
+    else:
+        parts.append("Nothing new is permitted this reply.")
+    parts.append(
+        "Reveal etiquette: voice newly permitted topics as tentative "
+        "possibilities, never as decided outcomes. A revealed category is "
+        "not proof of agreement: never promise, consent, or agree solely "
+        "because a category was revealed. Keep the resistance level above "
+        "regardless of what was revealed."
+    )
     return "\n\n".join(parts)
+
+
+def _status_error(model: str, exc: APIStatusError) -> PersonaError:
+    """Map an upstream HTTP status failure to a typed persona error."""
+    code = exc.status_code
+    if code in (408, 504):
+        return PersonaTimeoutError(
+            f"BasetenPersonaClient timed out (upstream status {code}) "
+            f"for model {model}."
+        )
+    if code in (401, 403, 429) or (
+        isinstance(code, int) and code >= 500 and code != 504
+    ):
+        return PersonaUnavailableError(
+            f"BasetenPersonaClient is unavailable (upstream status {code}) "
+            f"for model {model}."
+        )
+    return PersonaInvalidResponseError(
+        f"BasetenPersonaClient received upstream status {code} for model {model}."
+    )
 
 
 class BasetenPersonaClient:
@@ -154,12 +220,12 @@ class BasetenPersonaClient:
         returns an empty reply.
         """
         if not self.api_key:
-            raise RuntimeError(
+            raise PersonaUnavailableError(
                 "BasetenPersonaClient needs BASETEN_API_KEY to be set; "
                 "no key is configured, so no request was made."
             )
         if not self.base_url:
-            raise RuntimeError(
+            raise PersonaUnavailableError(
                 "BasetenPersonaClient needs BASETEN_API_BASE to be set; "
                 "no base URL is configured, so no request was made."
             )
@@ -168,15 +234,32 @@ class BasetenPersonaClient:
         # fall back to OPENAI_API_KEY). max_retries=0 keeps one request
         # per call.
         client = OpenAI(base_url=self.base_url, api_key=self.api_key, max_retries=0)
-        completion = client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": system_prompt}] + list(messages),
-            temperature=temperature,
-            timeout=timeout,
-        )
+        try:
+            completion = client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "system", "content": system_prompt}]
+                + list(messages),
+                temperature=temperature,
+                timeout=timeout,
+            )
+        except APITimeoutError as exc:
+            raise PersonaTimeoutError(
+                f"BasetenPersonaClient timed out after {timeout:g} seconds "
+                f"waiting for model {self.model}."
+            ) from exc
+        except APIConnectionError as exc:
+            raise PersonaUnavailableError(
+                f"BasetenPersonaClient could not reach {self.base_url}."
+            ) from exc
+        except APIStatusError as exc:
+            raise _status_error(self.model, exc) from exc
+        except OpenAIError as exc:
+            raise PersonaInvalidResponseError(
+                f"BasetenPersonaClient request to model {self.model} failed."
+            ) from exc
         content = completion.choices[0].message.content
         if not content or not content.strip():
-            raise RuntimeError(
+            raise PersonaInvalidResponseError(
                 f"BasetenPersonaClient received an empty reply from model {self.model}."
             )
         return content.strip()
@@ -188,17 +271,27 @@ def generate_persona_reply(
     user_text: str,
     *,
     revealed_titles: list[str] | tuple[str, ...] = (),
+    newly_revealed_titles: list[str] | tuple[str, ...] = (),
     resistance: str = RESISTANCE_GUARDED,
     history: list[dict] | None = None,
     temperature: float = 0.7,
+    timeout: float = 30.0,
 ) -> str:
-    """Build the system prompt from live state and get one reply."""
+    """Build the system prompt from live state and get one reply.
+
+    ``history`` passes through verbatim (route-assembled, branch-local);
+    ``timeout`` forwards to the provider call (contract: 30 seconds).
+    """
     system_prompt = build_persona_system_prompt(
-        brief, revealed_titles=revealed_titles, resistance=resistance
+        brief,
+        revealed_titles=revealed_titles,
+        newly_revealed_titles=newly_revealed_titles,
+        resistance=resistance,
     )
     messages = list(history or []) + [{"role": "user", "content": user_text}]
     return client.respond(
         system_prompt=system_prompt,
         messages=messages,
         temperature=temperature,
+        timeout=timeout,
     )
