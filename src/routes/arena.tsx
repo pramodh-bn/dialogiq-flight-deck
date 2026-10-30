@@ -13,7 +13,7 @@ export const Route = createFileRoute("/arena")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>): { scenario?: string; session?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { scenario?: string | undefined; session?: string | undefined } => ({
     scenario: typeof s["scenario"] === "string" ? s["scenario"] : undefined,
     session: typeof s["session"] === "string" ? s["session"] : undefined,
   }),
