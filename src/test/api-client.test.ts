@@ -34,6 +34,18 @@ describe("classifyTurn", () => {
     expect(classifyTurn("How did you feel? Did it help?").questionType).toBe("open");
   });
 
+  it("reads spoken prefaces as open, dropping at most one filler", () => {
+    expect(classifyTurn("Bob, what's been hardest?").questionType).toBe("open");
+    expect(classifyTurn("So what's been hardest?").questionType).toBe("open");
+    expect(classifyTurn("So and what's been hardest?").questionType).toBe("statement");
+  });
+
+  it("flags hostile questions as leading", () => {
+    expect(classifyTurn("Why did you miss every deadline?").leading).toBe(true);
+    expect(classifyTurn("How could you not feel embarrassed?").leading).toBe(true);
+    expect(classifyTurn("You never listen.").leading).toBe(true);
+  });
+
   it("does not match a prefix inside a longer word", () => {
     expect(classifyTurn("Whatification is not a question.").questionType).toBe("statement");
   });
