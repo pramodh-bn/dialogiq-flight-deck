@@ -1,6 +1,6 @@
 # Sprint 2 integration gate — CS-40
 
-Codex, 2026-10-30. **Active; browser completion and dev integration pending.**
+Codex, 2026-10-30. **Browser gate passed; dev integration pending.**
 This report separates completed checks from requested verification.
 
 ## Integrated source
@@ -111,12 +111,34 @@ loop and posted exact combined-snapshot requests CS-C170 (CS-40) and CS-C171
 Still required: combined browser reload persistence, tree/node detail, selected
 rewind, alternate continuation, and original transcript/score resume. The API
 demo proves storage/branch rules; it does not claim these remaining UI checks.
-No Claude response or completed combined browser result is assumed yet.
+Claude subsequently completed the requested combined run: CS-C172 / CS-A29,
+47/47 checks with zero console errors on commit4baa28d. This supersedes the
+pending browser status above. All four personas, Arena/Recorder reload, tree
+and selected-node detail, rewind, alternate branch scoring, original transcript
+and score preservation, Resume this branch, Branch from here, Hub resume,
+leaving mid-turn and a real stale409 passed. The served frontend selected the
+HTTP adapter with mock disabled. Of14 turn POSTs,3 were browser-injected errors,
+11 reached8080, including1 stale rejection: approximately10 live model calls.
+
+Limits: timeout/network/unavailable screens were injected in the browser,
+not actual provider failures. Bob's browser run used two initial turns; the
+closed0/good7 proofs are the separate combined live demo artifacts. Browser
+testing used Vite development serving and headless Edge, not a served production
+build. Production build compilation passed independently. No adversarial model
+reply leakage test was performed. Claude's evidence is preserved verbatim in
+docs/evidence/cs40-claude-combined-browser-evidence.md, attributed to Claude.
+
+Codex launched the production app with scripts/run_backend.py, not a fixture
+runner. backend/main.py creates app with its default practice.real_persona;
+that calls BasetenPersonaClient. Tests inject fixtures only into separately
+constructed test apps. The existing ignored config supplies Baseten settings;
+no credentials are recorded. This source/launcher confirmation complements
+Claude's browser evidence; it is not runtime process-memory introspection.
 
 ## Remaining integration gate
 
-Obtain actual combined browser evidence; resolve any real integration failure;
-review final diff and evidence; integrate via PRs into dev in dependency order;
+Combined browser evidence is complete. Review final diff and evidence;
+integrate via PRs into dev in dependency order;
 verify final dev tree matches the checked result. Do not mark CS-40 delivered or
 Sprint2 complete while browser or required PR integration remains outstanding.
 Keep main unchanged. Existing lint/dependency limitations stay explicit.

@@ -12,14 +12,14 @@ base origin/dev0ed9284. No main/dev merge yet.
   ready at881e1c1; no GitHub reviews. Origin/main77e7ff3 unchanged, dev0ed9284.
 - Created separate CS-40 worktree; merged backend881e1c1 then frontend2824542
   with no conflicts, preserving history and Codex/CS-40 attribution on merges.
-- Installing own Python3.12 venv and npm dependencies (Node26.13/npm11.20).
+- Installed own Python3.12.10 venv and npm dependencies (Node26.13/npm11.20).
 - Read AGENTS/spec/Sprint1 report again. Computer-use skill selected for own
   browser check; must follow its surface/tool restrictions.
 
 ## Latest checkpoint — automated/live gates pass, browser request pending
 
 Combined merges5bc7490/8ad2c33 clean. New scripts/demo_run.py, report and sanitized
-fixture/live artifacts are not committed yet. Backend71/frontend36/tsc/build/
+fixture/live artifacts were committed and pushed at4baa28d. Backend71/frontend36/tsc/build/
 reference97/pip pass. ESLint37 pre-existing errors (__root2/analytics35),6 UI
 warnings; public bundle13 JS files0 private hits, positive marker works.
 
@@ -49,21 +49,27 @@ Next: finish report/PR preparation while awaiting actual Claude result, then
 review and PR-merge into dev in sequence, final tree equivalence and delivery.
 Do not mark complete without the remaining gate. See sprint-2-integration-report.md.
 
-## Remaining gate
+## Resume checkpoint: browser proof received
 
-Initial plan (historical): run combined71 backend/36 frontend tests, tsc/build and lint with existing
-failures separated. Add deterministic scripts/demo_run.py proving closed<=3
-and good>=6 using fixed fixtures; actual8080/5173 clean-db browser flow with
-frontend mock disabled and live Baseten, reload/tree/rewind/alternate/original
-branch score integrity. Check migration/privacy/bundle boundaries.
+The integration evidence commit4baa28d is pushed. PR5 (frontend) and PR6
+(integration) are open drafts; PR3 (contract) and PR4 (backend) remain unmerged.
+No dev/main integration has occurred. Current source is unchanged by this update.
 
-Old CS42 production serverPID2984/execsession24614 may still own8080; it has
-Claude's prior test data. Stop only that owned process before starting CS40's
-fresh database server; never delete old databases or kill all Python. Config
-is in ignored original-repo .env, never print/copy values. No paid calls inside
-automated tests. Current CS40 setup has no application database yet.
+Claude answered requests CS-C170/171 with CS-C172 and evidence CS-A29:
+47/47 combined browser checks, zero console errors at4baa28d. Reload/tree/
+rewind/alternate/original resume and real409 pass. Of14 turn POSTs,3 errors
+were browser-injected,11 reached8080 including1 stale rejection; about10 live
+calls. Vite dev serving only. Browser Bob used two initial turns; full0/7 and
+7/7 scoring proof comes from Codex's separate live demo. Preserve these limits.
+Manual browser input remains stopped. Source/launcher uses production Baseten
+default, not a test fixture; see report. No additional paid call is necessary.
 
-Then explicit diff review, evidence/report and task PR. Merge only reviewed
-PRs into dev in dependency order after concrete gate evidence; no main
-promotion/force-push/history rewrite. Record delivery independently of any
-unrelated Sprint3 work. Keep journal/Megillah updated at consequential steps.
+Next: preserve Claude's evidence, review final diff, integrate reviewed
+PRs3/4/5/6 into dev in dependency order,
+and verify final dev tree. Preserve main and all existing databases. Keep
+CS-40 active until its remaining acceptance criteria are satisfied.
+
+Server process references above are last-known, not a fresh health check.
+Recheck ownership/health before reuse. Read config only through the existing
+launcher; never print/copy secrets. Python3.12 is required. No further tests
+were run for this documentation-only checkpoint.
