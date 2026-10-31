@@ -1,13 +1,42 @@
-// Client-side turn classifier. Placeholder for the Fireworks "Whispers" classifier
-// in docs/spec.md; shared by the Arena's coaching panel and the mock API.
-const CLOSED =
-  /^(do|does|did|is|are|was|were|can|could|will|would|should|have|has|had|won't|don't|isn't|aren't)\b/i;
-const OPEN = /^(what|how|why|tell me|help me|walk me|describe|in what)\b/i;
-const EMPATHY = /(understand|sounds like|i hear|feel|frustrat|appreciate|makes sense|tough|hard)/i;
+// Client-side copy of the contract's turn classifier, used only by the mock API. The
+// backend's coaching is authoritative whenever VITE_API_BASE_URL is set.
+import type { QuestionType } from "./api/types";
 
-export type TurnClass = { open: boolean; closed: boolean; empathy: boolean };
+const OPEN = /^(what|how|why|tell me|help me|walk me|describe|in what)(?![a-z0-9])/;
+const CLOSED =
+  /^(do|does|did|is|are|was|were|can|could|will|would|should|have|has|had|won't|don't|isn't|aren't)(?![a-z0-9])/;
+const FILLER = /^(so|and|but|okay|ok|well|um|uh|hey|then|alright|right|now)(?![a-z0-9])/;
+const LEADING =
+  /(?<![a-z0-9'])(don't you|isn't it|you should|you must|your fault|just admit|obviously|why did you|why didn't you|why can't you|why do you always|how could you|what were you thinking|what's wrong with you|you always|you never)(?![a-z0-9'])/;
+const EMPATHY = /understand|sounds like|i hear|feel|frustrat|appreciate|makes sense|tough|hard/;
+
+export type TurnClass = { questionType: QuestionType; empathy: boolean; leading: boolean };
+
+function normalize(text: string): string {
+  return text.normalize("NFKC").toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim();
+}
+
+function clean(segment: string): string {
+  return segment
+    .trim()
+    .replace(/^["'“”‘’]+/, "")
+    .trim();
+}
+
+function sentences(text: string): string[] {
+  return text
+    .split(/[.!?,;:]+/)
+    .map((s) => clean(clean(s).replace(FILLER, "")))
+    .filter(Boolean);
+}
 
 export function classifyTurn(text: string): TurnClass {
-  const open = OPEN.test(text);
-  return { open, closed: !open && CLOSED.test(text), empathy: EMPATHY.test(text) };
+  const value = normalize(text);
+  const parts = sentences(value);
+  const questionType: QuestionType = parts.some((s) => OPEN.test(s))
+    ? "open"
+    : parts.some((s) => CLOSED.test(s))
+      ? "closed"
+      : "statement";
+  return { questionType, empathy: EMPATHY.test(value), leading: LEADING.test(value) };
 }
