@@ -1,7 +1,23 @@
 # Sprint 2 integration gate — CS-40
 
-Codex, 2026-10-30. **Browser gate passed; dev integration pending.**
+Codex, updated 2026-10-31. **Implementation, browser gate and dev integration complete.**
 This report separates completed checks from requested verification.
+
+## Final integration outcome
+
+PR3 merged as cd6c243; PR4 as e4690e2; PR5 as50ce4f6; PR6 as aedc62e,
+in dependency order. origin/dev aedc62ecd513538c7ffcab02ea145db7f76d9ca7
+exactly matches verified6bfbade (git diff --exit-code passed). Changes since
+browser-tested4baa28d are documentation/evidence only. The final report/journal
+closeout is a separate documentation-only PR. No further runtime test is needed
+for that documentation change. Formal delivery is recorded on CS-40 in Megillah.
+
+Codex did not promote or push main. The final fetch observed origin/main
+fe3b929, including separate Lovable history after the earlier77e7ff3 snapshot;
+those changes were not part of this integration or its verification.
+
+Historical status paragraphs below describe intermediate checkpoints. The final
+outcome here and Claude's completed browser evidence supersede pending wording.
 
 ## Integrated source
 
@@ -135,10 +151,10 @@ constructed test apps. The existing ignored config supplies Baseten settings;
 no credentials are recorded. This source/launcher confirmation complements
 Claude's browser evidence; it is not runtime process-memory introspection.
 
-## Remaining integration gate
+## Closeout and remaining limitations
 
-Combined browser evidence is complete. Review final diff and evidence;
-integrate via PRs into dev in dependency order;
-verify final dev tree matches the checked result. Do not mark CS-40 delivered or
-Sprint2 complete while browser or required PR integration remains outstanding.
-Keep main unchanged. Existing lint/dependency limitations stay explicit.
+Combined browser evidence and required dev integration are complete; final tree
+equivalence passed. Existing lint/dependency limitations stay explicit. A served
+production-build rehearsal, real learner evaluation, accessibility and latency
+measurement remain follow-up proposals, not completed checks. CS-44 captures the
+retrospective; no Sprint3 work or main promotion is included in this delivery.

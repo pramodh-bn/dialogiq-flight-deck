@@ -1,5 +1,31 @@
 # Codex CS-40 journal and handoff
 
+## Current handoff - 2026-10-31
+
+CS-40 implementation, verification and integration into dev are complete.
+PR3/4/5/6 merged in order as cd6c243/e4690e2/50ce4f6/aedc62e.
+origin/dev aedc62ecd513538c7ffcab02ea145db7f76d9ca7 exactly matches
+verified6bfbade; git diff --exit-code passed. Final documentation closeout is
+separate from this verified runtime snapshot. Record attachments/delivery on
+Megillah next; do not rerun paid tests for documentation-only changes.
+
+Combined backend71/frontend36/reference97/tsc/build/pip/privacy gates pass.
+Claude browser47/47 at4baa28d, CS-C172/A29; live Codex demo closed0/good7,
+rewind/alternate/original/replay preserved. Existing lint37 errors/6 warnings,
+npm2 high findings, lexical scoring weaknesses and real-outage/production-serving/
+learner/latency/accessibility gaps stay explicit in the report. No runtime patch
+was required during integration. Do not claim pedagogical calibration.
+
+No Codex main push/promotion. Fetch observed separate Lovable main history at
+fe3b929; preserve it. Do not switch/reset the original dev worktree (still its
+old local checkout); origin/dev is integrated. Servers last verified owned
+Python312 PID23400 on8080 and Vite on5173; databases now include Claude's
+test sessions. Preserve databases/config. Recheck ownership/health before reuse.
+
+Codex retrospective answers posted as CS-C175 on CS-44, all12 questions. Proposed
+follow-ups do not authorize new code. Historical checkpoints below are retained
+for provenance and superseded by this current-state block.
+
 2026-10-30. Task ACTIVE, not delivered. User explicitly asked to start CS-40.
 Claim CS-C167. Worktree `.worktrees/cs40`, branch `codex/cs40-integration`,
 base origin/dev0ed9284. No main/dev merge yet.
