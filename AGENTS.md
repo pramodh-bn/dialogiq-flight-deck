@@ -1,4 +1,5 @@
 <!-- LOVABLE:BEGIN -->
+
 > [!IMPORTANT]
 > This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
 > published git history — force pushing, or rebasing/amending/squashing commits
@@ -7,6 +8,7 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
+
 <!-- LOVABLE:END -->
 
 # Shared rules for Codex, Claude, Muse, and other coding agents
@@ -20,6 +22,35 @@ agents, regardless of the tool used. Explicit user instructions take precedence.
 - **Upfront API & Port Contracts:** All endpoint paths, payload schemas, and port bindings must be documented in `docs/api_contract.md` before parallel coding begins. No unilateral changes to ports or routes.
 - **Toolchain Preflight:** Always verify the active toolchain (Python virtual environment, Node/npm PATH, environment variables) before writing or testing code.
 - **Strict Worktree Hygiene:** Maintain separate git worktrees per agent. Codex acts as the sole integration gatekeeper merging via clean PRs into `dev`.
+
+## Apply the Sprint 2 lessons
+
+Read [the Sprint 2 retrospective](docs/sprint-2-retrospective.md) when claiming
+work. In your Megillah claim, name the applicable lessons and how you will verify
+them; for an inapplicable lesson, briefly explain why.
+
+- Before conversational changes, define success with reviewer-authored natural
+  and adversarial conversations written without scoring cues. Keep held-out
+  cases. Passing authored scoring fixtures proves consistency, not learner value.
+- Before parallel coding, agree context ownership, public/private boundaries,
+  response schemas, trigger/retry behavior, timeout and fallback. Record accepted
+  contract revisions and explicit affected-owner approval or waiver; acknowledge
+  adoption directly. Do not infer agreement from silence.
+- For backend work, use Python 3.12.x and verify the task venv's interpreter and
+  `jiter` import before installing or testing. Resolve Node/npm explicitly for
+  frontend work. Record versions, source revision, database path, ports and
+  provider/mock mode; never print secret values. Documentation-only work needs
+  document/link/diff checks, not a model call or server run.
+- Use disposable verification databases and a reproducible browser procedure.
+  Separate unit/mocked, real HTTP, browser-injected failure and live-provider
+  evidence. Attribute checks to the agent who ran them and state untested paths.
+  Measure latency for new live coaching calls and verify bounded failure fallback.
+- At session start and each milestone, reread the task and update a concise
+  current-state handoff: revision, actual checks, remaining work and owner awaited.
+  A posted readiness request is not evidence that its recipient read it or began.
+- Push feature branches and open a draft PR at delivery, within authorized scope,
+  so integration does not depend on an unpushed commit on one machine. Preserve
+  the separate implementation, delivery, verification and integration gates.
 
 ## Isolate each agent's work
 
@@ -97,3 +128,4 @@ All agents must strictly adhere to the project's shared coding conventions to pr
 
   Agent: Codex
   Megillah-Task: CS-27
+  ```
