@@ -1,6 +1,12 @@
 # DialogIQ V2 API contract
 
-CS-36 · Codex · 2026-10-30 · revision 2, **draft pending Claude/Muse re-review**.
+CS-36 · Codex · 2026-10-30 · revision 2.1, **accepted**.
+
+Claude approved r2 (04af9aa) in CS-C143 and explicitly waived re-review if
+the small patches below are adopted as written. R2.1 adopts that package;
+Muse approved r2 in CS-C145 and this exact optional delta in CS-C149.
+Codex adopts it for CS-42; Claude is notified to use the same classifier.
+Historical pending-review statements below are superseded by this acceptance.
 
 This document is the proposed Sprint 2 implementation agreement for CS-39,
 CS-41 and CS-42. It supersedes the port examples in the Sprint 1 report and
@@ -36,7 +42,9 @@ streaming, voice, or scenario-creation endpoint is included in Sprint 2.
 
 Run each agent's checkout with its own `backend/.venv`, ignored configuration
 and SQLite database. Never share a live SQLite file between worktrees.
-Use Node 26.13.0/npm 11.20.0 and Python 3.15 (the pinned baseline toolchain).
+Use Node 26.13.0/npm 11.20.0 and Python 3.12 on Windows. The user selected
+3.12 because the 3.15 jiter wheel is affected by Windows Application Control;
+do not disable that protection. Historical Sprint 1 checks used 3.15.
 Verify executable paths and versions first. If the NVM shim has no active
 version, prepend its installed version directory to PATH; do not change a
 machine-wide installation for this task.
@@ -47,7 +55,7 @@ From the isolated worktree root, once:
 $env:PATH = 'C:\Users\User\AppData\Local\Author Software\nvm\installs\v26.13.0;' + $env:PATH
 node --version
 npm.cmd --version
-py -3.15 -m venv backend/.venv
+py -3.12 -m venv backend/.venv
 backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
 npm.cmd ci --ignore-scripts
 ```
@@ -457,8 +465,14 @@ under CS-36; disclose this limitation in demo evidence.
 
 Normalize input by Unicode NFKC, lowercase, convert curly apostrophes to ASCII,
 collapse whitespace and strip surrounding whitespace. Classify each nonempty
-sentence after splitting on one or more of `.`, `!`, `?`; trim whitespace and
-leading straight or curly single/double quotation marks on each sentence.
+sentence after splitting on one or more of `.`, `!`, `?`, `,`, `;`, `:`; trim
+whitespace and leading straight or curly single/double quotation marks. Drop
+at most one leading filler token from each resulting segment: `so`, `and`,
+`but`, `okay`, `ok`, `well`, `um`, `uh`, `hey`, `then`, `alright`, `right`, `now`.
+A filler must end before a non-ASCII-letter/digit or the segment end. Trim
+whitespace/leading quotation marks again after removing it. Do not repeatedly
+strip fillers or remove arbitrary words. Thus "Bob, what's been hardest?" and
+"So what's been hardest?" are open; "So and what's been hardest?" is statement.
 
 A sentence is open if it begins with `what`, `how`, `why`, `tell me`,
 `help me`, `walk me`, `describe`, or `in what`. Otherwise it is closed if
@@ -474,7 +488,10 @@ is open. No requirement to reorder an acknowledgment before a question.
 
 `leading` is true if the normalized whole turn contains a bounded phrase
 `don't you`, `isn't it`, `you should`, `you must`, `your fault`,
-`just admit`, or `obviously`. At each phrase edge, ASCII letters/digits/
+`just admit`, `obviously`, `why did you`, `why didn't you`, `why can't you`,
+`why do you always`, `how could you`, `what were you thinking`,
+`what's wrong with you`, `you always`, or `you never`. At each phrase edge,
+ASCII letters/digits/
 apostrophes count as word characters. This bounded-phrase rule applies only
 to the leading filter, not the different classifier/stem boundary rules.
 Set leading on **all** turn classes; it does not alter question_type or
@@ -504,7 +521,7 @@ by ID, even if discovery happened out of order.
 | n4   | `impact`, `affect`, `cost`, `consequence`, `toll`                         | How does that affect you?                  |
 | n5   | `need`, `matter`, `important`, `value`, `fair`                            | What matters most to you here?             |
 | n6   | `support`, `help`, `change`, `different`, `option`                        | What support would help?                   |
-| n7   | `next`, `step`, `plan`, `agree`, `try`, `first`                           | What next step could we agree on?          |
+| n7   | `step`, `plan`, `agree`, `try`                                            | What next step could we agree on?          |
 
 The seven fixed private seed needs use these exact titles and descriptions.
 They are design fixtures, not secrets or client-side seed data. Only earned
@@ -537,6 +554,15 @@ Known heuristic limits: "hardest" counts as empathy through substring "hard",
 and "Do you understand?" counts through "understand"; do not interpret the
 empathy counter as measured understanding. "What do you think you should do?"
 is leading by this rule and can be a false warning.
+
+Demo limitations: lexical eligibility cannot reliably distinguish curiosity
+from hostility. An accusing "Why is this so hard for you?" can remain eligible;
+a deliberately hostile stem-targeting run may still earn a high score even
+after the extra phrase filters. Do not call a high score proof of empathy or
+safe conversational behavior. Removing n7 stems next/first avoids treating
+"What happened next?" or "What did you do first?" as future agreement, but
+"What was the plan?" can still reveal n7. These are known Sprint 2 limits,
+alongside generic cues, substring empathy and leading-filter false positives.
 
 Coaching outcome is breakthrough if this turn committed a new reveal, else
 deadend if question_type is closed or leading is true, else neutral.
@@ -616,6 +642,12 @@ this before calling; Muse's prompt labels already public / permitted this
 reply / still private separately. Resistance uses the candidate post-turn
 score; history uses only previously committed messages. Default temperature
 remains 0.7; routes explicitly pass timeout=30.0. No automatic provider retry.
+
+With no reveal order, n7 can be newly permitted on turn 2 while resistance is
+still guarded. A revealed category titled "Agreed next step" is not itself
+proof of agreement. The persona must voice a tentative possibility/preference,
+retain guarded resistance, and never promise, consent or agree solely because
+that category was revealed. Muse must fixture-test this early-n7 case.
 
 The brief may contain all seven needs for roleplay, but no prompt/need table
 is returned to the browser. Failed generation commits neither candidate nor
@@ -720,3 +752,12 @@ R2 resolves their findings as follows, pending actual re-review:
 No runtime judge/persona/frontend changes are introduced by r2. CS-36 remains
 active, CS-39/41/42 blocked, and PR #3 an unmerged draft until re-review resolves
 all findings. The earlier baseline proof is still a proof of the Sprint 1 stub.
+
+### Revision 2.1 follow-up to Claude CS-C143
+
+Adopted the exact optional patch package: extra sentence delimiters and one
+leading filler; nine additional leading/blame phrases; n7 removes next/first.
+Full fixture coverage is rerun, including new polite-preface, repeated-filler,
+hostility-filter, historical-sequence and guarded-early-n7 cases. Claude's r2
+approval and patch re-review waiver stand as recorded; Muse must review the
+final contract/commit, including early n7 and the typed persona boundary.

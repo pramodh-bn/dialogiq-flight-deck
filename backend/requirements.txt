@@ -1,4 +1,4 @@
-# DialogIQ backend (Sprint 1 foundation) — exact pins, Python 3.15.
+# DialogIQ backend — direct dependency pins; Windows runtime Python 3.12.
 # Runtime: fastapi, uvicorn (dev server), sqlalchemy, pydantic,
 # openai (Baseten persona client, CS-32).
 # Dev/test: pytest, httpx (TestClient), ruff.

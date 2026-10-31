@@ -1,5 +1,5 @@
 {
-  "revision": "cs36-r2",
+  "revision": "cs36-r2.1",
   "note": "Contract reference fixtures only. Codex-authored examples are regression coverage, not independent calibration or runtime proof.",
   "cases": [
     {
@@ -571,6 +571,165 @@
           "new_need": null,
           "question_type": "statement",
           "leading": false
+        }
+      ]
+    },
+    {
+      "name": "spoken-prefaces",
+      "scenario": "Bob",
+      "turns": [
+        {
+          "text": "Bob, what's been going on?",
+          "new_need": "n1",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "So what's hardest?",
+          "new_need": "n2",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "Well, how's that felt?",
+          "new_need": "n3",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "Okay; how has this affected you?",
+          "new_need": "n4",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "And what matters most?",
+          "new_need": "n5",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "Hey: how could I help?",
+          "new_need": "n6",
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "Now what plan could work?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "one-filler-only",
+      "scenario": "Bob",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "So and what's hardest?",
+          "new_need": null,
+          "question_type": "statement",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "historical-sequence-limit",
+      "scenario": "Vendor",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What happened next?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What did you do first?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": false
+        },
+        {
+          "text": "What was the plan?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "guarded-early-n7",
+      "scenario": "Priya",
+      "initial_revealed": ["n1"],
+      "turns": [
+        {
+          "text": "What's a possible step we could try?",
+          "new_need": "n7",
+          "question_type": "open",
+          "leading": false
+        }
+      ]
+    },
+    {
+      "name": "extra-hostility-phrases",
+      "scenario": "Bob",
+      "turns": [
+        {
+          "text": "Why did you miss every deadline?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "Why didn't you plan ahead?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "Why can't you try harder?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "Why do you always make things difficult?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "How could you not feel embarrassed?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "What were you thinking about the cost?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "What's wrong with you and your plans?",
+          "new_need": null,
+          "question_type": "open",
+          "leading": true
+        },
+        {
+          "text": "You always need help.",
+          "new_need": null,
+          "question_type": "statement",
+          "leading": true
+        },
+        {
+          "text": "You never agree.",
+          "new_need": null,
+          "question_type": "statement",
+          "leading": true
         }
       ]
     }
