@@ -569,6 +569,61 @@ describe("useCoach", () => {
     expect(result.current.hints).toEqual([]);
   });
 
+  it("does not let a late result end the newer request's pending state", async () => {
+    stubList();
+    const resolvers: ((value: CoachHintResponse) => void)[] = [];
+    const post = vi.spyOn(api, "requestCoachHint").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ head }) =>
+        useCoach({
+          sessionId: 12,
+          position: { ...position, headId: head },
+          stalled: true,
+          hold: false,
+        }),
+      { wrapper: wrapper(), initialProps: { head: 103 } },
+    );
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+
+    rerender({ head: 104 });
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
+    expect(result.current.pending).toBe(true);
+
+    await act(async () => resolvers[0]!(fixtures.success));
+
+    expect(result.current.pending).toBe(true);
+  });
+
+  it.each([
+    ["hint_not_eligible", "the server refused"],
+    ["stale_revision", "the state moved"],
+  ])("does not ask again by itself after %s", async (code) => {
+    stubList();
+    // Takes as long as a real request, so the pending state renders before it clears.
+    const post = vi.spyOn(api, "requestCoachHint").mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      throw errorFor(code);
+    });
+
+    const { result } = renderHook(
+      () => useCoach({ sessionId: 12, position, stalled: true, hold: false }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(result.current.pending).toBe(false);
+  });
+
   it("retries an unresolved action with the same key", async () => {
     stubList();
     const post = vi
