@@ -54,6 +54,7 @@ const uiEvidence = REAL ? "real-http" : "injected";
 
 const results = [];
 const timings = [];
+const hintPairs = [];
 
 function check(name, passed, evidence, detail = "") {
   results.push({ name, status: passed ? "pass" : "FAIL", evidence, detail: String(detail) });
@@ -415,6 +416,22 @@ async function run() {
   check("first approach stays reachable", await has("First approach"), uiEvidence);
   await screenshot("3-two-approaches");
 
+  // The saved pair for the person reading the evidence. Differing text is the floor;
+  // whether the second hint is a different move is a human judgment.
+  if (REAL) {
+    const listed = await fetch(
+      `${API}/api/sessions/${sessionId}/branches/${second.body.branch_id}/coach-hints`,
+    ).then((r) => r.json());
+    const pair = listed.hints.filter((h) => h.head_node_id === closed.head.id).map((h) => h.hint);
+    hintPairs.push({ head_node_id: closed.head.id, hints: pair });
+    check(
+      "the two saved hints differ",
+      pair.length === 2 && pair[0].approach !== pair[1].approach,
+      hintEvidence,
+      pair.map((h) => `${h.attempt}:${h.source}`).join(" "),
+    );
+  }
+
   // Reload restores from GET and spends nothing.
   const postsBeforeReload = coachPosts.length;
   await send("Page.reload");
@@ -722,6 +739,8 @@ async function main() {
   const failed = results.filter((r) => r.status === "FAIL").length;
   const report = {
     coach_mode: args.coach,
+    wire_contract: "s3-coach-r2",
+    provider_delta: REAL ? "s3-coach-r2.token-2048.1" : null,
     source_revision: revision.stdout.trim(),
     uncommitted_changes: dirty.stdout.trim().length > 0,
     database: "disposable, removed after this run",
@@ -729,6 +748,7 @@ async function main() {
     coach_posts: coachPosts.length,
     injected_posts: coachPosts.filter((p) => p.injected).length,
     timings,
+    hint_pairs: hintPairs,
     summary: {
       passed: results.filter((r) => r.status === "pass").length,
       failed,

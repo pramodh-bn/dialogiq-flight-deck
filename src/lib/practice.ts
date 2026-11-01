@@ -277,8 +277,10 @@ export async function observeCoachHint({
   const deadline = now() + budgetMs;
 
   async function savedHint(): Promise<Hint | undefined> {
+    const remaining = deadline - now();
+    if (remaining <= 0) return undefined;
     try {
-      const list = await api.listCoachHints(sessionId, request.branch_id);
+      const list = await api.listCoachHints(sessionId, request.branch_id, remaining);
       return hintsAtHead(list, request.head_node_id).find((h) => h.attempt === request.attempt);
     } catch {
       return undefined;

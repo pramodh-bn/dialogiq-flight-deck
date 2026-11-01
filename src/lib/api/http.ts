@@ -81,12 +81,12 @@ export function createHttpApi(baseUrl: string, fetchImpl: typeof fetch = fetch):
         key,
         timeoutMs,
       ),
-    listCoachHints: (id, branchId) =>
+    listCoachHints: (id, branchId, timeoutMs = COACH_TIMEOUT_MS) =>
       request(
         `/api/sessions/${id}/branches/${branchId}/coach-hints`,
         undefined,
         undefined,
-        COACH_TIMEOUT_MS,
+        timeoutMs,
       ),
   };
 }

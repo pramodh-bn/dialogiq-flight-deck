@@ -181,5 +181,5 @@ export interface DialogApi {
     key: string,
     timeoutMs?: number,
   ): Promise<CoachHintResponse>;
-  listCoachHints(sessionId: number, branchId: number): Promise<CoachHintList>;
+  listCoachHints(sessionId: number, branchId: number, timeoutMs?: number): Promise<CoachHintList>;
 }

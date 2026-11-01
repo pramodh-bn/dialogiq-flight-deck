@@ -132,6 +132,17 @@ describe("HTTP adapter", () => {
     expect(url).toBe("http://api/api/sessions/12/branches/31/coach-hints");
     expect(init?.headers).not.toHaveProperty("Idempotency-Key");
   });
+
+  it("reads hints within the budget it is given", async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      json(emptyList),
+    );
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+
+    await createHttpApi("http://api", fetchImpl).listCoachHints(12, 31, 4_000);
+
+    expect(timeout).toHaveBeenCalledWith(4_000);
+  });
 });
 
 describe("the automatic trigger", () => {
@@ -344,6 +355,46 @@ describe("observeCoachHint", () => {
     await run();
 
     expect(post.mock.calls.map((c) => c[3])).toEqual([15_000, 13_000]);
+  });
+
+  it("gives the recovery GET after a network error only what remains", async () => {
+    const timing = clock();
+    vi.spyOn(api, "requestCoachHint").mockImplementation(async () => {
+      await timing.sleep(6_000);
+      throw new TypeError("network");
+    });
+    const list = vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+
+    await expect(run(timing)).resolves.toEqual({ kind: "unresolved" });
+
+    expect(list.mock.calls[0]![2]).toBe(9_000);
+  });
+
+  it("gives the GET after a late 409 only what remains", async () => {
+    const timing = clock();
+    vi.spyOn(api, "requestCoachHint").mockImplementation(async () => {
+      await timing.sleep(14_000);
+      throw errorFor("request_in_progress");
+    });
+    const list = vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+
+    await expect(run(timing)).resolves.toEqual({ kind: "unresolved" });
+
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(list.mock.calls[0]![2]).toBe(1_000);
+  });
+
+  it("skips the GET once the budget is gone", async () => {
+    const timing = clock();
+    vi.spyOn(api, "requestCoachHint").mockImplementation(async () => {
+      await timing.sleep(15_000);
+      throw new TypeError("timed out");
+    });
+    const list = vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+
+    await expect(run(timing)).resolves.toEqual({ kind: "unresolved" });
+
+    expect(list).not.toHaveBeenCalled();
   });
 
   it("stops at the first GET that shows the hint", async () => {
