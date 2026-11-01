@@ -1,5 +1,5 @@
 {
-  "contract_revision": "s3-coach-r1",
+  "contract_revision": "s3-coach-r2",
   "status": "draft",
   "author": "Codex",
   "provenance": "Synthetic author examples; not the user's Maya transcript, independent review cases or model results.",
@@ -7,13 +7,15 @@
     "branch_id": 31,
     "head_node_id": 103,
     "expected_revision": 4,
-    "trigger": "automatic"
+    "trigger": "automatic",
+    "attempt": 1
   },
   "requested_root": {
     "branch_id": 32,
     "head_node_id": null,
     "expected_revision": 5,
-    "trigger": "requested"
+    "trigger": "requested",
+    "attempt": 1
   },
   "success": {
     "session_id": 12,
@@ -22,13 +24,14 @@
     "revision": 4,
     "hint": {
       "id": 71,
-      "contract_revision": "s3-coach-r1",
+      "contract_revision": "s3-coach-r2",
       "approach": "Give her control over whether to talk now.",
       "example": "We can leave this for later. Would you rather have some space?",
       "reason": "She asked to stop, so another demand may make the exchange harder.",
       "source": "meta",
       "fallback_reason": null,
-      "latency_ms": 1320
+      "latency_ms": 1320,
+      "attempt": 1
     }
   },
   "fallback": {
@@ -38,13 +41,14 @@
     "revision": 4,
     "hint": {
       "id": 72,
-      "contract_revision": "s3-coach-r1",
+      "contract_revision": "s3-coach-r2",
       "approach": "Pause and invite their perspective.",
       "example": "I may be missing something. What would you like me to understand?",
       "reason": "An invitation leaves room for their account without assuming their reasons.",
       "source": "deterministic",
       "fallback_reason": "timeout",
-      "latency_ms": 8000
+      "latency_ms": 8000,
+      "attempt": 1
     }
   },
   "errors": [
@@ -81,18 +85,72 @@
     {
       "status": 404,
       "body": {
-        "detail": { "code": "branch_not_found", "message": "Branch not found.", "retryable": false }
+        "detail": {
+          "code": "branch_not_found",
+          "message": "Branch not found.",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "detail": {
+          "code": "hint_not_ready",
+          "message": "Save the first hint before requesting another approach.",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "detail": {
+          "code": "inactive_branch",
+          "message": "Reload the session before retrying.",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "detail": {
+          "code": "parent_mismatch",
+          "message": "Reload the session before retrying.",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "detail": {
+          "code": "idempotency_conflict",
+          "message": "Reload the session before retrying.",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "status": 422,
+      "body": {
+        "detail": {
+          "code": "validation_error",
+          "message": "Invalid request.",
+          "retryable": false
+        }
       }
     }
   ],
   "public_context": {
-    "contract_revision": "s3-coach-r1",
+    "contract_revision": "s3-coach-r2",
     "persona": {
       "name": "Maya",
       "role": "Teenage daughter",
-      "public_context": "You are checking in after school.",
-      "opening_message": "Can we not do this right now?"
+      "opening_message": "What do you want? I'm in the middle of something."
     },
+    "learner_situation": "You are checking in about homework and phone boundaries.",
     "turns": [
       {
         "user_text": "I only asked about your day.",
@@ -132,7 +190,7 @@
     {
       "id": "same-slot",
       "given": "Automatic and requested actions use different UUIDs concurrently at same branch/head.",
-      "expect": "One active slot lease/provider call; loser409 request_in_progress then cached Hint."
+      "expect": "Same numbered attempt uses one active lease/provider call; loser releases pending key and converges on cached winner; attempt2 requires committed1."
     },
     {
       "id": "key-conflict",
@@ -172,7 +230,7 @@
     {
       "id": "context-budget",
       "given": "More than six turns with long Unicode strings and more than two prior hints.",
-      "expect": "Last six complete exchanges, last1500 code points each; persona first500; latest two hints; omitted/truncated accurate; no role merge."
+      "expect": "Last six complete exchanges, last1500 code points each; persona/learner situation first500; latest two eligible earlier hints including same-head1 for2; omitted/truncated accurate."
     },
     {
       "id": "no-config",
@@ -192,7 +250,7 @@
     {
       "id": "cached-fallback",
       "given": "Fallback persisted; user requests help again at same slot.",
-      "expect": "Same fallback/ID/latency, zero new provider calls; clear Basic hint label, no regenerate."
+      "expect": "Attempt1 replay remains identical; explicit requested2 may use repaired/current Meta configuration;2 never overwrites1. No automatic second attempt."
     },
     {
       "id": "network-unknown",
@@ -207,14 +265,128 @@
     {
       "id": "maya-quality",
       "given": "Synthetic public_context example, not actual user's session.",
-      "expect": "Specific next move with respectful natural example and text-grounded reason; no invented motive or scoring keywords. Judge outcome not quality criterion."
+      "expect": "Pinned Maya public opening/learner situation, synthetic dialogue: respectful text-grounded next move; no inferred private motive or scoring instruction. Not actual user evidence."
+    },
+    {
+      "id": "second-attempt",
+      "given": "Saved1 exists, including fallback, and learner explicitly asks for another approach.",
+      "expect": "Requested2 uses first hint in previous_hints; saves separate immutable2. Repeated2 key/body replays; new key also caches2."
+    },
+    {
+      "id": "no-third-attempt",
+      "given": "Two saved results at a head; a request has attempt3 or automatic2.",
+      "expect": "422 validation_error, zero provider calls; UI disables generation and preserves both results."
+    },
+    {
+      "id": "automatic-after-two",
+      "given": "Two saved results exist and an old/duplicate automatic1 action arrives.",
+      "expect": "Returns saved1; no new call; UI keeps2 current instead of regressing to1."
+    },
+    {
+      "id": "second-before-first",
+      "given": "Requested2 races a pending1 or root group has no saved1.",
+      "expect": "409 hint_not_ready; pending reservation cleaned; bounded15s observation can discover1 then retry2 if still current."
+    },
+    {
+      "id": "same-head-context",
+      "given": "Requested2 at root or non-root with prior ancestor hints.",
+      "expect": "Same-head1 last in latest-two public previous_hints, no private IDs/score. Root2 fallback usesA. Other-branch/revision hints excluded."
+    },
+    {
+      "id": "pending-observation",
+      "given": "Reload during an8second generation, same-key/slot409 responses.",
+      "expect": "Every2seconds GET plus same-key attempts within a single15second budget; no2second premature stop or fresh budget per HTTP call."
+    },
+    {
+      "id": "coach-reservation-expiry",
+      "given": "Worker crashes with coach key and numbered-slot reservations.",
+      "expect": "Both expire at30seconds using durable Unix time; old owner cannot clean/publish winner; persona120second default unchanged."
     }
   ],
   "independent_review": {
-    "status": "requested_not_received",
+    "status": "received_changes_requested",
     "required_reviewers": ["Claude", "Muse"],
     "per_reviewer": "At least one natural and one hostile transcript authored without consulting scoring cues, plus one held-out case retained for evaluation; state author/exposure/provenance.",
-    "received_cases": [],
+    "received_cases": [
+      {
+        "reviewer": "Claude",
+        "reference": "CS-A40 / CS-C188",
+        "ids": ["N1", "N2", "N3", "N4", "H1", "H2", "H3", "H4", "H5"],
+        "prior_cue_exposure": true,
+        "provenance": "Synthetic, authored before reading r1; independent of draft, not cue-blind.",
+        "held_out_ids": ["CLAUDE-HO-1", "CLAUDE-HO-2", "CLAUDE-HO-3"],
+        "held_out_sha256": "3ba7d32746a52e6a2f8d1b012b0bc4c944876c03441ae44e3d813256fc009191"
+      },
+      {
+        "reviewer": "Muse",
+        "reference": "CS-C190",
+        "ids": ["MUSE-NAT-1", "MUSE-HOS-1"],
+        "prior_cue_exposure": true,
+        "provenance": "Synthetic user-side transcripts authored before reading r1 this session; no persona outputs supplied; independent of draft, not cue-blind.",
+        "held_out_ids": ["MUSE-HELD-1"],
+        "held_out_sha256": "a95c7df304f7fe8384d4504841a2ca9101c4232bcf7a5480b4123689636fd3b0"
+      }
+    ],
     "held_out_policy": "Reviewer retains unexposed case until evaluation; record identifier and commitment before adoption, do not fabricate its content or result."
+  },
+  "requested_second": {
+    "branch_id": 31,
+    "head_node_id": 103,
+    "expected_revision": 4,
+    "trigger": "requested",
+    "attempt": 2
+  },
+  "second_success": {
+    "session_id": 12,
+    "branch_id": 31,
+    "head_node_id": 103,
+    "revision": 4,
+    "hint": {
+      "id": 73,
+      "contract_revision": "s3-coach-r2",
+      "approach": "Name your own concern without demanding an explanation.",
+      "example": "I am worried our check-ins have started to sound like an interrogation. I can listen when you are ready.",
+      "reason": "Owning your concern changes the reporting demand without guessing what she is keeping private.",
+      "source": "meta",
+      "fallback_reason": null,
+      "latency_ms": 1430,
+      "attempt": 2
+    }
+  },
+  "list_with_two": {
+    "session_id": 12,
+    "branch_id": 31,
+    "head_node_id": 103,
+    "revision": 4,
+    "hints": [
+      {
+        "head_node_id": 103,
+        "hint": {
+          "id": 72,
+          "contract_revision": "s3-coach-r2",
+          "approach": "Pause and invite their perspective.",
+          "example": "I may be missing something. What would you like me to understand?",
+          "reason": "An invitation leaves room for their account without assuming their reasons.",
+          "source": "deterministic",
+          "fallback_reason": "timeout",
+          "latency_ms": 8000,
+          "attempt": 1
+        }
+      },
+      {
+        "head_node_id": 103,
+        "hint": {
+          "id": 73,
+          "contract_revision": "s3-coach-r2",
+          "approach": "Name your own concern without demanding an explanation.",
+          "example": "I am worried our check-ins have started to sound like an interrogation. I can listen when you are ready.",
+          "reason": "Owning your concern changes the reporting demand without guessing what she is keeping private.",
+          "source": "meta",
+          "fallback_reason": null,
+          "latency_ms": 1430,
+          "attempt": 2
+        }
+      }
+    ]
   }
 }
