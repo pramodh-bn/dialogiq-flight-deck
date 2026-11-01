@@ -1,5 +1,12 @@
 # DialogIQ V2 API contract
 
+Sprint 3 extension: [CS-45 contextual coaching](cs45-coaching-contract.md),
+revision `s3-coach-r1`, **DRAFT — reviewer approval outstanding**. It defines
+new coach endpoints and storage without changing the accepted Sprint 2 routes,
+judge, persona or immutable node DTOs below. The Sprint 2 baseline descriptions
+are historical; CS-40 delivered their implementation. Do not interpret the
+Sprint 3 draft or fixture examples as implemented or accepted behavior.
+
 CS-36 · Codex · 2026-10-30 · revision 2.1, **accepted**.
 
 Claude approved r2 (04af9aa) in CS-C143 and explicitly waived re-review if

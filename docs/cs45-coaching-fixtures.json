@@ -1,0 +1,220 @@
+{
+  "contract_revision": "s3-coach-r1",
+  "status": "draft",
+  "author": "Codex",
+  "provenance": "Synthetic author examples; not the user's Maya transcript, independent review cases or model results.",
+  "request": {
+    "branch_id": 31,
+    "head_node_id": 103,
+    "expected_revision": 4,
+    "trigger": "automatic"
+  },
+  "requested_root": {
+    "branch_id": 32,
+    "head_node_id": null,
+    "expected_revision": 5,
+    "trigger": "requested"
+  },
+  "success": {
+    "session_id": 12,
+    "branch_id": 31,
+    "head_node_id": 103,
+    "revision": 4,
+    "hint": {
+      "id": 71,
+      "contract_revision": "s3-coach-r1",
+      "approach": "Give her control over whether to talk now.",
+      "example": "We can leave this for later. Would you rather have some space?",
+      "reason": "She asked to stop, so another demand may make the exchange harder.",
+      "source": "meta",
+      "fallback_reason": null,
+      "latency_ms": 1320
+    }
+  },
+  "fallback": {
+    "session_id": 12,
+    "branch_id": 31,
+    "head_node_id": 103,
+    "revision": 4,
+    "hint": {
+      "id": 72,
+      "contract_revision": "s3-coach-r1",
+      "approach": "Pause and invite their perspective.",
+      "example": "I may be missing something. What would you like me to understand?",
+      "reason": "An invitation leaves room for their account without assuming their reasons.",
+      "source": "deterministic",
+      "fallback_reason": "timeout",
+      "latency_ms": 8000
+    }
+  },
+  "errors": [
+    {
+      "status": 409,
+      "body": {
+        "detail": {
+          "code": "stale_revision",
+          "message": "Reload the session before retrying.",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "detail": {
+          "code": "request_in_progress",
+          "message": "This request is still running.",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "status": 422,
+      "body": {
+        "detail": {
+          "code": "hint_not_eligible",
+          "message": "Automatic help is not available at this position.",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "detail": { "code": "branch_not_found", "message": "Branch not found.", "retryable": false }
+      }
+    }
+  ],
+  "public_context": {
+    "contract_revision": "s3-coach-r1",
+    "persona": {
+      "name": "Maya",
+      "role": "Teenage daughter",
+      "public_context": "You are checking in after school.",
+      "opening_message": "Can we not do this right now?"
+    },
+    "turns": [
+      {
+        "user_text": "I only asked about your day.",
+        "character_text": "And I said I don't want to talk."
+      }
+    ],
+    "omitted_turns": 0,
+    "truncated": false,
+    "previous_hints": []
+  },
+  "acceptance_cases": [
+    {
+      "id": "trigger-stalled",
+      "given": "Committed head score equals parent score and is below seven.",
+      "expect": "One automatic POST after turn/save or Arena restoration; repeated mount uses saved slot."
+    },
+    {
+      "id": "trigger-revealing",
+      "given": "Head score exceeds parent score.",
+      "expect": "No automatic call; requested help allowed; automatic POST returns422 hint_not_eligible."
+    },
+    {
+      "id": "trigger-root",
+      "given": "Branch has null head.",
+      "expect": "Requested help works from public opening only; automatic422."
+    },
+    {
+      "id": "trigger-seven",
+      "given": "Head score seven.",
+      "expect": "No automatic call; requested help supports continuation without scoring promises."
+    },
+    {
+      "id": "same-key",
+      "given": "Repeat identical completed UUID/body after later conversation change.",
+      "expect": "Exact original200, no call; UI discards historical binding."
+    },
+    {
+      "id": "same-slot",
+      "given": "Automatic and requested actions use different UUIDs concurrently at same branch/head.",
+      "expect": "One active slot lease/provider call; loser409 request_in_progress then cached Hint."
+    },
+    {
+      "id": "key-conflict",
+      "given": "Reuse UUID for a changed body or route.",
+      "expect": "409 idempotency_conflict, no new provider call."
+    },
+    {
+      "id": "expired-lease",
+      "given": "Worker disappears and slot lease expires30seconds later.",
+      "expect": "Recovery may call upstream; old owner cannot publish/clean new lease; no exactly-once billing claim."
+    },
+    {
+      "id": "navigation-race",
+      "given": "Turn, rewind or active branch changes during provider call.",
+      "expect": "Revalidation409, no stale hint row; original and current transcript/score intact; UI ignores late result."
+    },
+    {
+      "id": "away-back",
+      "given": "Select away and back to saved head at a later revision.",
+      "expect": "New key returns same Hint/latency with new envelope revision; no model call."
+    },
+    {
+      "id": "rewind-context",
+      "given": "Fork from source prefix; source has future hints and turns.",
+      "expect": "No copied hint rows; coach gets prefix only and same-new-branch prior hints only; source hints unchanged."
+    },
+    {
+      "id": "reload-restart",
+      "given": "Process/browser restart after successful hint commit.",
+      "expect": "GET restores exact saved Hint; replay no provider call; score/revision/node unchanged."
+    },
+    {
+      "id": "public-projection",
+      "given": "Private brief/needs, sibling/future text and cue-table sentinels inserted outside chosen public chain.",
+      "expect": "None in coach arguments/prompt/DTO; assert projection keys; separate tests assess adversarial public text."
+    },
+    {
+      "id": "context-budget",
+      "given": "More than six turns with long Unicode strings and more than two prior hints.",
+      "expect": "Last six complete exchanges, last1500 code points each; persona first500; latest two hints; omitted/truncated accurate; no role merge."
+    },
+    {
+      "id": "no-config",
+      "given": "Meta key/base/model missing/blank or invalid HTTPS base; Baseten/OpenAI keys exist.",
+      "expect": "Zero network; deterministic200 not_configured; no cross-provider credential fallback."
+    },
+    {
+      "id": "slow-provider",
+      "given": "Never-ending or trickled provider response.",
+      "expect": "Whole-call deadline8seconds, fallback chosen by10seconds; timeout200; no late publication; latency recorded."
+    },
+    {
+      "id": "bad-provider",
+      "given": "429/5xx/transport error or malformed/empty/oversized/extra-field200 content.",
+      "expect": "Deterministic200 unavailable or invalid_response; no raw errors; no repair call."
+    },
+    {
+      "id": "cached-fallback",
+      "given": "Fallback persisted; user requests help again at same slot.",
+      "expect": "Same fallback/ID/latency, zero new provider calls; clear Basic hint label, no regenerate."
+    },
+    {
+      "id": "network-unknown",
+      "given": "Client misses response after commit.",
+      "expect": "GET/refresh truth, retain UUID/body for same bound action; no accidental second charge/result."
+    },
+    {
+      "id": "safe-ui",
+      "given": "Hint includes markup-like text; keyboard user requests help and navigates while pending.",
+      "expect": "Render text only, announce loading/result, composer usable, duplicate action disabled, no late cross-branch display."
+    },
+    {
+      "id": "maya-quality",
+      "given": "Synthetic public_context example, not actual user's session.",
+      "expect": "Specific next move with respectful natural example and text-grounded reason; no invented motive or scoring keywords. Judge outcome not quality criterion."
+    }
+  ],
+  "independent_review": {
+    "status": "requested_not_received",
+    "required_reviewers": ["Claude", "Muse"],
+    "per_reviewer": "At least one natural and one hostile transcript authored without consulting scoring cues, plus one held-out case retained for evaluation; state author/exposure/provenance.",
+    "received_cases": [],
+    "held_out_policy": "Reviewer retains unexposed case until evaluation; record identifier and commitment before adoption, do not fabricate its content or result."
+  }
+}
