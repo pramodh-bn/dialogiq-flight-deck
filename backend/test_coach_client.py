@@ -123,7 +123,7 @@ def test_request_shape_single_nonstreaming_call(monkeypatch) -> None:  # type: i
     sent = completions.calls[0]
     assert sent["model"] == "muse-spark-1.3"
     assert sent["temperature"] == 0.3
-    assert sent["max_tokens"] == 512
+    assert sent["max_tokens"] == 2048
     assert sent["timeout"] == 8.0
     assert sent["stream"] is False
     assert [m["role"] for m in sent["messages"]] == ["system", "user"]

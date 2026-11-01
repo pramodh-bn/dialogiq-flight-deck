@@ -11,9 +11,10 @@ Contract bar (s3-coach-r2): at least 9/10 valid structured replies inside
 assistance is a human judgment call: this script prints every raw output
 and marks it MANUAL-JUDGMENT-REQUIRED; it never auto-passes that leg.
 
---max-tokens runs an approved experimental candidate WITHOUT changing the
-COACH_MAX_TOKENS constant, which always keeps the contract value until a
-versioned delta adopts a change. The evidence file records the run value.
+--max-tokens overrides the adopted default for reproducible historical
+runs (e.g. --max-tokens 512 reruns the original candidate) WITHOUT
+changing the COACH_MAX_TOKENS constant. The evidence file records the
+run value.
 
 Setup (keys are never committed; root .gitignore covers .env everywhere):
   1. Point --env-file at the checkout holding the keys (or export them):
@@ -190,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         "--max-tokens",
         type=int,
         default=COACH_MAX_TOKENS,
-        help="experimental candidate max_tokens (constant keeps contract 512)",
+        help="max_tokens override for historical runs (default: adopted 2048)",
     )
     args = parser.parse_args(argv)
 

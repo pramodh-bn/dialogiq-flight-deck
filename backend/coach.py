@@ -10,12 +10,12 @@ Configuration is env-only (mirrors the persona client pattern):
 - ``META_MODEL_API_BASE``: required, no default; must be plain https.
 - ``META_MODEL_API_MODEL``: default ``muse-spark-1.3`` (existing default).
 
-Fixed candidate parameters per the accepted contract: temperature 0.3,
-max_tokens 512, one 8-second non-streaming chat.completions call with
-max_retries=0. Changing these requires a contract delta review. Approved
-experimental re-probes may pass a different ``max_tokens`` at call time;
-the constant below always keeps the contract value until a versioned
-delta adopts a change.
+Effective parameters per the accepted contract plus adopted delta
+s3-coach-r2.token-2048.1: temperature 0.3, max_tokens 2048, one
+8-second non-streaming chat.completions call with max_retries=0.
+Changing these requires a contract delta review. Historical runs
+(e.g. the original 512 candidate) stay reproducible by passing
+``max_tokens`` explicitly at call time.
 
 Inert without valid config: construction never crashes and ``respond()``
 raises ``CoachNotConfiguredError`` before any network call. Tests use
@@ -42,7 +42,7 @@ from openai import (
 DEFAULT_MODEL = "muse-spark-1.3"
 
 COACH_TEMPERATURE = 0.3
-COACH_MAX_TOKENS = 512
+COACH_MAX_TOKENS = 2048
 COACH_TIMEOUT_SECONDS = 8.0
 
 APPROACH_MAX_CHARS = 240
