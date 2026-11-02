@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -89,6 +90,17 @@ def stop_server(process: subprocess.Popen[bytes]) -> None:
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=10)
+
+
+def remove_tree(path: Path) -> None:
+    """Best-effort temp cleanup; Windows may briefly lock a fresh DB file."""
+    for _ in range(10):
+        try:
+            shutil.rmtree(path)
+            return
+        except OSError:
+            time.sleep(0.5)
+    print(f"kept temp dir (still locked): {path}")
 
 
 def call(
@@ -279,26 +291,27 @@ def main() -> None:
     check_port_free(args.port)
     # Outside the temp dir: Windows cannot unlink it while the child runs.
     log_path = Path(tempfile.gettempdir()) / f"cs43-coach-uvicorn-{os.getpid()}.log"
-    with (
-        open(log_path, "wb") as log,
-        tempfile.TemporaryDirectory(prefix="cs43-coach-http-") as folder,
-    ):
-        db_path = Path(folder) / "coach-http.db"
-        process = start_server(
-            root, args.port, db_path, args.env_file, args.live, log, log_path
-        )
+    with open(log_path, "wb") as log:
+        folder = tempfile.mkdtemp(prefix="cs43-coach-http-")
         try:
-            base = f"http://127.0.0.1:{args.port}"
-            if args.live:
-                run_live(base)
-            else:
-                run_mocked(base)
-        except RuntimeError:
-            tail = log_path.read_bytes().decode("utf-8", errors="replace")
-            print("".join(f"UVICORN| {line}" for line in tail.splitlines()[-20:]))
-            raise
+            db_path = Path(folder) / "coach-http.db"
+            process = start_server(
+                root, args.port, db_path, args.env_file, args.live, log, log_path
+            )
+            try:
+                base = f"http://127.0.0.1:{args.port}"
+                if args.live:
+                    run_live(base)
+                else:
+                    run_mocked(base)
+            except RuntimeError:
+                tail = log_path.read_bytes().decode("utf-8", errors="replace")
+                print("".join(f"UVICORN| {line}" for line in tail.splitlines()[-20:]))
+                raise
+            finally:
+                stop_server(process)
         finally:
-            stop_server(process)
+            remove_tree(Path(folder))
     try:
         log_path.unlink()
     except OSError:
