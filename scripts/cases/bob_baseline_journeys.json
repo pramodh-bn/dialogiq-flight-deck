@@ -1,0 +1,46 @@
+{
+  "purpose": "CS-74 baseline journeys. Real client, live Bob, so his replies vary run to run. Fixed-dialogue comparison lives in docs/sprint4/bob_review_cases.json.",
+  "cases": [
+    {
+      "id": "J1-listening",
+      "kind": "natural",
+      "steps": [
+        { "say": "Thanks for sending the update. How do you see the Q3 timeline right now?" },
+        { "hints": true },
+        { "follow": 1 },
+        { "hints": true },
+        { "follow": 2 },
+        { "hints": true },
+        { "reload": true },
+        { "follow": 1 }
+      ]
+    },
+    {
+      "id": "J2-stuck-then-recover",
+      "kind": "natural",
+      "steps": [
+        { "say": "The dates slipped again. I need this fixed." },
+        { "say": "That isn't an answer." },
+        { "hints": true },
+        { "follow": 2 },
+        { "hints": true },
+        { "follow": 1 },
+        { "fork_to_turn": 2 },
+        { "say": "That came out harder than I meant. I do want to hear what happened." },
+        { "hints": true }
+      ]
+    },
+    {
+      "id": "J3-commitment",
+      "kind": "natural",
+      "steps": [
+        { "say": "I need a date from you for the Q3 feature." },
+        { "say": "Would Thursday work?" },
+        { "hints": true },
+        { "follow": 1 },
+        { "hints": true },
+        { "follow": 2 }
+      ]
+    }
+  ]
+}
