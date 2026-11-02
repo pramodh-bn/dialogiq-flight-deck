@@ -32,6 +32,7 @@ from coach import (
     CoachTimeoutError,
     CoachUnavailableError,
 )
+from coach_context import build_coach_system_prompt
 from database import create_sqlite_engine
 from main import create_app
 from migrations import SCHEMA_VERSION, initialize_database
@@ -916,3 +917,19 @@ def test_real_coach_provider_passes_none_timeout_only_in_demo(
     monkeypatch.delenv("COACH_DEMO_WAIT")
     coach_service.real_coach_provider("s", "{}")
     assert "timeout" not in seen[-1]
+
+
+def test_coach_system_prompt_grounds_concrete_details_in_transcript() -> None:
+    """CS-61: the grounding rule directly follows the untrusted-data rule."""
+    paragraphs = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
+    assert len(paragraphs) == 6
+    assert paragraphs[2].startswith("Ground every concrete detail")
+    assert "already appear there" in paragraphs[2]
+
+
+def test_coach_system_prompt_stays_single_variant() -> None:
+    """CS-61: only the persona name/role interpolate across personas."""
+    first = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
+    second = build_coach_system_prompt("Bob", "Team member").split("\n\n")
+    assert first[1:] == second[1:]
+    assert "Maya" in first[0] and "Bob" not in first[0]
