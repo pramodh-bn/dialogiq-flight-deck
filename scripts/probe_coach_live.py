@@ -16,6 +16,12 @@ runs (e.g. --max-tokens 512 reruns the original candidate) WITHOUT
 changing the COACH_MAX_TOKENS constant. The evidence file records the
 run value.
 
+--timeout overrides the per-call cutoff in seconds (default 8). Use
+--timeout none for a no-cutoff demo-wait measurement run: timeout=None
+is passed explicitly, exactly as demo-wait mode does. The 9/10 bar
+applies only at the 8s default; any other timeout reports parse-valid
+counts with denominators by case and no PASS/FAIL verdict.
+
 Setup (keys are never committed; root .gitignore covers .env everywhere):
   1. Point --env-file at the checkout holding the keys (or export them):
        META_MODEL_API_KEY=<key>
@@ -136,8 +142,14 @@ def run_once(
     system_prompt: str,
     context_json: str,
     max_tokens: int,
+    timeout: float | None = COACH_TIMEOUT_SECONDS,
 ) -> dict:
-    """Run one call; record elapsed, finish, usage, parse result, content."""
+    """Run one call; record elapsed, finish, usage, parse result, content.
+
+    Every failure path returns a record: typed CoachError carries its
+    finish/usage evidence, and any unexpected exception is recorded with
+    null finish/usage instead of aborting the run.
+    """
     started = time.perf_counter()
     try:
         completion: CoachCompletion = client.respond(
@@ -145,7 +157,7 @@ def run_once(
             context_json=context_json,
             temperature=COACH_TEMPERATURE,
             max_tokens=max_tokens,
-            timeout=COACH_TIMEOUT_SECONDS,
+            timeout=timeout,
         )
     except CoachError as exc:
         elapsed = time.perf_counter() - started
@@ -154,6 +166,17 @@ def run_once(
             "finish_reason": exc.finish_reason,
             "completion_tokens": exc.completion_tokens,
             "reasoning_tokens": exc.reasoning_tokens,
+            "parse_ok": False,
+            "content": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    except Exception as exc:  # noqa: BLE001 - unexpected failures still record
+        elapsed = time.perf_counter() - started
+        return {
+            "elapsed_s": round(elapsed, 3),
+            "finish_reason": None,
+            "completion_tokens": None,
+            "reasoning_tokens": None,
             "parse_ok": False,
             "content": None,
             "error": f"{type(exc).__name__}: {exc}",
@@ -177,8 +200,19 @@ def run_once(
     }
 
 
+def parse_timeout_option(raw: str, parser: argparse.ArgumentParser) -> float | None:
+    """Parse --timeout: seconds, or none for a no-cutoff demo-wait run."""
+    if raw.strip().lower() == "none":
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        parser.error(f"--timeout must be seconds or 'none', got {raw!r}")
+        raise AssertionError("unreachable")  # parser.error exits
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the probe; 0 ok/pass, 1 bar failed, 2 usage/config error."""
+    """Run the probe; 0 ok/pass/measure, 1 bar failed, 2 usage/config error."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", default=None, help="env file to load")
     parser.add_argument(
@@ -193,7 +227,13 @@ def main(argv: list[str] | None = None) -> int:
         default=COACH_MAX_TOKENS,
         help="max_tokens override for historical runs (default: adopted 2048)",
     )
+    parser.add_argument(
+        "--timeout",
+        default=str(COACH_TIMEOUT_SECONDS),
+        help="per-call cutoff in seconds, or 'none' for no-cutoff demo-wait",
+    )
     args = parser.parse_args(argv)
+    timeout = parse_timeout_option(args.timeout, parser)
 
     if args.env_file:
         env_path = Path(args.env_file)
@@ -208,9 +248,13 @@ def main(argv: list[str] | None = None) -> int:
         print("env file: (none; process env only)")
     for key in ENV_KEYS:
         print(f"{key}: {'SET' if os.environ.get(key) else 'MISSING'}")
+    if timeout is None:
+        timeout_label = "none (no cutoff; demo-wait mode)"
+    else:
+        timeout_label = f"{timeout:g}s"
     print(
         f"candidate: temperature={COACH_TEMPERATURE} "
-        f"max_tokens={args.max_tokens} timeout={COACH_TIMEOUT_SECONDS:g}s "
+        f"max_tokens={args.max_tokens} timeout={timeout_label} "
         "max_retries=0 whole-content-JSON no-fence-strip"
     )
 
@@ -236,7 +280,9 @@ def main(argv: list[str] | None = None) -> int:
     calls: list[dict] = []
     for case, system_prompt, context_json in payloads:
         for index in range(1, CALLS_PER_CASE + 1):
-            record = run_once(client, system_prompt, context_json, args.max_tokens)
+            record = run_once(
+                client, system_prompt, context_json, args.max_tokens, timeout
+            )
             record["case"] = case
             record["call"] = index
             calls.append(record)
@@ -247,18 +293,36 @@ def main(argv: list[str] | None = None) -> int:
                 f"tok={record['completion_tokens']}/{record['reasoning_tokens']} "
                 f"{record['error'] or ''}".rstrip()
             )
-    valid = sum(
-        1 for c in calls if c["parse_ok"] and c["elapsed_s"] <= COACH_TIMEOUT_SECONDS
-    )
+    bar_applies = timeout == COACH_TIMEOUT_SECONDS
+    if bar_applies:
+        valid: int | None = sum(
+            1
+            for c in calls
+            if c["parse_ok"] and c["elapsed_s"] <= COACH_TIMEOUT_SECONDS
+        )
+    else:
+        valid = sum(1 for c in calls if c["parse_ok"])
     print(f"--- raw outputs ({len(calls)} calls, credential-free) ---")
     for record in calls:
         print(f"[{record['case']} #{record['call']}] {record['content']}")
     print("H1-ASSISTANCE: MANUAL-JUDGMENT-REQUIRED (read H1 outputs above)")
-    passed = valid >= PASS_MINIMUM
-    print(
-        f"BAR: {valid}/10 valid-inside-8s (need >={PASS_MINIMUM}): "
-        f"{'PASS' if passed else 'FAIL'}"
-    )
+    passed: bool | None
+    if bar_applies:
+        passed = valid >= PASS_MINIMUM
+        print(
+            f"BAR: {valid}/10 valid-inside-8s (need >={PASS_MINIMUM}): "
+            f"{'PASS' if passed else 'FAIL'}"
+        )
+    else:
+        passed = None
+        by_case = {
+            case: sum(1 for c in calls if c["case"] == case and c["parse_ok"])
+            for case, _, _ in payloads
+        }
+        detail = " ".join(
+            f"{case}={by_case[case]}/{CALLS_PER_CASE}" for case in by_case
+        )
+        print(f"MEASURE: {valid}/{len(calls)} parse-valid ({detail}); no deadline bar")
     if args.output:
         Path(args.output).write_text(
             json.dumps(
@@ -266,11 +330,13 @@ def main(argv: list[str] | None = None) -> int:
                     "candidate": {
                         "temperature": COACH_TEMPERATURE,
                         "max_tokens": args.max_tokens,
-                        "timeout_s": COACH_TIMEOUT_SECONDS,
+                        "timeout_s": timeout,
                         "max_retries": 0,
                     },
-                    "valid_inside_deadline": valid,
+                    "valid_inside_deadline": valid if bar_applies else None,
+                    "parse_valid": valid,
                     "pass_minimum": PASS_MINIMUM,
+                    "bar_applies": bar_applies,
                     "bar_passed": passed,
                     "calls": calls,
                 },
@@ -280,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
             encoding="utf-8",
         )
         print(f"evidence written: {args.output}")
-    return 0 if passed else 1
+    return 0 if passed is not False else 1
 
 
 if __name__ == "__main__":
