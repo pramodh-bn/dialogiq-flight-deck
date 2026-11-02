@@ -8,8 +8,8 @@
         { "say": "Bob, we missed the Q3 dates again." },
         { "say": "You told me it would be done by Friday." },
         { "hints": true },
-        { "follow": 1 },
         { "reload": true },
+        { "follow": 1 },
         { "fork_to_turn": 1 },
         { "say": "I know the last few weeks have been messy. Where would you like to start?" },
         { "hints": true }
