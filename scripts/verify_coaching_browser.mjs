@@ -55,6 +55,7 @@ const uiEvidence = REAL ? "real-http" : "injected";
 const results = [];
 const timings = [];
 const hintPairs = [];
+const savedHints = [];
 
 function check(name, passed, evidence, detail = "") {
   results.push({ name, status: passed ? "pass" : "FAIL", evidence, detail: String(detail) });
@@ -620,6 +621,16 @@ async function run() {
   );
   await screenshot("5-fork");
 
+  // Every saved hint on every branch, so latency and fallback reasons are on the record.
+  if (REAL) {
+    for (const branch of forked.branches) {
+      const listed = await getJson(`/api/sessions/${sessionId}/branches/${branch.id}/coach-hints`);
+      savedHints.push(
+        ...listed.hints.map((h) => ({ branch_id: branch.id, head: h.head_node_id, ...h.hint })),
+      );
+    }
+  }
+
   check(
     "no console errors or exceptions",
     problems.length === 0,
@@ -752,6 +763,7 @@ async function main() {
     injected_posts: coachPosts.filter((p) => p.injected).length,
     timings,
     hint_pairs: hintPairs,
+    saved_hints: savedHints,
     summary: {
       passed: results.filter((r) => r.status === "pass").length,
       failed,
