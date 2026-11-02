@@ -1,5 +1,9 @@
 # DialogIQ V2 API contract
 
+Demo reasoning proposal: [CS-62 low reasoning](cs62-demo-reasoning-delta.md),
+delta `s3-coach-r2.demo-reasoning-low.1`. This is pending the controlled result,
+owner review and explicit adoption on CS-62; it is not a runtime claim.
+
 Demo token extension: [CS-62 demo token budget](cs62-demo-token-delta.md),
 delta `s3-coach-r2.demo-tokens-16384.1`, defines 16384 for exact-1 demo mode,
 paired with the CS-61 grounding correction. Normal mode retains 2048.
