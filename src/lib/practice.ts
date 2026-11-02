@@ -5,6 +5,7 @@ import {
   api,
   ApiError,
   COACH_CONTRACT_REVISION,
+  COACH_DEMO_WAIT,
   type Branch,
   type ChatTurnResponse,
   type CoachHintList,
@@ -252,7 +253,9 @@ type ObserveOptions = {
   request: CoachHintRequest;
   key: string;
   isCurrent: () => boolean;
-  budgetMs?: number;
+  // Null is demo waiting: no total limit on the action.
+  budgetMs?: number | null;
+  abort?: AbortSignal;
   retryMs?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -270,17 +273,19 @@ export async function observeCoachHint({
   key,
   isCurrent,
   budgetMs = COACH_BUDGET_MS,
+  abort,
   retryMs = COACH_RETRY_MS,
   now = Date.now,
   sleep = wait,
 }: ObserveOptions): Promise<CoachOutcome> {
-  const deadline = now() + budgetMs;
+  const deadline = budgetMs === null ? Infinity : now() + budgetMs;
 
   async function savedHint(): Promise<Hint | undefined> {
     const remaining = deadline - now();
     if (remaining <= 0) return undefined;
     try {
-      const list = await api.listCoachHints(sessionId, request.branch_id, remaining);
+      const timeoutMs = Math.min(remaining, COACH_BUDGET_MS);
+      const list = await api.listCoachHints(sessionId, request.branch_id, timeoutMs, abort);
       return hintsAtHead(list, request.head_node_id).find((h) => h.attempt === request.attempt);
     } catch {
       return undefined;
@@ -291,7 +296,8 @@ export async function observeCoachHint({
     const remaining = deadline - now();
     if (remaining <= 0) return { kind: "unresolved" };
     try {
-      const response = await api.requestCoachHint(sessionId, request, key, remaining);
+      const timeoutMs = budgetMs === null ? null : remaining;
+      const response = await api.requestCoachHint(sessionId, request, key, timeoutMs, abort);
       return isCurrent()
         ? { kind: "hint", hint: response.hint, revision: response.revision }
         : { kind: "abandoned" };
@@ -326,6 +332,7 @@ export function useCoach({
   position,
   stalled,
   hold,
+  demoWait = COACH_DEMO_WAIT,
 }: {
   sessionId: number;
   // Null until the session and tree agree on where the conversation is.
@@ -333,6 +340,7 @@ export function useCoach({
   stalled: boolean;
   // True while a turn is in flight, when the head is about to move.
   hold: boolean;
+  demoWait?: boolean;
 }) {
   const client = useQueryClient();
   const keys = useActionKeys();
@@ -349,11 +357,14 @@ export function useCoach({
   });
   const mounted = useRef(false);
   const automaticStarted = useRef(new Set<string>());
+  // Only demo waiting can hold a request open indefinitely, so only it needs stopping.
+  const localWait = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      localWait.current?.abort();
     };
   }, []);
 
@@ -361,6 +372,7 @@ export function useCoach({
   useEffect(() => {
     if (scope.current.binding === binding) return;
     scope.current = { binding, generation: scope.current.generation + 1 };
+    localWait.current?.abort();
     setRun(null);
   }, [binding]);
 
@@ -371,11 +383,14 @@ export function useCoach({
       const isCurrent = () => mounted.current && scope.current.generation === generation;
       const action = `coach:${sessionId}:${JSON.stringify(request)}`;
       setRun({ binding: runBinding, status: "pending" });
+      const wait = demoWait ? new AbortController() : null;
+      localWait.current = wait;
       const outcome = await observeCoachHint({
         sessionId,
         request,
         key: keys.keyFor(action),
         isCurrent,
+        ...(wait ? { budgetMs: null, abort: wait.signal } : {}),
       });
       if (outcome.kind !== "unresolved") keys.release(action);
 
@@ -420,7 +435,7 @@ export function useCoach({
           });
       }
     },
-    [client, keys, sessionId],
+    [client, demoWait, keys, sessionId],
   );
 
   const saved = hintsAtHead(hintsResult.data, headId);

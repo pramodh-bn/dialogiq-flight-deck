@@ -494,6 +494,143 @@ describe("observeCoachHint", () => {
   });
 });
 
+describe("demo waiting", () => {
+  const isCurrent = () => true;
+
+  it("sends no timer on the POST and keeps a per-read limit on recovery", async () => {
+    const post = vi
+      .spyOn(api, "requestCoachHint")
+      .mockRejectedValueOnce(errorFor("request_in_progress"))
+      .mockResolvedValue(fixtures.success);
+    const list = vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+    let clock = 0;
+
+    const outcome = await observeCoachHint({
+      sessionId: 12,
+      request,
+      key: "k",
+      isCurrent,
+      budgetMs: null,
+      now: () => clock,
+      sleep: async (ms) => {
+        expect(ms).toBe(2_000);
+        clock += 60_000;
+      },
+    });
+
+    expect(outcome.kind).toBe("hint");
+    expect(post.mock.calls.map((c) => c[3])).toEqual([null, null]);
+    expect(post.mock.calls[0]![2]).toBe(post.mock.calls[1]![2]);
+    expect(list.mock.calls[0]![2]).toBe(15_000);
+  });
+
+  it("keeps observing past fifteen seconds of 409s", async () => {
+    const running = errorFor("request_in_progress");
+    const post = vi.spyOn(api, "requestCoachHint");
+    for (let i = 0; i < 40; i++) post.mockRejectedValueOnce(running);
+    post.mockResolvedValue(fixtures.success);
+    vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+    let clock = 0;
+
+    const outcome = await observeCoachHint({
+      sessionId: 12,
+      request,
+      key: "k",
+      isCurrent,
+      budgetMs: null,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+      },
+    });
+
+    expect(outcome.kind).toBe("hint");
+    expect(clock).toBe(80_000);
+  });
+
+  it("still reports a lost connection, so the same key can be retried", async () => {
+    vi.spyOn(api, "requestCoachHint").mockRejectedValue(new TypeError("failed"));
+    vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+
+    const outcome = await observeCoachHint({
+      sessionId: 12,
+      request,
+      key: "k",
+      isCurrent,
+      budgetMs: null,
+    });
+
+    expect(outcome.kind).toBe("unresolved");
+  });
+
+  it("the adapter sets no signal when there is no limit and nothing to abort", async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify(fixtures.success)));
+
+    await createHttpApi("http://api", fetchImpl).requestCoachHint(12, request, "k", null);
+
+    expect(fetchImpl.mock.calls[0]![1]!.signal).toBeUndefined();
+  });
+
+  it("the adapter stops waiting when the local wait is aborted", async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response("{}"));
+
+    await createHttpApi("http://api", fetchImpl).requestCoachHint(
+      12,
+      request,
+      "k",
+      null,
+      controller.signal,
+    );
+    const signal = fetchImpl.mock.calls[0]![1]!.signal!;
+    expect(signal.aborted).toBe(false);
+    controller.abort();
+    expect(signal.aborted).toBe(true);
+  });
+
+  it("aborts the local wait when the learner moves to another turn", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+    const post = vi
+      .spyOn(api, "requestCoachHint")
+      .mockImplementation(
+        (_id, _req, _key, _timeout, abort) =>
+          new Promise((_, reject) => abort?.addEventListener("abort", () => reject(new Error()))),
+      );
+    const first = { branchId: 31, headId: 103, revision: 4 };
+
+    const { rerender } = renderHook(
+      ({ position }) =>
+        useCoach({ sessionId: 12, position, stalled: true, hold: false, demoWait: true }),
+      { wrapper, initialProps: { position: first } },
+    );
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post.mock.calls[0]![3]).toBeNull();
+    const signal = post.mock.calls[0]![4]!;
+    expect(signal.aborted).toBe(false);
+
+    rerender({ position: { branchId: 31, headId: 104, revision: 5 } });
+
+    await waitFor(() => expect(signal.aborted).toBe(true));
+  });
+
+  it("leaves the normal budget and no abort outside demo waiting", async () => {
+    const post = vi.spyOn(api, "requestCoachHint").mockResolvedValue(fixtures.success);
+    const list = vi.spyOn(api, "listCoachHints").mockResolvedValue(emptyList);
+
+    await observeCoachHint({ sessionId: 12, request, key: "k", isCurrent });
+
+    expect(post.mock.calls[0]![3]).toBeGreaterThan(14_000);
+    expect(post.mock.calls[0]![4]).toBeUndefined();
+    expect(list).not.toHaveBeenCalled();
+  });
+});
+
 describe("useCoach", () => {
   const position = { branchId: 31, headId: 103, revision: 4 };
 

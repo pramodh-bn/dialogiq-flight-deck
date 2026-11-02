@@ -41,11 +41,16 @@ export function createHttpApi(baseUrl: string, fetchImpl: typeof fetch = fetch):
     path: string,
     init?: RequestInit,
     key?: string,
-    timeoutMs = REQUEST_TIMEOUT_MS,
+    timeoutMs: number | null = REQUEST_TIMEOUT_MS,
+    abort?: AbortSignal,
   ): Promise<T> {
+    const signals = [
+      ...(timeoutMs === null ? [] : [AbortSignal.timeout(timeoutMs)]),
+      ...(abort ? [abort] : []),
+    ];
     const res = await fetchImpl(`${root}${path}`, {
       ...init,
-      signal: AbortSignal.timeout(timeoutMs),
+      ...(signals.length ? { signal: AbortSignal.any(signals) } : {}),
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -74,19 +79,21 @@ export function createHttpApi(baseUrl: string, fetchImpl: typeof fetch = fetch):
         { method: "PUT", body: JSON.stringify(req) },
         key,
       ),
-    requestCoachHint: (id, req, key, timeoutMs = COACH_TIMEOUT_MS) =>
+    requestCoachHint: (id, req, key, timeoutMs = COACH_TIMEOUT_MS, abort) =>
       request(
         `/api/sessions/${id}/coach-hints`,
         { method: "POST", body: JSON.stringify(req) },
         key,
         timeoutMs,
+        abort,
       ),
-    listCoachHints: (id, branchId, timeoutMs = COACH_TIMEOUT_MS) =>
+    listCoachHints: (id, branchId, timeoutMs = COACH_TIMEOUT_MS, abort) =>
       request(
         `/api/sessions/${id}/branches/${branchId}/coach-hints`,
         undefined,
         undefined,
         timeoutMs,
+        abort,
       ),
   };
 }
