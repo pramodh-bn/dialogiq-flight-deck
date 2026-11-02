@@ -138,6 +138,24 @@ def test_explicit_max_tokens_override_reaches_sdk(monkeypatch) -> None:  # type:
     assert completions.calls[0]["max_tokens"] == 16384
 
 
+def test_default_omits_reasoning_effort_from_sdk_call(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Normal mode sends no reasoning field; omission is the default."""
+    result = _FakeCompletion(VALID_HINT, "stop", 1730, 1597)
+    completions = _install_fake(monkeypatch, result)
+    _client().respond(system_prompt="s", context_json="{}")
+    assert len(completions.calls) == 1
+    assert "reasoning_effort" not in completions.calls[0]
+
+
+def test_explicit_reasoning_effort_reaches_sdk_top_level(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Adopted demo LOW rides the supported top-level SDK keyword."""
+    result = _FakeCompletion(VALID_HINT, "stop", 1057, 935)
+    completions = _install_fake(monkeypatch, result)
+    _client().respond(system_prompt="s", context_json="{}", reasoning_effort="low")
+    assert len(completions.calls) == 1
+    assert completions.calls[0]["reasoning_effort"] == "low"
+
+
 def test_success_carries_finish_and_usage(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     result = _FakeCompletion(VALID_HINT, "stop", 1730, 1597)
     _install_fake(monkeypatch, result)
