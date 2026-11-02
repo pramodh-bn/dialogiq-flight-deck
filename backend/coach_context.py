@@ -66,6 +66,14 @@ def build_coach_system_prompt(persona_name: str, persona_role: str) -> str:
                 "continuation as if already spoken."
             ),
             (
+                "Make the example line one short acknowledgment of what the "
+                "other person just said, followed by one open question that "
+                "starts with what or how and invites their view. Exception: if "
+                "the other person has asked to stop, to be left alone, or not "
+                "to talk now, the example only acknowledges that and offers to "
+                "come back later, with no question about the present moment."
+            ),
+            (
                 "Do not repeat or rephrase an approach already present in "
                 "previous_hints; when earlier hints exist, offer a genuinely "
                 "different move. Do not explain your reasoning."

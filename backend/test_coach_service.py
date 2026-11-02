@@ -974,9 +974,23 @@ def test_real_coach_provider_selects_demo_reasoning_only_on_exact_flag(
 def test_coach_system_prompt_grounds_concrete_details_in_transcript() -> None:
     """CS-61: the grounding rule directly follows the untrusted-data rule."""
     paragraphs = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
-    assert len(paragraphs) == 6
+    assert len(paragraphs) == 7
     assert paragraphs[2].startswith("Ground every concrete detail")
     assert "already appear there" in paragraphs[2]
+
+
+def test_coach_system_prompt_example_line_sentence_and_refusal_exception() -> None:
+    """CS-68: CS-C307 sentence plus CS-C348 exception share one paragraph."""
+    paragraphs = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
+    assert len(paragraphs) == 7
+    assert paragraphs[4] == (
+        "Make the example line one short acknowledgment of what the other "
+        "person just said, followed by one open question that starts with "
+        "what or how and invites their view. Exception: if the other person "
+        "has asked to stop, to be left alone, or not to talk now, the example "
+        "only acknowledges that and offers to come back later, with no "
+        "question about the present moment."
+    )
 
 
 def test_coach_system_prompt_stays_single_variant() -> None:
