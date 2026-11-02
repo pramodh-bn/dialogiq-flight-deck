@@ -916,3 +916,29 @@ def test_real_coach_provider_passes_none_timeout_only_in_demo(
     monkeypatch.delenv("COACH_DEMO_WAIT")
     coach_service.real_coach_provider("s", "{}")
     assert "timeout" not in seen[-1]
+
+
+def test_real_coach_provider_selects_demo_cap_only_on_exact_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exact-"1" demo gets 16384; anything else leaves the 2048 default."""
+    monkeypatch.setenv("META_MODEL_API_KEY", "k")
+    monkeypatch.setenv("META_MODEL_API_BASE", "https://meta.example/v1")
+    monkeypatch.setenv("META_MODEL_API_MODEL", "m")
+    seen: list[dict] = []
+
+    class _Client:
+        def respond(self, **kwargs):  # type: ignore[no-untyped-def]
+            seen.append(kwargs)
+            return CoachCompletion(content=META_HINT_JSON, finish_reason="stop")
+
+    monkeypatch.setattr(coach_service, "MetaCoachClient", _Client)
+    monkeypatch.setenv("COACH_DEMO_WAIT", "1")
+    coach_service.real_coach_provider("s", "{}")
+    assert seen[-1]["max_tokens"] == 16384
+    monkeypatch.setenv("COACH_DEMO_WAIT", "0")
+    coach_service.real_coach_provider("s", "{}")
+    assert "max_tokens" not in seen[-1]
+    monkeypatch.delenv("COACH_DEMO_WAIT")
+    coach_service.real_coach_provider("s", "{}")
+    assert "max_tokens" not in seen[-1]
