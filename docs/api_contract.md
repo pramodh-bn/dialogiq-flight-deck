@@ -1,5 +1,10 @@
 # DialogIQ V2 API contract
 
+Demo token extension: [CS-62 demo token budget](cs62-demo-token-delta.md),
+delta `s3-coach-r2.demo-tokens-16384.1`, defines 16384 for exact-1 demo mode,
+paired with the CS-61 grounding correction. Normal mode retains 2048.
+Exact owner approval, adoption and runtime evidence are recorded on CS-62.
+
 Demo timing extension: [CS-60 demo coach waiting](cs60-demo-wait-delta.md),
 delta `s3-coach-r2.demo-wait.1`. The user authorized lifting the demo cutoff;
 the linked agreement defines paired opt-in configuration and lease renewal.
