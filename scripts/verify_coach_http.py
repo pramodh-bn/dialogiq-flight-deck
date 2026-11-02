@@ -275,6 +275,7 @@ def run_live(base: str, demo_wait: bool = False) -> None:
 
     status, first, elapsed1 = call("POST", path, hint_body(1), str(uuid4()))
     hint1 = first.get("hint", {})
+    print("LIVE-HINT-1 " + json.dumps(hint1, ensure_ascii=False))
     check(
         "live-attempt1-meta",
         status == 200 and hint1.get("source") == "meta",
@@ -282,6 +283,7 @@ def run_live(base: str, demo_wait: bool = False) -> None:
     )
     status, second, elapsed2 = call("POST", path, hint_body(2), str(uuid4()))
     hint2 = second.get("hint", {})
+    print("LIVE-HINT-2 " + json.dumps(hint2, ensure_ascii=False))
     check(
         "live-attempt2-meta",
         status == 200 and hint2.get("source") == "meta",
@@ -290,8 +292,6 @@ def run_live(base: str, demo_wait: bool = False) -> None:
     if demo_wait:
         check_saturation("live-demo1", elapsed1, hint1.get("latency_ms"))
         check_saturation("live-demo2", elapsed2, hint2.get("latency_ms"))
-    print("LIVE-HINT-1 " + json.dumps(hint1, ensure_ascii=False))
-    print("LIVE-HINT-2 " + json.dumps(hint2, ensure_ascii=False))
     print("MANUAL-JUDGMENT-REQUIRED distinct second approach vs hint 1")
 
 
