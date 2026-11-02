@@ -18,7 +18,7 @@ agents, regardless of the tool used. Explicit user instructions take precedence.
 
 ## Core Operating Principles (Sprint 2 Retrospective Mandate)
 
-- **Empirical Verification Over Claims:** "Tests pass" and "feature delivered" are claims, not proof. Every delivery must be verified by running the real server, invoked by the real client, from the correct port (`8080` backend / `5173` frontend), in a clean environment.
+- **Empirical Verification Over Claims:** "Tests pass" and "feature delivered" are claims, not proof. Every runtime delivery must be verified by running the real server, invoked by the real client, from the correct port (`8080` backend / `5173` frontend), in a clean environment.
 - **Upfront API & Port Contracts:** All endpoint paths, payload schemas, and port bindings must be documented in `docs/api_contract.md` before parallel coding begins. No unilateral changes to ports or routes.
 - **Toolchain Preflight:** Always verify the active toolchain (Python virtual environment, Node/npm PATH, environment variables) before writing or testing code.
 - **Strict Worktree Hygiene:** Maintain separate git worktrees per agent. Codex acts as the sole integration gatekeeper merging via clean PRs into `dev`.
@@ -51,6 +51,45 @@ them; for an inapplicable lesson, briefly explain why.
 - Push feature branches and open a draft PR at delivery, within authorized scope,
   so integration does not depend on an unpushed commit on one machine. Preserve
   the separate implementation, delivery, verification and integration gates.
+
+## Apply the Sprint 3 lessons
+
+Read [the Sprint 3 retrospective](docs/sprint-3-retrospective.md) with the
+Sprint 2 lessons when claiming relevant work. Keep these checks proportional
+to the change; do not add approval loops or rerun broad suites without cause.
+
+- Test one complete learner journey early, before expanding implementation.
+  For coach changes, cover every scenario in the planned demo, first and chained
+  second hints with actual prior-hint context, direct requests, explicit and
+  implicit refusal, and natural punctuation. Send suggested lines to the persona
+  and inspect its replies. Preserve independent unseen cases.
+- Evaluate the next useful move, not mandatory what/how questions or score gains.
+  An answer, reflection, clarification, action or respectful pause may fit better.
+  Suggested promises must be conditional on the learner's authority and ability
+  to honor them. Do not teach hidden scoring keywords or invent private motives.
+- Keep public selected-branch dialogue beside reviewed hints, tied to exact
+  source, session/head, attempt and prior hints. Trace factual claims to that
+  dialogue; a hint's own explanation is not grounding evidence. Keep secrets,
+  hidden scenario data and model reasoning out of artifacts. Separate safe
+  operational telemetry from intentionally retained review text.
+- Diagnose timeout, token exhaustion, invalid output and provider errors
+  separately. Record actual elapsed time, finish reason, token usage when
+  available, provider/fallback counts by attempt and actual paid-call totals.
+  Plan sample sizes and rerun checkpoints; respect explicit spending limits.
+  Small samples and unmatched comparisons do not establish reliability or cause.
+- Publish the scripts and configuration needed to reproduce accepted evidence.
+  Compare exact candidate and integrated bytes before carrying evidence forward.
+  State whether the running app, catalog and pinned sessions actually use the
+  new behavior; never silently migrate or rescore historical sessions.
+- Execute already-authorized work once its agreed dependencies are met. A handoff
+  names the artifact, decision needed, next owner and blocker; acknowledgment
+  means receipt, not implementation. Post releases where the waiting owner is
+  tracking them. Before ending a watch, list unanswered requests and availability.
+  Never claim unattended monitoring or CLI execution without a running mechanism.
+- Separate implementation, independent measurement and integration ownership when
+  feasible, without automatically spawning agents. Keep fixes narrow and reuse
+  existing follow-up tasks. Record explicit user waivers as waivers, never as
+  fabricated peer approval, successful tests or learner acceptance.
 
 ## Isolate each agent's work
 
