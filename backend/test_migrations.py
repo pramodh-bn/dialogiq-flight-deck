@@ -8,7 +8,7 @@ from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session as DbSession
 
 from database import create_sqlite_engine
-from migrations import initialize_database
+from migrations import SCHEMA_VERSION, initialize_database
 from models import Branch, ConversationNode, Scenario, Session, User
 
 
@@ -79,7 +79,10 @@ def test_legacy_upgrade_preserves_forks_ids_text_and_private_fields(
         assert len(list(db.scalars(select(ConversationNode)))) == 3
         assert len(list(db.scalars(select(Scenario)))) == 4
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("PRAGMA user_version").scalar_one() == 2
+        assert (
+            connection.exec_driver_sql("PRAGMA user_version").scalar_one()
+            == SCHEMA_VERSION
+        )
         assert connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall() == []
     engine.dispose()
 

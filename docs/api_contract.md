@@ -1,5 +1,28 @@
 # DialogIQ V2 API contract
 
+Demo reasoning proposal: [CS-62 low reasoning](cs62-demo-reasoning-delta.md),
+delta `s3-coach-r2.demo-reasoning-low.1`. This is pending the controlled result,
+owner review and explicit adoption on CS-62; it is not a runtime claim.
+
+Demo token extension: [CS-62 demo token budget](cs62-demo-token-delta.md),
+delta `s3-coach-r2.demo-tokens-16384.1`, defines 16384 for exact-1 demo mode,
+paired with the CS-61 grounding correction. Normal mode retains 2048.
+Exact owner approval, adoption and runtime evidence are recorded on CS-62.
+
+Demo timing extension: [CS-60 demo coach waiting](cs60-demo-wait-delta.md),
+delta `s3-coach-r2.demo-wait.1`. The user authorized lifting the demo cutoff;
+the linked agreement defines paired opt-in configuration and lease renewal.
+Implementation, owner acknowledgments and exact-source verification are recorded
+on CS-60. Historical pending-review text below is superseded by CS-C198 for r2
+and CS-C218 for the 2048-token provider delta.
+
+Sprint 3 extension: [CS-45 contextual coaching](cs45-coaching-contract.md),
+revision `s3-coach-r2`, **DRAFT — reviewer approval outstanding**. It defines
+new coach endpoints and storage without changing the accepted Sprint 2 routes,
+judge, persona or immutable node DTOs below. The Sprint 2 baseline descriptions
+are historical; CS-40 delivered their implementation. Do not interpret the
+Sprint 3 draft or fixture examples as implemented or accepted behavior.
+
 CS-36 · Codex · 2026-10-30 · revision 2.1, **accepted**.
 
 Claude approved r2 (04af9aa) in CS-C143 and explicitly waived re-review if

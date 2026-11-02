@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import sessionmaker
 from starlette.middleware.base import RequestResponseEndpoint
 
+import coach_service
 import practice
 from api_errors import ApiError, not_found
 from database import engine
@@ -33,6 +34,9 @@ from schemas import (
     BranchSelectRequest,
     ChatTurnRequest,
     ChatTurnResponse,
+    CoachHintRequest,
+    CoachHintResponse,
+    CoachHintsGetResponse,
     ScenarioResponse,
     SessionCreateRequest,
     SessionResponse,
@@ -56,6 +60,10 @@ def provider_dependency(request: Request) -> practice.Provider:
     return request.app.state.provider
 
 
+def coach_provider_dependency(request: Request) -> coach_service.CoachProvider:
+    return request.app.state.coach_provider
+
+
 def idempotency_key(request: Request) -> str:
     values = request.headers.getlist("Idempotency-Key")
     value = values[0] if len(values) == 1 else ""
@@ -72,6 +80,9 @@ def idempotency_key(request: Request) -> str:
 DbDep = Annotated[DbSession, Depends(request_db)]
 KeyDep = Annotated[str, Depends(idempotency_key)]
 ProviderDep = Annotated[practice.Provider, Depends(provider_dependency)]
+CoachProviderDep = Annotated[
+    coach_service.CoachProvider, Depends(coach_provider_dependency)
+]
 
 
 def reply(result: tuple[int, dict]) -> JSONResponse:
@@ -80,7 +91,9 @@ def reply(result: tuple[int, dict]) -> JSONResponse:
 
 
 def create_app(
-    db_engine: Engine = engine, provider: practice.Provider | None = None
+    db_engine: Engine = engine,
+    provider: practice.Provider | None = None,
+    coach_provider: coach_service.CoachProvider | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -92,6 +105,9 @@ def create_app(
         bind=db_engine, expire_on_commit=False
     )
     application.state.provider = provider or practice.real_persona
+    application.state.coach_provider = (
+        coach_provider or coach_service.real_coach_provider
+    )
 
     @application.middleware("http")
     async def safe_failures(
@@ -246,6 +262,33 @@ def create_app(
         session_id: IdPath, payload: BranchSelectRequest, key: KeyDep, db: DbDep
     ) -> JSONResponse:
         return reply(practice.select_branch(db, session_id, payload, key))
+
+    @application.post(
+        "/api/sessions/{session_id}/coach-hints", response_model=CoachHintResponse
+    )
+    def coach_hint(
+        session_id: IdPath,
+        payload: CoachHintRequest,
+        key: KeyDep,
+        db: DbDep,
+        coach_call: CoachProviderDep,
+    ) -> JSONResponse:
+        return reply(
+            coach_service.request_hint(db, session_id, payload, key, coach_call)
+        )
+
+    @application.get(
+        "/api/sessions/{session_id}/branches/{branch_id}/coach-hints",
+        response_model=CoachHintsGetResponse,
+    )
+    def coach_hints(
+        session_id: IdPath, branch_id: IdPath, request: Request, db: DbDep
+    ) -> dict:
+        if request.query_params:
+            raise ApiError(
+                422, "validation_error", "This endpoint takes no query parameters."
+            )
+        return coach_service.list_hints(db, session_id, branch_id)
 
     # Outer CORS also decorates safe unexpected-failure responses.
     origins = [

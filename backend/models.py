@@ -149,3 +149,61 @@ class IdempotencyRecord(Base):
     expires_at: Mapped[float] = mapped_column(Float)
     status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class CoachHint(Base):
+    """Immutable persisted coach hint plus its generation slot identity."""
+
+    __tablename__ = "coach_hints"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "branch_id",
+            "head_slot",
+            "contract_revision",
+            "attempt",
+            name="uq_coach_hint_slot",
+        ),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"), index=True)
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"), index=True)
+    head_node_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversation_nodes.id"), nullable=True
+    )
+    head_slot: Mapped[int] = mapped_column(Integer)
+    contract_revision: Mapped[str] = mapped_column(String(32))
+    attempt: Mapped[int] = mapped_column(Integer)
+    approach: Mapped[str] = mapped_column(Text)
+    example: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(16))
+    fallback_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    latency_ms: Mapped[int] = mapped_column(Integer)
+
+
+class CoachSlotLease(Base):
+    """One active generation lease per numbered coach slot."""
+
+    __tablename__ = "coach_slot_leases"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "branch_id",
+            "head_slot",
+            "contract_revision",
+            "attempt",
+            name="uq_coach_slot_lease",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"))
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
+    head_slot: Mapped[int] = mapped_column(Integer)
+    contract_revision: Mapped[str] = mapped_column(String(32))
+    attempt: Mapped[int] = mapped_column(Integer)
+    owner: Mapped[str] = mapped_column(String(36))
+    expires_at: Mapped[float] = mapped_column(Float)

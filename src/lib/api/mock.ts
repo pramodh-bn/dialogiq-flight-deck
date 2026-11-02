@@ -1,9 +1,13 @@
 import { classifyTurn } from "../classify";
 import { ApiError } from "./http";
+import { COACH_CONTRACT_REVISION } from "./types";
 import type {
   Branch,
   Coaching,
+  CoachHintResponse,
   DialogApi,
+  Hint,
+  HintAttempt,
   PracticeSession,
   RevealedNeed,
   Scenario,
@@ -183,6 +187,37 @@ function nextState(prev: State, coaching: Coaching): State {
   };
 }
 
+// The contract's deterministic bank. The mock has no provider, so every hint is honestly
+// a labelled fallback: it must never look like live coaching.
+type BankEntry = Pick<Hint, "approach" | "example" | "reason">;
+
+const ROOT_HINT: BankEntry = {
+  approach: "Start with a low-pressure invitation.",
+  example: "Is now an okay time to talk, or would later be better?",
+  reason: "Giving a choice can make it easier to begin.",
+};
+const FIRST_HINT: BankEntry = {
+  approach: "Pause and invite their perspective.",
+  example: "I may be missing something. What would you like me to understand?",
+  reason: "An invitation leaves room for their account without assuming their reasons.",
+};
+const LATER_HINT_A: BankEntry = {
+  approach: "Ask permission for one small question.",
+  example: "Would it be okay if I asked one thing, or should we stop here?",
+  reason: "Permission gives the other person a clear way to set a boundary.",
+};
+const LATER_HINT_B: BankEntry = {
+  approach: "Invite them to correct your understanding.",
+  example: "I may be reading this wrong. Is there anything you want to correct?",
+  reason: "Checking your interpretation avoids assuming you know their reasons.",
+};
+
+function bankEntry(isRoot: boolean, attempt: HintAttempt, earlier: number): BankEntry {
+  if (isRoot && attempt === 1) return ROOT_HINT;
+  if (earlier === 0) return FIRST_HINT;
+  return earlier % 2 === 1 ? LATER_HINT_A : LATER_HINT_B;
+}
+
 function fail(status: number, path: string, code: string, retryable = false): ApiError {
   return new ApiError(status, path, JSON.stringify({ detail: { code, message: code, retryable } }));
 }
@@ -198,6 +233,22 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
   const branches = new Map<number, Branch>();
   const nodes = new Map<number, TurnNode>();
   const completed = new Map<string, { request: string; result: unknown }>();
+  const savedHints = new Map<string, Hint>();
+
+  const hintSlot = (branchId: number, headId: number | null, attempt: number) =>
+    `${branchId}:${headId ?? "root"}:${attempt}`;
+
+  // Root first, then each ancestor in order, so a list reads oldest to newest.
+  function hintsOnChain(branchId: number, headId: number | null) {
+    const heads: (number | null)[] = [];
+    for (let id = headId; id !== null; id = nodes.get(id)?.parent_id ?? null) heads.unshift(id);
+    return [null, ...heads].flatMap((head_node_id) =>
+      ([1, 2] as const).flatMap((attempt) => {
+        const hint = savedHints.get(hintSlot(branchId, head_node_id, attempt));
+        return hint ? [{ head_node_id, hint }] : [];
+      }),
+    );
+  }
 
   function once<T>(path: string, key: string, body: unknown, run: () => T): T {
     const request = `${path}:${JSON.stringify(body)}`;
@@ -357,6 +408,71 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
         }
         return snapshot(id);
       });
+    },
+    async requestCoachHint(id, req, key) {
+      const path = `/api/sessions/${id}/coach-hints`;
+      if (req.attempt !== 1 && req.attempt !== 2) throw fail(422, path, "validation_error");
+      if (req.attempt === 2 && req.trigger !== "requested") {
+        throw fail(422, path, "validation_error");
+      }
+      return once(path, key, req, (): CoachHintResponse => {
+        const session = sessionOr404(id, path);
+        const branch = branchOr404(req.branch_id, id, path);
+        const headId = req.head_node_id;
+        if (req.expected_revision !== session.revision) throw fail(409, path, "stale_revision");
+        if (branch.id !== session.active_branch_id) throw fail(409, path, "inactive_branch");
+        if (headId !== branch.head_node_id) throw fail(409, path, "parent_mismatch");
+
+        if (req.trigger === "automatic") {
+          const head = headId === null ? undefined : nodes.get(headId);
+          const parentScore = head?.parent_id ? (nodes.get(head.parent_id)?.score ?? 0) : 0;
+          if (!head || head.score !== parentScore || head.score >= 7) {
+            throw fail(422, path, "hint_not_eligible");
+          }
+        }
+        if (req.attempt === 2 && !savedHints.has(hintSlot(branch.id, headId, 1))) {
+          throw fail(409, path, "hint_not_ready", true);
+        }
+
+        const envelope = (hint: Hint): CoachHintResponse => ({
+          session_id: id,
+          branch_id: branch.id,
+          head_node_id: headId,
+          revision: session.revision,
+          hint,
+        });
+        const slot = hintSlot(branch.id, headId, req.attempt);
+        const saved = savedHints.get(slot);
+        if (saved) return envelope(saved);
+
+        const onChain = hintsOnChain(branch.id, headId);
+        const earlier = onChain.filter(
+          (h) => h.head_node_id !== headId || (req.attempt === 2 && h.hint.attempt === 1),
+        ).length;
+        const hint: Hint = {
+          id: nextId++,
+          contract_revision: COACH_CONTRACT_REVISION,
+          attempt: req.attempt,
+          ...bankEntry(headId === null, req.attempt, earlier),
+          source: "deterministic",
+          fallback_reason: "not_configured",
+          latency_ms: 0,
+        };
+        savedHints.set(slot, hint);
+        return envelope(hint);
+      });
+    },
+    async listCoachHints(id, branchId) {
+      const path = `/api/sessions/${id}/branches/${branchId}/coach-hints`;
+      const session = sessionOr404(id, path);
+      const branch = branchOr404(branchId, id, path);
+      return {
+        session_id: id,
+        branch_id: branchId,
+        head_node_id: branch.head_node_id,
+        revision: session.revision,
+        hints: hintsOnChain(branchId, branch.head_node_id),
+      };
     },
   };
   return api;
