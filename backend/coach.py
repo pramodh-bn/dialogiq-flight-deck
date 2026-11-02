@@ -46,6 +46,10 @@ COACH_MAX_TOKENS = 2048
 # Demo-wait headroom per s3-coach-r2.demo-tokens-16384.1: selected by the
 # service only when COACH_DEMO_WAIT is exactly "1". Normal mode keeps 2048.
 COACH_DEMO_MAX_TOKENS = 16384
+# Demo-only reasoning level per s3-coach-r2.demo-reasoning-low.1: sent as a
+# top-level SDK field only when COACH_DEMO_WAIT is exactly "1". Normal mode
+# omits the field entirely.
+COACH_DEMO_REASONING_EFFORT = "low"
 COACH_TIMEOUT_SECONDS = 8.0
 
 APPROACH_MAX_CHARS = 240
@@ -222,6 +226,7 @@ class MetaCoachClient:
         temperature: float = COACH_TEMPERATURE,
         max_tokens: int = COACH_MAX_TOKENS,
         timeout: float | None = COACH_TIMEOUT_SECONDS,
+        reasoning_effort: str | None = None,
     ) -> CoachCompletion:
         """Return one raw completion for serialized coach context.
 
@@ -232,7 +237,9 @@ class MetaCoachClient:
         reason and usage ride on both the success value and the raised
         error, so probes record provider evidence on every path.
         ``timeout=None`` disables the SDK cutoff (demo-wait mode) and is
-        passed through explicitly, never omitted.
+        passed through explicitly, never omitted. ``reasoning_effort``
+        is sent as a top-level SDK field only when set; the default
+        ``None`` omits it (normal mode).
         """
         if not self.api_key or not self.model:
             raise CoachNotConfiguredError(
@@ -249,18 +256,21 @@ class MetaCoachClient:
         # fall back to OPENAI_API_KEY). max_retries=0 keeps one request
         # per call.
         client = OpenAI(base_url=self.base_url, api_key=self.api_key, max_retries=0)
+        create_kwargs: dict[str, object] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": context_json},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+            "stream": False,
+        }
+        if reasoning_effort is not None:
+            create_kwargs["reasoning_effort"] = reasoning_effort
         try:
-            completion = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": context_json},
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
-                stream=False,
-            )
+            completion = client.chat.completions.create(**create_kwargs)  # type: ignore[arg-type]
         except APITimeoutError as exc:
             detail = f" after {timeout:g} seconds" if timeout is not None else ""
             raise CoachTimeoutError(
@@ -323,6 +333,7 @@ def generate_coach_hint(
     temperature: float = COACH_TEMPERATURE,
     max_tokens: int = COACH_MAX_TOKENS,
     timeout: float | None = COACH_TIMEOUT_SECONDS,
+    reasoning_effort: str | None = None,
 ) -> tuple[dict[str, str], str | None]:
     """Run one provider call and return the validated hint plus finish reason.
 
@@ -336,5 +347,6 @@ def generate_coach_hint(
         temperature=temperature,
         max_tokens=max_tokens,
         timeout=timeout,
+        reasoning_effort=reasoning_effort,
     )
     return parse_coach_output(completion.content), completion.finish_reason

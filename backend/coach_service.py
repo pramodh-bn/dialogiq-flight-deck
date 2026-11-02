@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session as DbSession
 from api_errors import ApiError, conflict
 from coach import (
     COACH_DEMO_MAX_TOKENS,
+    COACH_DEMO_REASONING_EFFORT,
     CoachCompletion,
     CoachError,
     CoachNotConfiguredError,
@@ -112,6 +113,7 @@ def real_coach_provider(system_prompt: str, context_json: str) -> CoachCompletio
             context_json=context_json,
             max_tokens=COACH_DEMO_MAX_TOKENS,
             timeout=None,
+            reasoning_effort=COACH_DEMO_REASONING_EFFORT,
         )
     return MetaCoachClient().respond(
         system_prompt=system_prompt, context_json=context_json
