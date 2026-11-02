@@ -194,15 +194,17 @@ class MetaCoachClient:
         model: str | None = None,
         api_key: str | None = None,
     ) -> None:
-        self.base_url = (
-            base_url if base_url is not None else os.environ.get(ENV_BASE, "")
-        )
-        self.model = (
+        raw_base = base_url if base_url is not None else os.environ.get(ENV_BASE, "")
+        raw_model = (
             model if model is not None else os.environ.get(ENV_MODEL, DEFAULT_MODEL)
         )
         # Passing "" (not None) stops any fallback to another backend's
         # key when no Meta key is set.
-        self.api_key = api_key if api_key is not None else os.environ.get(ENV_KEY, "")
+        raw_key = api_key if api_key is not None else os.environ.get(ENV_KEY, "")
+        # Blank (whitespace-only) values are missing config, never live input.
+        self.base_url = raw_base.strip()
+        self.model = raw_model.strip()
+        self.api_key = raw_key.strip()
 
     @property
     def configured(self) -> bool:
@@ -221,7 +223,9 @@ class MetaCoachClient:
         """Return one raw completion for serialized coach context.
 
         Raises ``CoachNotConfiguredError`` before any network call when
-        config is missing or the base URL is not plain https. Finish
+        config is missing or the base URL is not plain https. Only a
+        non-empty string reply with ``finish_reason`` stop is returned;
+        anything else raises ``CoachInvalidResponseError``. Finish
         reason and usage ride on both the success value and the raised
         error, so probes record provider evidence on every path.
         """
@@ -267,22 +271,40 @@ class MetaCoachClient:
             raise CoachInvalidResponseError(
                 f"MetaCoachClient request to model {self.model} failed."
             ) from exc
-        choice = completion.choices[0]
-        usage = completion.usage
+        usage = getattr(completion, "usage", None)
         completion_tokens = getattr(usage, "completion_tokens", None)
         details = getattr(usage, "completion_tokens_details", None)
         reasoning_tokens = getattr(details, "reasoning_tokens", None)
-        content = choice.message.content
-        if not content or not content.strip():
+        choices = getattr(completion, "choices", None) or []
+        if not choices:
+            raise CoachInvalidResponseError(
+                f"MetaCoachClient received no choices from model {self.model}.",
+                finish_reason=None,
+                completion_tokens=completion_tokens,
+                reasoning_tokens=reasoning_tokens,
+            )
+        choice = choices[0]
+        message = getattr(choice, "message", None)
+        content = getattr(message, "content", None)
+        finish_reason = getattr(choice, "finish_reason", None)
+        if not isinstance(content, str) or not content.strip():
             raise CoachInvalidResponseError(
                 f"MetaCoachClient received an empty reply from model {self.model}.",
-                finish_reason=choice.finish_reason,
+                finish_reason=finish_reason,
+                completion_tokens=completion_tokens,
+                reasoning_tokens=reasoning_tokens,
+            )
+        if finish_reason != "stop":
+            raise CoachInvalidResponseError(
+                "MetaCoachClient received an unfinished reply from model "
+                f"{self.model}; only finish_reason stop is accepted.",
+                finish_reason=finish_reason,
                 completion_tokens=completion_tokens,
                 reasoning_tokens=reasoning_tokens,
             )
         return CoachCompletion(
             content=content.strip(),
-            finish_reason=choice.finish_reason,
+            finish_reason=finish_reason,
             completion_tokens=completion_tokens,
             reasoning_tokens=reasoning_tokens,
         )

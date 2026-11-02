@@ -158,3 +158,63 @@ def test_parse_rejects_fenced_json() -> None:
         pass
     else:
         raise AssertionError("expected CoachInvalidResponseError")
+
+
+class _EmptyCompletion:
+    def __init__(self) -> None:
+        self.choices: list = []
+        self.usage = _FakeUsage(None, None)
+
+
+def test_empty_choices_raise_typed_error(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _install_fake(monkeypatch, _EmptyCompletion())
+    try:
+        _client().respond(system_prompt="s", context_json="{}")
+    except CoachInvalidResponseError as exc:
+        assert exc.finish_reason is None
+    else:
+        raise AssertionError("expected CoachInvalidResponseError")
+
+
+def test_blank_config_never_constructs_client(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    constructed: list = []
+
+    class _RecordingOpenAI:
+        def __init__(self, **kwargs):  # type: ignore[no-untyped-def]
+            constructed.append(kwargs)
+
+    monkeypatch.setattr(coach, "OpenAI", _RecordingOpenAI)
+    blanked = [
+        {"api_key": "   "},
+        {"model": "  "},
+        {"base_url": "  "},
+    ]
+    for override in blanked:
+        kwargs = {
+            "base_url": "https://meta.example/v1",
+            "model": "muse-spark-1.3",
+            "api_key": "test-key",
+        }
+        kwargs.update(override)
+        client = MetaCoachClient(**kwargs)  # type: ignore[arg-type]
+        assert not client.configured
+        try:
+            client.respond(system_prompt="s", context_json="{}")
+        except CoachNotConfiguredError:
+            pass
+        else:
+            raise AssertionError("expected CoachNotConfiguredError")
+    assert constructed == []
+
+
+def test_finish_length_valid_json_rejected(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    result = _FakeCompletion(VALID_HINT, "length", 2048, 1973)
+    _install_fake(monkeypatch, result)
+    try:
+        _client().respond(system_prompt="s", context_json="{}")
+    except CoachInvalidResponseError as exc:
+        assert exc.finish_reason == "length"
+        assert exc.completion_tokens == 2048
+        assert exc.reasoning_tokens == 1973
+    else:
+        raise AssertionError("expected CoachInvalidResponseError")

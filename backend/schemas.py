@@ -138,3 +138,46 @@ class ChatTurnResponse(WireModel):
 class BranchCreateResponse(WireModel):
     branch: BranchResponse
     session: SessionResponse
+
+
+class CoachHintRequest(WireModel):
+    branch_id: Identifier
+    head_node_id: Identifier | None
+    expected_revision: Revision
+    trigger: Literal["automatic", "requested"]
+    attempt: int = Field(strict=True, ge=1, le=2)
+
+
+class Hint(WireModel):
+    id: Identifier
+    contract_revision: Literal["s3-coach-r2"]
+    attempt: Literal[1, 2]
+    approach: str = Field(min_length=1, max_length=240)
+    example: str = Field(min_length=1, max_length=320)
+    reason: str = Field(min_length=1, max_length=360)
+    source: Literal["meta", "deterministic"]
+    fallback_reason: (
+        Literal["not_configured", "timeout", "unavailable", "invalid_response"] | None
+    )
+    latency_ms: int = Field(strict=True, ge=0, le=10000)
+
+
+class CoachHintResponse(WireModel):
+    session_id: Identifier
+    branch_id: Identifier
+    head_node_id: Identifier | None
+    revision: Revision
+    hint: Hint
+
+
+class HeadHint(WireModel):
+    head_node_id: Identifier | None
+    hint: Hint
+
+
+class CoachHintsGetResponse(WireModel):
+    session_id: Identifier
+    branch_id: Identifier
+    head_node_id: Identifier | None
+    revision: Revision
+    hints: list[HeadHint]

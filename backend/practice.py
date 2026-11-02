@@ -140,7 +140,12 @@ def validate_revision(session: Session, expected: int) -> None:
 
 
 def reserve(
-    db: DbSession, key: str, method: str, path: str, payload: dict
+    db: DbSession,
+    key: str,
+    method: str,
+    path: str,
+    payload: dict,
+    lease_seconds: int = LEASE_SECONDS,
 ) -> tuple[str, tuple[int, dict] | None]:
     fingerprint = json.dumps(
         [method, path, payload],
@@ -174,7 +179,7 @@ def reserve(
             key=key,
             fingerprint=fingerprint,
             owner=owner,
-            expires_at=time.time() + LEASE_SECONDS,
+            expires_at=time.time() + lease_seconds,
         )
     )
     db.commit()
