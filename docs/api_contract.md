@@ -1,5 +1,12 @@
 # DialogIQ V2 API contract
 
+Demo timing extension: [CS-60 demo coach waiting](cs60-demo-wait-delta.md),
+delta `s3-coach-r2.demo-wait.1`. The user authorized lifting the demo cutoff;
+the linked agreement defines paired opt-in configuration and lease renewal.
+Implementation, owner acknowledgments and exact-source verification are recorded
+on CS-60. Historical pending-review text below is superseded by CS-C198 for r2
+and CS-C218 for the 2048-token provider delta.
+
 Sprint 3 extension: [CS-45 contextual coaching](cs45-coaching-contract.md),
 revision `s3-coach-r2`, **DRAFT — reviewer approval outstanding**. It defines
 new coach endpoints and storage without changing the accepted Sprint 2 routes,
