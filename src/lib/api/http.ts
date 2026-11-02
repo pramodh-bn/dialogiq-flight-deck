@@ -3,6 +3,9 @@ import type { DialogApi } from "./types";
 // Must outlast the backend's 30-second persona timeout, so the server decides that case.
 const REQUEST_TIMEOUT_MS = 45_000;
 
+// The contract's client budget for one coach action, across all its attempts.
+export const COACH_TIMEOUT_MS = 15_000;
+
 function parseDetail(body: string): { code: string | null; retryable: boolean } {
   try {
     const detail = (JSON.parse(body) as { detail?: { code?: unknown; retryable?: unknown } })
@@ -34,10 +37,15 @@ export class ApiError extends Error {
 export function createHttpApi(baseUrl: string, fetchImpl: typeof fetch = fetch): DialogApi {
   const root = baseUrl.replace(/\/+$/, "");
 
-  async function request<T>(path: string, init?: RequestInit, key?: string): Promise<T> {
+  async function request<T>(
+    path: string,
+    init?: RequestInit,
+    key?: string,
+    timeoutMs = REQUEST_TIMEOUT_MS,
+  ): Promise<T> {
     const res = await fetchImpl(`${root}${path}`, {
       ...init,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -65,6 +73,20 @@ export function createHttpApi(baseUrl: string, fetchImpl: typeof fetch = fetch):
         `/api/sessions/${id}/active-branch`,
         { method: "PUT", body: JSON.stringify(req) },
         key,
+      ),
+    requestCoachHint: (id, req, key, timeoutMs = COACH_TIMEOUT_MS) =>
+      request(
+        `/api/sessions/${id}/coach-hints`,
+        { method: "POST", body: JSON.stringify(req) },
+        key,
+        timeoutMs,
+      ),
+    listCoachHints: (id, branchId, timeoutMs = COACH_TIMEOUT_MS) =>
+      request(
+        `/api/sessions/${id}/branches/${branchId}/coach-hints`,
+        undefined,
+        undefined,
+        timeoutMs,
       ),
   };
 }

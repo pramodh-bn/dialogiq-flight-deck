@@ -114,6 +114,51 @@ export type CreateBranchResponse = { branch: Branch; session: PracticeSession };
 
 export type SelectBranchRequest = { branch_id: number; expected_revision: number };
 
+// Contextual coaching, per docs/cs45-coaching-contract.md.
+export const COACH_CONTRACT_REVISION = "s3-coach-r2";
+
+export type HintTrigger = "automatic" | "requested";
+
+export type HintAttempt = 1 | 2;
+
+export type HintFallbackReason = "not_configured" | "timeout" | "unavailable" | "invalid_response";
+
+export type Hint = {
+  id: number;
+  contract_revision: string;
+  attempt: HintAttempt;
+  approach: string;
+  example: string;
+  reason: string;
+  source: "meta" | "deterministic";
+  fallback_reason: HintFallbackReason | null;
+  latency_ms: number;
+};
+
+export type CoachHintRequest = {
+  branch_id: number;
+  head_node_id: number | null;
+  expected_revision: number;
+  trigger: HintTrigger;
+  attempt: HintAttempt;
+};
+
+export type CoachHintResponse = {
+  session_id: number;
+  branch_id: number;
+  head_node_id: number | null;
+  revision: number;
+  hint: Hint;
+};
+
+export type CoachHintList = {
+  session_id: number;
+  branch_id: number;
+  head_node_id: number | null;
+  revision: number;
+  hints: { head_node_id: number | null; hint: Hint }[];
+};
+
 // Mutations take an idempotency key, kept across retries of one action.
 export interface DialogApi {
   listScenarios(): Promise<Scenario[]>;
@@ -129,4 +174,12 @@ export interface DialogApi {
     key: string,
   ): Promise<CreateBranchResponse>;
   selectBranch(sessionId: number, req: SelectBranchRequest, key: string): Promise<PracticeSession>;
+  // timeoutMs is what remains of one action's budget, not a fresh limit per attempt.
+  requestCoachHint(
+    sessionId: number,
+    req: CoachHintRequest,
+    key: string,
+    timeoutMs?: number,
+  ): Promise<CoachHintResponse>;
+  listCoachHints(sessionId: number, branchId: number, timeoutMs?: number): Promise<CoachHintList>;
 }

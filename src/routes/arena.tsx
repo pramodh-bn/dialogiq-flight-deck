@@ -2,18 +2,21 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { CoachHint } from "@/components/CoachHint";
 import { api, ApiError, type Resistance, type Whisper } from "@/lib/api";
 import {
   applyTurn,
   branchChain,
   failureAction,
   failureMessage,
+  isStalled,
   refreshSession,
   scenarioQuery,
   sessionQuery,
   storeSession,
   treeQuery,
   useActionKeys,
+  useCoach,
 } from "@/lib/practice";
 
 type ArenaSearch = { sessionId?: number | undefined; scenarioId?: number | undefined };
@@ -90,7 +93,6 @@ function ArenaSession({
   const [input, setInput] = useState("");
   const [mic, setMic] = useState(false);
   const [notes, setNotes] = useState<Whisper[]>([]);
-  const [hintIdx, setHintIdx] = useState(0);
   const feed = useRef<HTMLDivElement>(null);
 
   const typingNodeId = typing?.nodeId;
@@ -141,6 +143,22 @@ function ArenaSession({
 
   const busy = pending !== null || typing !== null;
   const ready = session.data !== undefined && tree.data !== undefined && persona !== undefined;
+
+  // Coach requests bind to a position both reads agree on, never a mix of the two.
+  const headId = chain.at(-1)?.id ?? null;
+  const coachPosition = useMemo(() => {
+    if (!session.data || !tree.data) return null;
+    const { active_branch_id: branchId, active_head_node_id, revision } = session.data;
+    if (revision !== tree.data.revision || branchId !== tree.data.active_branch_id) return null;
+    if (active_head_node_id !== headId) return null;
+    return { branchId, headId, revision };
+  }, [headId, session.data, tree.data]);
+  const coach = useCoach({
+    sessionId,
+    position: coachPosition,
+    stalled: isStalled(chain),
+    hold: pending !== null,
+  });
 
   async function send() {
     const text = input.trim();
@@ -238,11 +256,9 @@ function ArenaSession({
   const score = session.data?.score ?? 0;
   const total = session.data?.total_needs ?? 7;
 
-  const whispers: Whisper[] = [
-    ...notes,
-    ...[...chain].reverse().flatMap((n) => n.coaching.whispers),
-    ...(persona ? [{ kind: "tip" as const, text: persona.public_context }] : []),
-  ].slice(0, 6);
+  const turnFeedback: Whisper[] = chain.at(-1)?.coaching.whispers ?? [];
+  const earlierHint = coach.pending ? coach.earlier : undefined;
+  const earlierTurn = chain.find((n) => n.id === earlierHint?.head_node_id)?.turn_number;
 
   return (
     <div className="flex h-screen flex-col bg-background bg-ambient">
@@ -302,6 +318,13 @@ function ArenaSession({
             </div>
           </div>
 
+          {persona && (
+            <p className="border-b border-border bg-secondary/30 px-4 py-2 text-xs text-muted-foreground">
+              <span className="font-semibold text-secondary-foreground">Your situation: </span>
+              {persona.public_context}
+            </p>
+          )}
+
           <div ref={feed} className="flex-1 space-y-4 overflow-y-auto p-5">
             {!ready && <p className="text-sm text-muted-foreground">Loading session…</p>}
             {msgs.map((m, i) => (
@@ -339,17 +362,19 @@ function ArenaSession({
                 className="max-h-32 min-h-10 flex-1 resize-none rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-primary/60"
               />
               <button
-                disabled={!persona?.practice_hints.length}
-                onClick={() => {
-                  const hints = persona?.practice_hints ?? [];
-                  const hint = hints[hintIdx % hints.length];
-                  if (!hint) return;
-                  setNotes((p) => [{ kind: "tip" as const, text: "💡 " + hint }, ...p].slice(0, 6));
-                  setHintIdx((h) => h + 1);
-                }}
-                className="h-10 shrink-0 rounded-lg border border-border px-3 text-sm text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40"
+                disabled={!coachPosition || pending !== null || coach.pending || coach.exhausted}
+                onClick={coach.requestHelp}
+                className={`h-10 shrink-0 rounded-lg border border-border px-3 text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40 ${coach.exhausted ? "max-w-36 text-[11px] leading-tight" : "text-sm"}`}
               >
-                Get Hint
+                {coach.exhausted
+                  ? "Two approaches saved for this turn"
+                  : coach.pending
+                    ? "Getting a hint…"
+                    : coach.canRetry
+                      ? "Try again"
+                      : coach.hints.length
+                        ? "Try another approach"
+                        : "Get a hint"}
               </button>
               <button
                 onClick={() => void send()}
@@ -362,12 +387,29 @@ function ArenaSession({
           </div>
         </section>
 
-        <aside className="bento flex min-h-0 flex-col overflow-hidden">
+        <aside className="bento flex min-h-0 flex-col overflow-y-auto">
           <div className="border-b border-border p-4">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-accent">
-              Live AI Coach
-            </p>
-            <h2 className="font-semibold">Whispers</h2>
+            <h2 className="font-semibold">Conversation coach</h2>
+          </div>
+          <div className="space-y-3 border-b border-border p-4">
+            <CoachHint
+              hints={coach.hints}
+              earlier={earlierHint?.hint}
+              earlierLabel={earlierTurn ? `From turn ${earlierTurn}` : "From the opening"}
+              pending={coach.pending}
+              failure={coach.failure}
+            />
+            {turnFeedback.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">Turn feedback</p>
+                {turnFeedback.map((w, i) => (
+                  <WhisperNote key={i} whisper={w} />
+                ))}
+              </div>
+            )}
+            {notes.map((w, i) => (
+              <WhisperNote key={i} whisper={w} />
+            ))}
           </div>
           <div className="space-y-4 p-4">
             <Meter
@@ -401,22 +443,6 @@ function ArenaSession({
               tone="warning"
             />
           </div>
-          <div className="flex-1 space-y-2 overflow-y-auto border-t border-border p-4">
-            {whispers.map((w, i) => (
-              <div
-                key={i}
-                className={`rounded-lg px-3 py-2 text-sm ring-1 transition-all ${
-                  w.kind === "warn"
-                    ? "bg-warning/10 text-warning ring-warning/30"
-                    : w.kind === "good"
-                      ? "bg-success/10 text-success ring-success/30"
-                      : "bg-secondary/50 text-secondary-foreground ring-border"
-                }`}
-              >
-                {w.text}
-              </div>
-            ))}
-          </div>
         </aside>
       </div>
     </div>
@@ -447,6 +473,22 @@ function ArenaMessage({
           </Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+function WhisperNote({ whisper }: { whisper: Whisper }) {
+  return (
+    <div
+      className={`rounded-lg px-3 py-2 text-sm ring-1 ${
+        whisper.kind === "warn"
+          ? "bg-warning/10 text-warning ring-warning/30"
+          : whisper.kind === "good"
+            ? "bg-success/10 text-success ring-success/30"
+            : "bg-secondary/50 text-secondary-foreground ring-border"
+      }`}
+    >
+      {whisper.text}
     </div>
   );
 }
