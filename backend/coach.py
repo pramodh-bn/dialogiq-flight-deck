@@ -43,6 +43,9 @@ DEFAULT_MODEL = "muse-spark-1.3"
 
 COACH_TEMPERATURE = 0.3
 COACH_MAX_TOKENS = 2048
+# Demo-wait headroom per s3-coach-r2.demo-tokens-16384.1: selected by the
+# service only when COACH_DEMO_WAIT is exactly "1". Normal mode keeps 2048.
+COACH_DEMO_MAX_TOKENS = 16384
 COACH_TIMEOUT_SECONDS = 8.0
 
 APPROACH_MAX_CHARS = 240
