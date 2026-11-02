@@ -46,8 +46,8 @@ gives the observed Meta count in `meta_calls_observed`.
 
 `stalled_total_ms` runs from sending the turn to the hint being saved, and adds
 the second hint's wait for attempt 2. It leaves out reading time between actions.
-It is null-based for rewinds and first requests at the opening, which have no turn
-to send. `latency_ms_wire` saturates at 10000, so use `timing` for real waits.
+After a rewind or at the opening there is no turn to send, so `turn_ms` is null and
+the total is the hint wait alone. `latency_ms_wire` saturates at 10000, so use `timing` for real waits.
 
 ## Limits
 
