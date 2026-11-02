@@ -6,7 +6,7 @@ import unicodedata
 
 from schemas import State
 
-RULESET_REVISION = "s2-r2.1"
+RULESET_REVISION = "s2-r2.2"
 OPEN_PREFIXES = (
     "what",
     "how",
@@ -102,11 +102,17 @@ def classify(
 ) -> tuple[str, bool, bool]:
     """Classify public user text, including contractions and acknowledgments."""
     value = normalize(text)
-    if ruleset_revision not in {"s2-r2", "s2-r2.1"}:
+    if ruleset_revision not in {"s2-r2", "s2-r2.1", "s2-r2.2"}:
         raise ValueError("Unsupported pinned scoring ruleset.")
     legacy = ruleset_revision == "s2-r2"
+    if legacy:
+        separator_pattern = r"[.!?]+"
+    elif ruleset_revision == "s2-r2.1":
+        separator_pattern = r"[.!?,;:]+"
+    else:
+        separator_pattern = r"[.!?,;:\u2013\u2014]+|(?<=\s)--?(?=\s)"
     sentences = []
-    for segment in re.split(r"[.!?]+" if legacy else r"[.!?,;:]+", value):
+    for segment in re.split(separator_pattern, value):
         sentence = segment.lstrip(" \"'“”‘’")
         for filler in () if legacy else FILLERS:
             if re.match(re.escape(filler) + r"(?![a-z0-9])", sentence):
@@ -196,7 +202,7 @@ def evaluate(
             tokens = re.findall(r"[a-z]+", normalize(text))
             rules = (
                 STEMS
-                if ruleset_revision == RULESET_REVISION
+                if ruleset_revision != "s2-r2"
                 else {
                     **STEMS,
                     "n7": ("next", "step", "plan", "agree", "try", "first"),

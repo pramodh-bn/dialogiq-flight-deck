@@ -146,7 +146,8 @@ def test_scenario_session_hub_cors_and_idempotent_seed(harness: Harness) -> None
     assert len(client.get("/api/scenarios").json()) == 4
 
 
-def test_runtime_judge_matches_all_reference_fixtures() -> None:
+@pytest.mark.parametrize("ruleset_revision", ["s2-r2.1", "s2-r2.2"])
+def test_runtime_judge_matches_all_reference_fixtures(ruleset_revision: str) -> None:
     fixtures = json.loads(
         (Path(__file__).parents[1] / "docs/cs36-judge-fixtures.json").read_text(
             encoding="utf-8"
@@ -164,7 +165,9 @@ def test_runtime_judge_matches_all_reference_fixtures() -> None:
         prior["score"] = len(prior["revealed_needs"])
         for item in case["turns"]:
             old = copy.deepcopy(prior)
-            state, coaching, newly = evaluate(item["text"], prior, facts)
+            state, coaching, newly = evaluate(
+                item["text"], prior, facts, ruleset_revision
+            )
             label = case["name"] + ": " + item["text"]
             assert coaching["question_type"] == item["question_type"], label
             assert coaching["leading"] == item["leading"], label
@@ -537,3 +540,48 @@ def test_rules_and_private_facts_pin_per_session(harness: Harness) -> None:
             )
             db.commit()
         db.rollback()
+
+
+def test_fresh_catalog_dash_questions_progress_through_real_routes(
+    harness: Harness,
+) -> None:
+    client, engine, recorder = harness
+    session = start(client)
+    with DbSession(engine) as db:
+        pinned = db.get(Session, session["id"])
+        assert pinned.scenario_config["revision"].split(":", 1)[0] == "s2-r2.2"
+    first = send(client, session, "I hear you — what has this been like?")
+    assert first["node"]["coaching"]["question_type"] == "open"
+    assert first["session"]["score"] == 1
+    second = send(
+        client,
+        first["session"],
+        "Thanks for explaining - what has been hardest to juggle?",
+    )
+    assert second["node"]["coaching"]["question_type"] == "open"
+    assert second["session"]["score"] == 2
+    assert len(recorder.calls) == 2
+
+
+def test_complete_catalog_and_existing_sessions_keep_legacy_dash_rules(
+    harness: Harness,
+) -> None:
+    client, engine, _ = harness
+    with DbSession(engine) as db:
+        scenario = db.scalar(select(Scenario).order_by(Scenario.id))
+        scenario.config_revision = "s2-r2.1:pinned-catalog"
+        db.commit()
+    old = start(client)
+    first = send(client, old, "I hear you — what has this been like?")
+    assert first["node"]["coaching"]["question_type"] == "statement"
+    assert first["session"]["score"] == 0
+    initialize_database(engine)
+    with DbSession(engine) as db:
+        scenario = db.get(Scenario, old["scenario_id"])
+        assert scenario.config_revision == "s2-r2.1:pinned-catalog"
+        pinned = db.get(Session, old["id"])
+        assert pinned.scenario_config["revision"] == "s2-r2.1:pinned-catalog"
+    new = start(client)
+    second = send(client, new, "I hear you — what has this been like?")
+    assert second["node"]["coaching"]["question_type"] == "statement"
+    assert second["session"]["score"] == 0

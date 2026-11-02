@@ -1,5 +1,11 @@
 # DialogIQ V2 API contract
 
+Versioned parser extension: [CS-71 dash-separated questions](cs71-question-parser-delta.md),
+revision `s2-r2.2`, defines dash-clause recognition for fresh seed catalogs.
+Review/adoption and actual-source verification are recorded on CS-71. Existing
+complete catalogs and pinned sessions retain their old behavior; the Sprint 2
+classification agreement below describes `s2-r2.1`.
+
 Demo reasoning proposal: [CS-62 low reasoning](cs62-demo-reasoning-delta.md),
 delta `s3-coach-r2.demo-reasoning-low.1`. This is pending the controlled result,
 owner review and explicit adoption on CS-62; it is not a runtime claim.
