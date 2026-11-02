@@ -254,12 +254,15 @@ async function onPaused({ requestId, request }) {
   const body = JSON.parse(postData);
   const key = Object.entries(headers).find(([k]) => k.toLowerCase() === "idempotency-key")?.[1];
   const step = script.shift();
-  coachPosts.push({ body, key, at: Date.now(), injected: Boolean(step) });
+  // A timing-only step answers nothing, so a real run still reaches the backend.
+  const passes = REAL && Object.keys(step ?? {}).every((k) => k === "delayMs");
+  coachPosts.push({ body, key, at: Date.now(), injected: Boolean(step) && !passes });
 
-  if (!step) {
-    if (REAL) return send("Fetch.continueRequest", { requestId });
-    return respondHint(requestId, body, url);
+  if (passes) {
+    if (step?.delayMs) await sleep(step.delayMs);
+    return send("Fetch.continueRequest", { requestId });
   }
+  if (!step) return respondHint(requestId, body, url);
   if (step.delayMs) await sleep(step.delayMs);
   if (step.network) {
     return send("Fetch.failRequest", { requestId, errorReason: "ConnectionFailed" });
