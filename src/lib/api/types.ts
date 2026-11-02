@@ -174,12 +174,19 @@ export interface DialogApi {
     key: string,
   ): Promise<CreateBranchResponse>;
   selectBranch(sessionId: number, req: SelectBranchRequest, key: string): Promise<PracticeSession>;
-  // timeoutMs is what remains of one action's budget, not a fresh limit per attempt.
+  // timeoutMs is what remains of one action's budget, not a fresh limit per attempt. Null
+  // sets no limit, which only demo waiting does. Aborting stops local waiting, not the server.
   requestCoachHint(
     sessionId: number,
     req: CoachHintRequest,
     key: string,
-    timeoutMs?: number,
+    timeoutMs?: number | null,
+    abort?: AbortSignal,
   ): Promise<CoachHintResponse>;
-  listCoachHints(sessionId: number, branchId: number, timeoutMs?: number): Promise<CoachHintList>;
+  listCoachHints(
+    sessionId: number,
+    branchId: number,
+    timeoutMs?: number,
+    abort?: AbortSignal,
+  ): Promise<CoachHintList>;
 }
