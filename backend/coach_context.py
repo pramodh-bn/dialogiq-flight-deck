@@ -50,6 +50,15 @@ def build_coach_system_prompt(persona_name: str, persona_role: str) -> str:
                 "from what was actually said; never promise another scoring reveal."
             ),
             (
+                "Ground every concrete detail in the approach and the example "
+                "in the quoted dialogue above: mention only people, events, "
+                "objects, numbers, and messages that already appear there. If a "
+                "detail is not in the transcript, do not state it as fact — ask "
+                "about it or leave it out. The example must be something the "
+                "learner can say without asserting anything the conversation "
+                "never established."
+            ),
+            (
                 "Respect refusal and do not escalate conflict. The example sentence "
                 "itself must be non-hostile: do not help the learner shame, "
                 "manipulate, or pressure the other person, and do not shame the "
