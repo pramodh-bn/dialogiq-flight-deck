@@ -5,9 +5,11 @@
 //   --coach injected   Serve the coach routes from this script (default). Works before
 //                      the backend has them. Proves client behaviour only.
 //   --coach real       Use the backend's coach routes, and so the Meta API if configured.
-//   --demo-wait        Set COACH_DEMO_WAIT=1 and VITE_COACH_DEMO_WAIT=1, and add delayed
-//                      checks past 15s and 30s. The delays are injected, so run those with
-//                      --coach injected. Real backends need the CS-60 backend work.
+//   --coach stub       Real backend and browser, with a slow stand-in for the Meta provider
+//                      (scripts/run_backend_stub_coach.py), to prove waits past the 30s
+//                      leases over real HTTP without paid calls. Needs --demo-wait.
+//   --demo-wait        Set COACH_DEMO_WAIT=1 and VITE_COACH_DEMO_WAIT=1. With --coach
+//                      injected, adds delayed browser checks past 15s and 30s.
 //   --out <dir>        Report and screenshots. Default: a new temp directory.
 //   --python <path>    Default: backend/.venv's interpreter.
 //   --edge <path>      Default: the standard Windows Edge install.
@@ -19,7 +21,14 @@
 // injected, real-http or live-meta. Key values are never read or printed here.
 
 import { spawn, spawnSync } from "node:child_process";
-import { createWriteStream, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  createWriteStream,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -36,14 +45,19 @@ const { values: args } = parseArgs({
   },
 });
 
-if (!["injected", "real"].includes(args.coach)) throw new Error("--coach: injected or real");
+if (!["injected", "real", "stub"].includes(args.coach)) {
+  throw new Error("--coach: injected, real or stub");
+}
+if (args.coach === "stub" && !args["demo-wait"]) throw new Error("--coach stub needs --demo-wait");
 if (!args["env-file"]) throw new Error("--env-file is required: persona turns need Baseten");
 
 const ROOT = resolve(import.meta.dirname, "..");
 const WEB = "http://127.0.0.1:5173";
 const API = "http://127.0.0.1:8080";
 const DEBUG_PORT = 9334;
-const REAL = args.coach === "real";
+const STUB = args.coach === "stub";
+const STUB_DELAY_S = 35;
+const REAL = args.coach !== "injected";
 const DEMO = args["demo-wait"];
 // With no cutoff in demo waiting, a live hint can take far longer than the usual bound.
 const HINT_WAIT_MS = DEMO ? 300_000 : 20_000;
@@ -51,10 +65,11 @@ const OUT = resolve(args.out ?? mkdtempSync(join(tmpdir(), "coach-browser-")));
 const PYTHON = args.python ?? join(ROOT, "backend", ".venv", "Scripts", "python.exe");
 const EDGE = args.edge ?? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const SCRATCH = mkdtempSync(join(tmpdir(), "coach-browser-db-"));
+const STUB_CALLS = join(SCRATCH, "stub-calls.txt");
 mkdirSync(OUT, { recursive: true });
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-const hintEvidence = REAL ? "live-meta" : "injected";
+const hintEvidence = STUB ? "stub-provider" : REAL ? "live-meta" : "injected";
 const uiEvidence = REAL ? "real-http" : "injected";
 
 // ---- Results ---------------------------------------------------------------------------
@@ -376,14 +391,18 @@ async function runN1() {
     const atHead = async () =>
       (await saved()).filter((h) => h.head_node_id === turn.head.id).map((h) => h.hint);
     if (!turn.stalled) await click("Get a hint");
+    const firstPost = () => coachPosts.find((p) => p.body.head_node_id === turn.head.id);
     await waitFor("the N1 first hint", async () => (await atHead()).length === 1, HINT_WAIT_MS);
+    const firstElapsed = Date.now() - (firstPost()?.at ?? Date.now());
     await waitFor(
       "the N1 second action",
       async () => (await buttonState("Try another approach")) === "enabled",
       5_000,
     );
+    const secondStart = Date.now();
     await click("Try another approach");
     await waitFor("the N1 second hint", async () => (await atHead()).length === 2, HINT_WAIT_MS);
+    const secondElapsed = Date.now() - secondStart;
     await sleep(500);
     await screenshot(`6-n1-round-${round}`);
     const hints = await atHead();
@@ -392,6 +411,7 @@ async function runN1() {
       head_node_id: turn.head.id,
       last_turn_stalled: turn.stalled,
       both_provider: hints.every((h) => h.source === "meta"),
+      elapsed_ms: [firstElapsed, secondElapsed],
       hints,
     });
     savedHints.push(
@@ -450,6 +470,137 @@ async function runDemoWait() {
   }
 }
 
+// Waits past both 30s leases, over real HTTP, with a stand-in provider that sleeps. Competing
+// requests have to observe the running generation, and only one provider call may happen.
+const stubCalls = () => {
+  try {
+    return readFileSync(STUB_CALLS, "utf8").split("\n").filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+};
+
+async function competitor(sessionId, post, key) {
+  const res = await fetch(`${API}/api/sessions/${sessionId}/coach-hints`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+    body: JSON.stringify(post.body),
+  });
+  const body = await res.json();
+  return { status: res.status, code: body.detail?.code ?? null, hint: body.hint ?? null };
+}
+
+async function runLongWait() {
+  const sessionId = await openMayaSession();
+  const hintsOn = async (branch, head) => {
+    const path = `/api/sessions/${sessionId}/branches/${branch}/coach-hints`;
+    return (await getJson(path)).hints.filter((h) => h.head_node_id === head).map((h) => h.hint);
+  };
+
+  const start = Date.now();
+  await click("Get a hint");
+  await waitFor("the coach POST", () => coachPosts.length === 1, 5_000);
+  const post = coachPosts[0];
+  await sleep(16_000);
+  check("still pending past 15s", await has("Getting a hint"), "stub-provider");
+  await sleep(Math.max(0, start + 32_000 - Date.now()));
+  check("still pending past the 30s leases", await has("Getting a hint"), "stub-provider");
+
+  const sameKey = await competitor(sessionId, post, post.key);
+  check(
+    "same-key competitor past 30s sees it running",
+    sameKey.status === 409 && sameKey.code === "request_in_progress",
+    "stub-provider",
+    `${sameKey.status} ${sameKey.code}`,
+  );
+  const otherKey = await competitor(sessionId, post, crypto.randomUUID());
+  check(
+    "different-key competitor past 30s sees it running",
+    otherKey.status === 409 && otherKey.code === "request_in_progress",
+    "stub-provider",
+    `${otherKey.status} ${otherKey.code}`,
+  );
+
+  await waitFor("the long hint", () => has("Try another approach"), 60_000);
+  const elapsed = Date.now() - start;
+  timings.push({ attempt: 1, head: null, browser_ms: elapsed });
+  check(
+    "a hint past 30s arrives",
+    elapsed >= STUB_DELAY_S * 1_000,
+    "stub-provider",
+    `${elapsed}ms`,
+  );
+  check(
+    "the long wait made one provider call",
+    stubCalls() === 1,
+    "stub-provider",
+    `${stubCalls()}`,
+  );
+  const branch = post.body.branch_id;
+  const saved = await hintsOn(branch, null);
+  check("the long wait saved one hint", saved.length === 1, "stub-provider");
+  check(
+    "latency_ms saturates at 10000",
+    saved[0]?.latency_ms === 10_000,
+    "stub-provider",
+    `${saved[0]?.latency_ms}ms against ${elapsed}ms in the browser`,
+  );
+  const replay = await competitor(sessionId, post, post.key);
+  check(
+    "same-key replay returns the saved hint",
+    replay.status === 200 && replay.hint?.id === saved[0]?.id && stubCalls() === 1,
+    "stub-provider",
+    `${replay.status}`,
+  );
+
+  // A reload mid-wait loses the page's key, so a new key has to wait on the same generation.
+  const stalled = await sendTurn(sessionId, "Did you finish your homework?");
+  if (stalled.stalled) {
+    await waitFor("the automatic hint call", () => stubCalls() === 2, 10_000);
+    await sleep(3_000);
+    const before = coachPosts.length;
+    await send("Page.reload");
+    await waitFor("a new POST after reload", () => coachPosts.length > before, 20_000);
+    await waitFor("the hint after reload", () => has("Try another approach"), 60_000);
+    check(
+      "reload mid-wait costs no second call",
+      stubCalls() === 2,
+      "stub-provider",
+      `${stubCalls()}`,
+    );
+    check(
+      "reload mid-wait uses paced 409s",
+      coachPosts.slice(before).length > 1,
+      "stub-provider",
+      `${coachPosts.slice(before).length} POSTs`,
+    );
+    const atHead = await hintsOn(stalled.data.active_branch_id, stalled.head.id);
+    check("reload mid-wait saved one hint", atHead.length === 1, "stub-provider");
+  } else {
+    notExercised("reload mid-wait", "stub-provider", "the turn was not stalled");
+  }
+
+  // Moving on: the abandoned call may finish, but its hint is neither saved nor shown.
+  const moved = await sendTurn(sessionId, "Okay.");
+  if (moved.stalled) {
+    const number = stubCalls();
+    await waitFor("the next automatic call", () => stubCalls() === 3, 10_000);
+    await waitFor("the pending hint", () => has("Getting a hint"), 10_000);
+    await sendTurn(sessionId, "Fine.");
+    await sleep((STUB_DELAY_S + 4) * 1_000);
+    check(
+      "a result from the old turn is not shown",
+      !(await has(`Stub approach ${number + 1}.`)),
+      "stub-provider",
+    );
+    const old = await hintsOn(moved.data.active_branch_id, moved.head.id);
+    check("a result from the old turn is not saved", old.length === 0, "stub-provider");
+  } else {
+    notExercised("moving on mid-wait", "stub-provider", "the turn was not stalled");
+  }
+  await screenshot("long-wait-end");
+}
+
 function liveHintStats() {
   const provider = savedHints.filter((h) => h.source === "meta");
   const reasons = {};
@@ -466,6 +617,16 @@ function liveHintStats() {
 }
 
 async function run() {
+  if (STUB) {
+    await runLongWait();
+    check(
+      "no console errors or exceptions",
+      problems.length === 0,
+      "real-http",
+      problems.join(" | "),
+    );
+    return;
+  }
   const sessionId = await openMayaSession();
 
   // The panel.
@@ -825,9 +986,23 @@ async function main() {
   startLogged(
     "backend",
     PYTHON,
-    ["scripts/run_backend.py", "--env-file", resolve(args["env-file"])],
+    STUB
+      ? [
+          "scripts/run_backend_stub_coach.py",
+          "--env-file",
+          resolve(args["env-file"]),
+          "--delay",
+          String(STUB_DELAY_S),
+          "--calls-file",
+          STUB_CALLS,
+        ]
+      : ["scripts/run_backend.py", "--env-file", resolve(args["env-file"])],
     {
-      env: { ...process.env, DIALOGIQ_DB_PATH: database },
+      env: {
+        ...process.env,
+        DIALOGIQ_DB_PATH: database,
+        ...(DEMO ? { COACH_DEMO_WAIT: "1" } : {}),
+      },
     },
   );
   await waitForUrl(`${API}/api/scenarios`, "backend");
