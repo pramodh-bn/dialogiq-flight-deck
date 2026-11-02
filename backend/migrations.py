@@ -12,7 +12,7 @@ from models import Branch, ConversationNode, Session
 from schemas import State
 from seed import pin_scenario, seed_scenarios
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 ADDITIONS = {
     "scenarios": {
         "public_persona": "JSON NOT NULL DEFAULT '{}'",

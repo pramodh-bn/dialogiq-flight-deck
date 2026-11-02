@@ -8,6 +8,8 @@ from pathlib import Path
 import uvicorn
 from probe_persona_live import ENV_KEYS, parse_env_file
 
+META_ENV_KEYS = ("META_MODEL_API_KEY", "META_MODEL_API_BASE", "META_MODEL_API_MODEL")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -18,7 +20,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     if args.env_file:
         values = parse_env_file(Path(args.env_file))
-        for key in ENV_KEYS:
+        for key in ENV_KEYS + META_ENV_KEYS:
             if key in values:
                 os.environ.setdefault(key, values[key])
     sys.path.insert(0, str(root / "backend"))
