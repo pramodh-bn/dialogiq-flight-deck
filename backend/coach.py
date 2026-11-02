@@ -218,7 +218,7 @@ class MetaCoachClient:
         context_json: str,
         temperature: float = COACH_TEMPERATURE,
         max_tokens: int = COACH_MAX_TOKENS,
-        timeout: float = COACH_TIMEOUT_SECONDS,
+        timeout: float | None = COACH_TIMEOUT_SECONDS,
     ) -> CoachCompletion:
         """Return one raw completion for serialized coach context.
 
@@ -228,6 +228,8 @@ class MetaCoachClient:
         anything else raises ``CoachInvalidResponseError``. Finish
         reason and usage ride on both the success value and the raised
         error, so probes record provider evidence on every path.
+        ``timeout=None`` disables the SDK cutoff (demo-wait mode) and is
+        passed through explicitly, never omitted.
         """
         if not self.api_key or not self.model:
             raise CoachNotConfiguredError(
@@ -257,9 +259,9 @@ class MetaCoachClient:
                 stream=False,
             )
         except APITimeoutError as exc:
+            detail = f" after {timeout:g} seconds" if timeout is not None else ""
             raise CoachTimeoutError(
-                f"MetaCoachClient timed out after {timeout:g} seconds "
-                f"waiting for model {self.model}."
+                f"MetaCoachClient timed out{detail} waiting for model {self.model}."
             ) from exc
         except APIConnectionError as exc:
             raise CoachUnavailableError(
@@ -317,7 +319,7 @@ def generate_coach_hint(
     context_json: str,
     temperature: float = COACH_TEMPERATURE,
     max_tokens: int = COACH_MAX_TOKENS,
-    timeout: float = COACH_TIMEOUT_SECONDS,
+    timeout: float | None = COACH_TIMEOUT_SECONDS,
 ) -> tuple[dict[str, str], str | None]:
     """Run one provider call and return the validated hint plus finish reason.
 

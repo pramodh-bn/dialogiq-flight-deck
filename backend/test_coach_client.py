@@ -218,3 +218,21 @@ def test_finish_length_valid_json_rejected(monkeypatch) -> None:  # type: ignore
         assert exc.reasoning_tokens == 1973
     else:
         raise AssertionError("expected CoachInvalidResponseError")
+
+
+def test_respond_passes_none_timeout_explicitly(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """CS-60 demo-wait mode sends timeout=None, never an omitted default."""
+    result = _FakeCompletion(VALID_HINT, "stop", 1730, 1597)
+    completions = _install_fake(monkeypatch, result)
+    completion = _client().respond(system_prompt="s", context_json="{}", timeout=None)
+    assert completion.finish_reason == "stop"
+    assert len(completions.calls) == 1
+    assert "timeout" in completions.calls[0]
+    assert completions.calls[0]["timeout"] is None
+
+
+def test_default_timeout_stays_eight_seconds(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    result = _FakeCompletion(VALID_HINT, "stop", 1730, 1597)
+    completions = _install_fake(monkeypatch, result)
+    _client().respond(system_prompt="s", context_json="{}")
+    assert completions.calls[0]["timeout"] == coach.COACH_TIMEOUT_SECONDS == 8.0

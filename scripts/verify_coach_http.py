@@ -6,6 +6,9 @@ validation, replay, rotation, and GET ordering run over real sockets.
 --live passes --env-file to run_backend.py and makes exactly two paid Meta
 calls (requested root attempt1 + attempt2), printing both hints so a human
 can judge distinctness. No secrets are printed, only SET/MISSING per name.
+--demo-wait (CS-60) sets COACH_DEMO_WAIT=1 in the server env: mocked mode
+re-runs the fast-path checks with the flag on, live mode uses a 300s client
+timeout and asserts wire latency_ms saturation honesty instead of a cutoff.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from pathlib import Path
 from uuid import uuid4
 
 META_ENV_KEYS = ("META_MODEL_API_KEY", "META_MODEL_API_BASE", "META_MODEL_API_MODEL")
+REQUEST_TIMEOUT = 30.0
 
 
 def check_port_free(port: int) -> None:
@@ -45,6 +49,7 @@ def start_server(
     live: bool,
     log: object,
     log_path: Path,
+    demo_wait: bool = False,
 ) -> subprocess.Popen[bytes]:
     environment = os.environ.copy()
     if live:
@@ -54,6 +59,9 @@ def start_server(
         for key in META_ENV_KEYS:
             environment.pop(key, None)
         print("Meta credentials stripped from server env (mocked mode).")
+    if demo_wait:
+        environment["COACH_DEMO_WAIT"] = "1"
+        print("COACH_DEMO_WAIT=1 set in server env (demo-wait mode).")
     environment["DIALOGIQ_DB_PATH"] = str(db_path)
     command = [
         sys.executable,
@@ -118,7 +126,7 @@ def call(
     )
     started = time.monotonic()
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
             elapsed = time.monotonic() - started
             return (
                 response.status,
@@ -230,7 +238,20 @@ def run_mocked(base: str) -> None:
     check("get-rejects-query", status == 422, f"status={status}")
 
 
-def run_live(base: str) -> None:
+def check_saturation(name: str, elapsed: float, latency_ms: object) -> None:
+    """Wire latency_ms must saturate at 10000 iff the server ran past 10s.
+
+    Client elapsed always exceeds server-measured latency (HTTP overhead), so
+    only assert outside a 0.5s middle zone.
+    """
+    assert isinstance(latency_ms, int), f"{name}: latency_ms missing"
+    if elapsed < 9.5:
+        check(f"{name}-unsaturated", latency_ms < 10000, f"latency_ms={latency_ms}")
+    elif elapsed > 10.5:
+        check(f"{name}-saturated", latency_ms == 10000, f"latency_ms={latency_ms}")
+
+
+def run_live(base: str, demo_wait: bool = False) -> None:
     status, scenarios, _ = call("GET", f"{base}/api/scenarios")
     check("scenarios", status == 200, f"status={status}")
     maya = next(s for s in scenarios if s["title"].startswith("Teenage Daughter:"))
@@ -266,6 +287,9 @@ def run_live(base: str) -> None:
         status == 200 and hint2.get("source") == "meta",
         f"status={status} http_s={elapsed2:.2f} latency_ms={hint2.get('latency_ms')}",
     )
+    if demo_wait:
+        check_saturation("live-demo1", elapsed1, hint1.get("latency_ms"))
+        check_saturation("live-demo2", elapsed2, hint2.get("latency_ms"))
     print("LIVE-HINT-1 " + json.dumps(hint1, ensure_ascii=False))
     print("LIVE-HINT-2 " + json.dumps(hint2, ensure_ascii=False))
     print("MANUAL-JUDGMENT-REQUIRED distinct second approach vs hint 1")
@@ -276,10 +300,24 @@ def main() -> None:
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--env-file", default=None)
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument(
+        "--demo-wait",
+        action="store_true",
+        help="Set COACH_DEMO_WAIT=1 in the server env (no app-imposed hint cutoff).",
+    )
     args = parser.parse_args()
     if args.live and not args.env_file:
         raise RuntimeError("--live requires --env-file; no call made.")
     root = Path(__file__).resolve().parents[1]
+    if args.demo_wait:
+        global REQUEST_TIMEOUT
+        REQUEST_TIMEOUT = 300.0
+        sys.path.insert(0, str(root / "scripts"))
+        import run_backend
+
+        allowed = set(getattr(run_backend, "META_ENV_KEYS", ()))
+        allowed |= set(getattr(run_backend, "COACH_DEMO_ENV_KEYS", ()))
+        check("launcher-allows-demo-flag", "COACH_DEMO_WAIT" in allowed)
     revision = subprocess.run(
         ["git", "-c", "safe.directory=*", "rev-parse", "--short", "HEAD"],
         cwd=root,
@@ -296,12 +334,19 @@ def main() -> None:
         try:
             db_path = Path(folder) / "coach-http.db"
             process = start_server(
-                root, args.port, db_path, args.env_file, args.live, log, log_path
+                root,
+                args.port,
+                db_path,
+                args.env_file,
+                args.live,
+                log,
+                log_path,
+                args.demo_wait,
             )
             try:
                 base = f"http://127.0.0.1:{args.port}"
                 if args.live:
-                    run_live(base)
+                    run_live(base, args.demo_wait)
                 else:
                     run_mocked(base)
             except RuntimeError:
@@ -316,7 +361,10 @@ def main() -> None:
         log_path.unlink()
     except OSError:
         print(f"kept server log: {log_path}")
-    print(f"COACH-HTTP-DONE mode={'live' if args.live else 'mocked'}")
+    print(
+        f"COACH-HTTP-DONE mode={'live' if args.live else 'mocked'} "
+        f"demo_wait={'1' if args.demo_wait else '0'}"
+    )
 
 
 if __name__ == "__main__":

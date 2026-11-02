@@ -9,6 +9,7 @@ import uvicorn
 from probe_persona_live import ENV_KEYS, parse_env_file
 
 META_ENV_KEYS = ("META_MODEL_API_KEY", "META_MODEL_API_BASE", "META_MODEL_API_MODEL")
+COACH_DEMO_ENV_KEYS = ("COACH_DEMO_WAIT",)
 
 
 def main() -> None:
@@ -20,7 +21,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     if args.env_file:
         values = parse_env_file(Path(args.env_file))
-        for key in ENV_KEYS + META_ENV_KEYS:
+        for key in ENV_KEYS + META_ENV_KEYS + COACH_DEMO_ENV_KEYS:
             if key in values:
                 os.environ.setdefault(key, values[key])
     sys.path.insert(0, str(root / "backend"))

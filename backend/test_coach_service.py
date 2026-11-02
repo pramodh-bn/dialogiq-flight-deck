@@ -20,10 +20,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, inspect, select
+from sqlalchemy import Engine, delete, inspect, select
 from sqlalchemy.orm import sessionmaker
 
 import coach_service
+from api_errors import ApiError
 from coach import (
     CoachCompletion,
     CoachInvalidResponseError,
@@ -34,7 +35,7 @@ from coach import (
 from database import create_sqlite_engine
 from main import create_app
 from migrations import SCHEMA_VERSION, initialize_database
-from models import CoachHint, CoachSlotLease
+from models import CoachHint, CoachSlotLease, IdempotencyRecord
 from schemas import CoachHintRequest
 from test_integration import Recorder, fork, headers, send, start
 
@@ -547,3 +548,371 @@ def test_slot_race_loser_converges_on_winner(coach_harness: CoachHarness) -> Non
     assert retry.status_code == 200, retry.text
     assert retry.json()["hint"]["id"] == winner.json()["hint"]["id"]
     assert len(coach.calls) == 1
+
+
+# --- CS-60 demo-wait mode (delta s3-coach-r2.demo-wait.1) ---
+
+
+@pytest.fixture(autouse=True)
+def _normal_mode_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Normal budgets unless a test opts into demo mode explicitly."""
+    monkeypatch.delenv("COACH_DEMO_WAIT", raising=False)
+    yield
+
+
+def test_demo_wait_flag_requires_exact_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert coach_service.demo_wait_enabled() is False
+    assert coach_service.demo_wait_enabled(None) is False
+    assert coach_service.demo_wait_enabled(False) is False
+    assert coach_service.demo_wait_enabled(True) is True
+    monkeypatch.setenv("COACH_DEMO_WAIT", "1")
+    assert coach_service.demo_wait_enabled() is True
+    assert coach_service.demo_wait_enabled(None) is True
+    assert coach_service.demo_wait_enabled(False) is False
+    for value in ("0", "true", "yes", " 1", "1 ", "2", ""):
+        monkeypatch.setenv("COACH_DEMO_WAIT", value)
+        assert coach_service.demo_wait_enabled() is False
+    monkeypatch.setenv("COACH_DEMO_WAIT", "0")
+    assert coach_service.demo_wait_enabled(True) is True
+
+
+def _seed_owned_rows(db, session: dict, owner: str, expires_at: float) -> str:  # type: ignore[no-untyped-def]
+    """Seed one pending UUID reservation plus its slot lease under one owner."""
+    key = str(uuid4())
+    db.add(
+        IdempotencyRecord(key=key, fingerprint="fp", owner=owner, expires_at=expires_at)
+    )
+    db.add(
+        CoachSlotLease(
+            session_id=session["id"],
+            branch_id=session["active_branch_id"],
+            head_slot=0,
+            contract_revision=coach_service.CONTRACT_REVISION,
+            attempt=1,
+            owner=owner,
+            expires_at=expires_at,
+        )
+    )
+    db.commit()
+    return key
+
+
+def test_demo_wait_renewal_extends_both_leases(
+    coach_harness: CoachHarness,
+) -> None:
+    client, engine, _, _ = coach_harness
+    session = start(client, title="Teenage Daughter:")
+    owner = coach_service.new_request_owner()
+    factory = sessionmaker(bind=engine)
+    with factory() as db:
+        key = _seed_owned_rows(db, session, owner, time.time() + 30.0)
+    before = time.time()
+    with factory() as db:
+        renewed = coach_service.renew_owned_leases(
+            db, key, owner, session["id"], session["active_branch_id"], None, 1
+        )
+        assert renewed is True
+    with factory() as db:
+        record = db.get(IdempotencyRecord, key)
+        assert record is not None
+        lease = db.scalar(select(CoachSlotLease).where(CoachSlotLease.owner == owner))
+        assert lease is not None
+        now = time.time()
+        for expiry in (record.expires_at, lease.expires_at):
+            assert before + 29.0 < expiry <= now + 30.0
+
+
+def test_demo_wait_renewal_refuses_stale_foreign_and_finished_rows(
+    coach_harness: CoachHarness,
+) -> None:
+    client, engine, _, _ = coach_harness
+    session = start(client, title="Teenage Daughter:")
+    owner = coach_service.new_request_owner()
+    factory = sessionmaker(bind=engine)
+    expired_at = time.time() - 1.0
+    with factory() as db:
+        expired_key = _seed_owned_rows(db, session, owner, expired_at)
+    with factory() as db:
+        assert (
+            coach_service.renew_owned_leases(
+                db,
+                expired_key,
+                owner,
+                session["id"],
+                session["active_branch_id"],
+                None,
+                1,
+            )
+            is False
+        )
+    with factory() as db:  # expired rows are never resurrected
+        assert db.get(IdempotencyRecord, expired_key) is not None
+        assert db.get(IdempotencyRecord, expired_key).expires_at == expired_at
+    with factory() as db:
+        db.execute(delete(CoachSlotLease).where(CoachSlotLease.owner == owner))
+        db.execute(
+            delete(IdempotencyRecord).where(IdempotencyRecord.key == expired_key)
+        )
+        db.commit()
+    with factory() as db:
+        live_key = _seed_owned_rows(db, session, owner, time.time() + 30.0)
+    with factory() as db:
+        assert (
+            coach_service.renew_owned_leases(
+                db,
+                live_key,
+                "someone-else",
+                session["id"],
+                session["active_branch_id"],
+                None,
+                1,
+            )
+            is False
+        )
+    with factory() as db:
+        assert (
+            coach_service.renew_owned_leases(
+                db,
+                str(uuid4()),
+                owner,
+                session["id"],
+                session["active_branch_id"],
+                None,
+                1,
+            )
+            is False
+        )
+    with factory() as db:
+        record = db.get(IdempotencyRecord, live_key)
+        assert record is not None
+        record.status = 200
+        record.response = {}
+        db.commit()
+    with factory() as db:
+        assert (
+            coach_service.renew_owned_leases(
+                db,
+                live_key,
+                owner,
+                session["id"],
+                session["active_branch_id"],
+                None,
+                1,
+            )
+            is False
+        )
+
+
+def test_demo_wait_slow_provider_success_after_15s(
+    coach_harness: CoachHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("COACH_DEMO_WAIT", "1")
+    client, _, _, coach = coach_harness
+    coach.delay = 16.0
+    session = start(client, title="Teenage Daughter:")
+    started = time.monotonic()
+    response = client.post(
+        f"/api/sessions/{session['id']}/coach-hints",
+        json=hint_payload(session),
+        headers=headers(str(uuid4())),
+        timeout=120.0,
+    )
+    elapsed = time.monotonic() - started
+    assert response.status_code == 200, response.text
+    hint = response.json()["hint"]
+    assert hint["source"] == "meta"
+    assert hint["fallback_reason"] is None
+    assert hint["latency_ms"] == 10000
+    assert elapsed >= 16.0
+    assert len(coach.calls) == 1
+
+
+def test_demo_wait_competitors_observe_in_progress_beyond_initial_lease(
+    coach_harness: CoachHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("COACH_DEMO_WAIT", "1")
+    client, engine, _, coach = coach_harness
+    session = start(client, title="Teenage Daughter:")
+    payload = hint_payload(session)
+    path = f"/api/sessions/{session['id']}/coach-hints"
+    coach.delay = 34.0
+    main_key = str(uuid4())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(
+            client.post,
+            path,
+            json=payload,
+            headers=headers(main_key),
+            timeout=120.0,
+        )
+        assert coach.entered.wait(10), "slow generation never reached the provider"
+        entered_at = time.monotonic()
+        time.sleep(max(0.0, 31.0 - (time.monotonic() - entered_at)))
+        same = client.post(path, json=payload, headers=headers(main_key))
+        assert same.status_code == 409, same.text
+        assert same.json()["detail"]["code"] == "request_in_progress"
+        other = client.post(path, json=payload, headers=headers(str(uuid4())))
+        assert other.status_code == 409, other.text
+        assert other.json()["detail"]["code"] == "request_in_progress"
+        done = pending.result(timeout=60)
+    assert done.status_code == 200, done.text
+    assert done.json()["hint"]["source"] == "meta"
+    assert len(coach.calls) == 1
+    factory = sessionmaker(bind=engine)
+    with factory() as check:
+        rows = list(
+            check.scalars(
+                select(CoachHint).where(CoachHint.session_id == session["id"])
+            )
+        )
+        assert len(rows) == 1
+        assert rows[0].source == "meta"
+
+
+def test_demo_wait_owner_loss_abandons_generation_without_publish(
+    coach_harness: CoachHarness,
+) -> None:
+    client, engine, _, _ = coach_harness
+    session = start(client, title="Teenage Daughter:")
+    payload = CoachHintRequest(
+        branch_id=session["active_branch_id"],
+        head_node_id=None,
+        expected_revision=0,
+        trigger="requested",
+        attempt=1,
+    )
+    stub = CoachStub()
+    stub.release = threading.Event()
+    factory = sessionmaker(bind=engine)
+    key = str(uuid4())
+    errors: list[Exception] = []
+
+    def run() -> None:
+        db = factory()
+        try:
+            coach_service.request_hint(
+                db,
+                session["id"],
+                payload,
+                key,
+                stub,
+                demo_wait=True,
+                heartbeat_seconds=0.2,
+            )
+        except Exception as exc:  # noqa: BLE001 - asserted below
+            errors.append(exc)
+        finally:
+            db.close()
+
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert stub.entered.wait(10), "generation never reached the provider"
+        with factory() as killer:
+            killer.execute(
+                delete(IdempotencyRecord).where(IdempotencyRecord.key == key)
+            )
+            killer.execute(
+                delete(CoachSlotLease).where(CoachSlotLease.session_id == session["id"])
+            )
+            killer.commit()
+        stub.release.set()
+        worker.join(timeout=10)
+        assert not worker.is_alive()
+    finally:
+        stub.release.set()
+        worker.join(timeout=10)
+    assert len(errors) == 1
+    error = errors[0]
+    assert isinstance(error, ApiError)
+    assert error.status == 409
+    assert error.detail["code"] == "request_in_progress"
+    assert len(stub.calls) == 1
+    with factory() as check:
+        assert (
+            list(
+                check.scalars(
+                    select(CoachHint).where(CoachHint.session_id == session["id"])
+                )
+            )
+            == []
+        )
+
+
+def test_demo_wait_expired_crashed_leases_are_reclaimable(
+    coach_harness: CoachHarness,
+) -> None:
+    client, engine, _, coach = coach_harness
+    session = start(client, title="Teenage Daughter:")
+    payload = CoachHintRequest(
+        branch_id=session["active_branch_id"],
+        head_node_id=None,
+        expected_revision=0,
+        trigger="requested",
+        attempt=1,
+    )
+    body = payload.model_dump()
+    fingerprint = json.dumps(
+        ["POST", f"/api/sessions/{session['id']}/coach-hints", body],
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    crashed_key = str(uuid4())
+    crashed_owner = coach_service.new_request_owner()
+    factory = sessionmaker(bind=engine)
+    with factory() as db:
+        db.add(
+            IdempotencyRecord(
+                key=crashed_key,
+                fingerprint=fingerprint,
+                owner=crashed_owner,
+                expires_at=time.time() - 5.0,
+            )
+        )
+        db.add(
+            CoachSlotLease(
+                session_id=session["id"],
+                branch_id=session["active_branch_id"],
+                head_slot=0,
+                contract_revision=coach_service.CONTRACT_REVISION,
+                attempt=1,
+                owner=crashed_owner,
+                expires_at=time.time() - 5.0,
+            )
+        )
+        db.commit()
+    db = factory()
+    try:
+        status, body = coach_service.request_hint(
+            db, session["id"], payload, crashed_key, coach, demo_wait=True
+        )
+    finally:
+        db.close()
+    assert status == 200
+    assert body["hint"]["source"] == "meta"
+
+
+def test_real_coach_provider_passes_none_timeout_only_in_demo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("META_MODEL_API_KEY", "k")
+    monkeypatch.setenv("META_MODEL_API_BASE", "https://meta.example/v1")
+    monkeypatch.setenv("META_MODEL_API_MODEL", "m")
+    seen: list[dict] = []
+
+    class _Client:
+        def respond(self, **kwargs):  # type: ignore[no-untyped-def]
+            seen.append(kwargs)
+            return CoachCompletion(content=META_HINT_JSON, finish_reason="stop")
+
+    monkeypatch.setattr(coach_service, "MetaCoachClient", _Client)
+    monkeypatch.setenv("COACH_DEMO_WAIT", "1")
+    coach_service.real_coach_provider("s", "{}")
+    assert seen[-1]["timeout"] is None
+    monkeypatch.setenv("COACH_DEMO_WAIT", "0")
+    coach_service.real_coach_provider("s", "{}")
+    assert "timeout" not in seen[-1]
+    monkeypatch.delenv("COACH_DEMO_WAIT")
+    coach_service.real_coach_provider("s", "{}")
+    assert "timeout" not in seen[-1]

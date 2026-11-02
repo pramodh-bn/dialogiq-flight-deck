@@ -9,6 +9,7 @@ branch, or session revision is mutated here.
 from __future__ import annotations
 
 import copy
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -56,6 +57,8 @@ from schemas import (
 COACH_LEASE_SECONDS = 30
 COACH_PROVIDER_WAIT_SECONDS = 8.0
 COACH_FALLBACK_DEADLINE_SECONDS = 10.0
+COACH_HEARTBEAT_SECONDS = 5.0
+DEMO_WAIT_ENV_VAR = "COACH_DEMO_WAIT"
 LATENCY_SATURATION_MS = 10000
 EFFECTIVE_PROVIDER_DELTA = "s3-coach-r2.token-2048.1"
 
@@ -88,8 +91,24 @@ def _monotonic() -> float:
     return time.monotonic()
 
 
+def demo_wait_enabled(explicit: bool | None = None) -> bool:
+    """True only for demo-wait mode: exact env "1", or an explicit opt-in.
+
+    An explicit argument always wins so tests can force either mode
+    without touching the process environment; routes pass nothing and
+    follow the paired backend flag exactly.
+    """
+    if explicit is not None:
+        return explicit
+    return os.environ.get(DEMO_WAIT_ENV_VAR) == "1"
+
+
 def real_coach_provider(system_prompt: str, context_json: str) -> CoachCompletion:
     """Production Meta call; the client is built per request from current env."""
+    if demo_wait_enabled():
+        return MetaCoachClient().respond(
+            system_prompt=system_prompt, context_json=context_json, timeout=None
+        )
     return MetaCoachClient().respond(
         system_prompt=system_prompt, context_json=context_json
     )
@@ -255,6 +274,48 @@ def _release_owned(db: DbSession, key: str, owner: str) -> None:
     db.commit()
 
 
+def renew_owned_leases(
+    db: DbSession,
+    key: str,
+    owner: str,
+    session_id: int,
+    branch_id: int,
+    head_node_id: int | None,
+    attempt: int,
+) -> bool:
+    """Extend one live generation's pending UUID and slot leases by 30s.
+
+    Both rows move atomically to 30s after renewal, only while both are
+    present, pending, unexpired, and owned by this generation. Anything
+    else — missing, finished, foreign, or already expired — returns False
+    without touching either row, so a heartbeat never creates, reclaims,
+    or resurrects ownership. Any database failure also returns False.
+    """
+    try:
+        write_lock(db)
+        record = db.get(IdempotencyRecord, key)
+        lease = _slot_lease(db, session_id, branch_id, head_node_id, attempt)
+        now = time.time()
+        if (
+            record is None
+            or record.owner != owner
+            or record.status is not None
+            or record.expires_at <= now
+            or lease is None
+            or lease.owner != owner
+            or lease.expires_at <= now
+        ):
+            db.rollback()
+            return False
+        record.expires_at = now + COACH_LEASE_SECONDS
+        lease.expires_at = now + COACH_LEASE_SECONDS
+        db.commit()
+        return True
+    except Exception:  # noqa: BLE001 - a failed heartbeat abandons, never raises
+        db.rollback()
+        return False
+
+
 def _earlier_hint_rows(
     db: DbSession,
     session_id: int,
@@ -341,10 +402,12 @@ def _run_provider_boxed(
         box["error"] = exc
 
 
-def _choice_timing(started: float, total_seconds: float) -> tuple[int, bool]:
+def _choice_timing(
+    started: float, total_seconds: float, demo_wait: bool = False
+) -> tuple[int, bool]:
     """Return (latency_ms, over_total) at the moment a result is chosen."""
     elapsed = _monotonic() - started
-    if elapsed > total_seconds:
+    if not demo_wait and elapsed > total_seconds:
         return LATENCY_SATURATION_MS, True
     return min(LATENCY_SATURATION_MS, int(elapsed * 1000)), False
 
@@ -357,6 +420,9 @@ def _call_or_fallback(
     started: float,
     wait_seconds: float = COACH_PROVIDER_WAIT_SECONDS,
     total_seconds: float = COACH_FALLBACK_DEADLINE_SECONDS,
+    demo_wait: bool = False,
+    heartbeat: Callable[[], bool] | None = None,
+    heartbeat_seconds: float = COACH_HEARTBEAT_SECONDS,
 ) -> tuple[dict[str, str], str, str | None, int]:
     """Run one provider call under a real wall-clock wait budget.
 
@@ -367,6 +433,12 @@ def _call_or_fallback(
     map to typed fallbacks; a wrong-typed provider result counts as
     invalid_response, and any outcome chosen past ``total_seconds``
     becomes a saturated timeout fallback.
+
+    In demo-wait mode both cutoffs are removed instead of lengthened:
+    this thread joins in heartbeat-sized slices with no total deadline,
+    renewing ownership each slice. A failed heartbeat raises
+    request_in_progress so the generation is abandoned and its late
+    outcome can never publish; wire latency still saturates at 10000.
     """
     box: dict[str, object] = {}
     worker = threading.Thread(
@@ -375,9 +447,15 @@ def _call_or_fallback(
         daemon=True,
     )
     worker.start()
-    worker.join(timeout=max(0.0, started + wait_seconds - _monotonic()))
+    if demo_wait:
+        while worker.is_alive():
+            worker.join(timeout=max(0.0, heartbeat_seconds))
+            if worker.is_alive() and heartbeat is not None and not heartbeat():
+                raise _in_progress()
+    else:
+        worker.join(timeout=max(0.0, started + wait_seconds - _monotonic()))
     if worker.is_alive():
-        latency_ms, _ = _choice_timing(started, total_seconds)
+        latency_ms, _ = _choice_timing(started, total_seconds, demo_wait)
         return fallback_fields, "deterministic", "timeout", latency_ms
     error = box.get("error")
     if error is None:
@@ -388,7 +466,9 @@ def _call_or_fallback(
             except CoachError:
                 fields = None
             if fields is not None:
-                latency_ms, over_total = _choice_timing(started, total_seconds)
+                latency_ms, over_total = _choice_timing(
+                    started, total_seconds, demo_wait
+                )
                 if over_total:
                     return (
                         fallback_fields,
@@ -406,7 +486,7 @@ def _call_or_fallback(
         fields, source, reason = fallback_fields, "deterministic", "unavailable"
     else:
         fields, source, reason = fallback_fields, "deterministic", "invalid_response"
-    latency_ms, _ = _choice_timing(started, total_seconds)
+    latency_ms, _ = _choice_timing(started, total_seconds, demo_wait)
     return fields, source, reason, latency_ms
 
 
@@ -446,6 +526,8 @@ def _generate(
     started: float,
     wait_seconds: float,
     total_seconds: float,
+    demo_wait: bool,
+    heartbeat_seconds: float,
 ) -> tuple[int, dict]:
     session, branch = _validate_action(db, session_id, payload)
     write_lock(db)
@@ -460,6 +542,18 @@ def _generate(
         db, session, branch, payload
     )
     db.rollback()
+
+    def heartbeat() -> bool:
+        return renew_owned_leases(
+            db,
+            key,
+            owner,
+            session_id,
+            payload.branch_id,
+            payload.head_node_id,
+            payload.attempt,
+        )
+
     fields, source, reason, latency_ms = _call_or_fallback(
         provider,
         system_prompt,
@@ -468,6 +562,9 @@ def _generate(
         started,
         wait_seconds=wait_seconds,
         total_seconds=total_seconds,
+        demo_wait=demo_wait,
+        heartbeat=heartbeat,
+        heartbeat_seconds=heartbeat_seconds,
     )
     write_lock(db)
     session, branch = _validate_action(db, session_id, payload)
@@ -511,14 +608,19 @@ def request_hint(
     *,
     wait_seconds: float = COACH_PROVIDER_WAIT_SECONDS,
     total_seconds: float = COACH_FALLBACK_DEADLINE_SECONDS,
+    demo_wait: bool | None = None,
+    heartbeat_seconds: float = COACH_HEARTBEAT_SECONDS,
 ) -> tuple[int, dict]:
     """Run one coach-hint action: replay, cache, generate, or safe fallback.
 
     Latency is measured from entry here until the result or fallback is
     chosen. Tests scale the wait/total budgets down; production routes
-    always use the 8/10-second defaults.
+    always use the 8/10-second defaults. Demo-wait mode follows the
+    COACH_DEMO_WAIT flag unless forced explicitly: no wait/total cutoff,
+    with ownership heartbeated until the provider answers or fails.
     """
     started = _monotonic()
+    demo = demo_wait_enabled(demo_wait)
     path = f"/api/sessions/{session_id}/coach-hints"
     owner, replay = reserve(
         db, key, "POST", path, payload.model_dump(), COACH_LEASE_SECONDS
@@ -536,6 +638,8 @@ def request_hint(
             started,
             wait_seconds,
             total_seconds,
+            demo,
+            heartbeat_seconds,
         )
     except Exception:
         _release_owned(db, key, owner)
