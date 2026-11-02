@@ -779,6 +779,10 @@ async function bobReload(ctx) {
     latest_hint_visible: latest ? await has(latest.approach) : null,
   };
   bob.reloads.push(record);
+  if (before.length === 0) {
+    notExercised(`${ctx.caseId}: reload`, "real-http", "no saved hint on this turn to restore");
+    return;
+  }
   check(
     `${ctx.caseId}: reload keeps saved hints and makes no POST`,
     JSON.stringify(before) === JSON.stringify(after) && record.posts_added === 0,
