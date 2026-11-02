@@ -945,22 +945,6 @@ def test_real_coach_provider_selects_demo_cap_only_on_exact_flag(
     assert "max_tokens" not in seen[-1]
 
 
-def test_coach_system_prompt_grounds_concrete_details_in_transcript() -> None:
-    """CS-61: the grounding rule directly follows the untrusted-data rule."""
-    paragraphs = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
-    assert len(paragraphs) == 6
-    assert paragraphs[2].startswith("Ground every concrete detail")
-    assert "already appear there" in paragraphs[2]
-
-
-def test_coach_system_prompt_stays_single_variant() -> None:
-    """CS-61: only the persona name/role interpolate across personas."""
-    first = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
-    second = build_coach_system_prompt("Bob", "Team member").split("\n\n")
-    assert first[1:] == second[1:]
-    assert "Maya" in first[0] and "Bob" not in first[0]
-
-
 def test_real_coach_provider_selects_demo_reasoning_only_on_exact_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -985,3 +969,33 @@ def test_real_coach_provider_selects_demo_reasoning_only_on_exact_flag(
     monkeypatch.delenv("COACH_DEMO_WAIT")
     coach_service.real_coach_provider("s", "{}")
     assert "reasoning_effort" not in seen[-1]
+
+
+def test_coach_system_prompt_grounds_concrete_details_in_transcript() -> None:
+    """CS-61: the grounding rule directly follows the untrusted-data rule."""
+    paragraphs = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
+    assert len(paragraphs) == 7
+    assert paragraphs[2].startswith("Ground every concrete detail")
+    assert "already appear there" in paragraphs[2]
+
+
+def test_coach_system_prompt_example_line_sentence_and_refusal_exception() -> None:
+    """CS-68: CS-C307 sentence plus CS-C348 exception share one paragraph."""
+    paragraphs = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
+    assert len(paragraphs) == 7
+    assert paragraphs[4] == (
+        "Make the example line one short acknowledgment of what the other "
+        "person just said, followed by one open question that starts with "
+        "what or how and invites their view. Exception: if the other person "
+        "has asked to stop, to be left alone, or not to talk now, the example "
+        "only acknowledges that and offers to come back later, with no "
+        "question about the present moment."
+    )
+
+
+def test_coach_system_prompt_stays_single_variant() -> None:
+    """CS-61: only the persona name/role interpolate across personas."""
+    first = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
+    second = build_coach_system_prompt("Bob", "Team member").split("\n\n")
+    assert first[1:] == second[1:]
+    assert "Maya" in first[0] and "Bob" not in first[0]
