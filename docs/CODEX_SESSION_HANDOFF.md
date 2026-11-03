@@ -1,5 +1,19 @@
 # Codex session restart and Megillah handoff
 
+## Superseding checkpoint: accepted demo, application stopped
+
+Pramodh explicitly asked Codex to stop the application. Codex stopped its own
+backend session85115 and frontend53571 and verified no listeners remained on
+8080/5173. Saved sessions and budget logs are preserved. Do not restart the app
+or paid calls from the older preview instructions below.
+
+Pramodh then authorized the remaining Codex merges. Codex claims PR43 (demo
+walkthrough/launcher, head65dcd04) followed by PR37 (this handoff). Both target
+dev; merge commits preserve published history. CS78 is already delivered with
+explicit acceptance; these merges do not reopen it or promote main/submission.
+Check GitHub for the resulting merge revisions. The demo artifacts are also
+Megillah A99/A100 and described in C567.
+
 ## Superseding checkpoint: November 3, about 20:05 UTC
 
 Pramodh accepted the preview directly ("okay preview looks good, I accept").
