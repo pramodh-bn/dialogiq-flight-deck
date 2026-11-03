@@ -2,7 +2,8 @@
 
 Sprint 4 Bob proposal: [CS-75 behavior contract](sprint4/bob-behavior-contract.md),
 revision `s4-bob-r1`, specifies opt-in pinned Bob behavior, separate simulated
-stance and adaptive coaching. Review proposal only; not adopted runtime.
+stance and adaptive coaching. Adopted on CS-75 in CS-C441; runtime delivery
+and integration remain separate downstream gates.
 
 Versioned parser extension: [CS-71 dash-separated questions](cs71-question-parser-delta.md),
 revision `s2-r2.2`, defines dash-clause recognition for fresh seed catalogs.

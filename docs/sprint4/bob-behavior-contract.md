@@ -2,13 +2,14 @@
 
 Owner: Codex. Task: CS-75. Base: dev `97c96cb`.
 
-Proposal `s4-bob-r1`. CS-74 is delivered; this proposal adopts its predeclared
-evaluation targets before any candidate exists. Claude/Muse interface review
-is pending. This document does not claim runtime implementation or adoption.
+Adopted contract `s4-bob-r1`, CS-C441. Claude CS-C438 and Muse CS-C439
+acknowledged the exact semantic proposal at `16c6573` / CS-A87. CS-74 is
+delivered; its predeclared evaluation targets were adopted before a candidate
+existed. Contract delivery does not claim runtime implementation or acceptance.
 
 ## Exact proposed interfaces and behavior
 
-This section supersedes open questions in the preparation inventory below.
+These interfaces govern the separately owned implementation tasks.
 
 **Version selection.** Add optional `behavior_revision` to SessionCreateRequest:
 absent/null preserves catalog behavior; literal `s4-bob-r1` selects new Bob
