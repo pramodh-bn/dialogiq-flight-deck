@@ -122,7 +122,8 @@ def _bob_feedback_flags(value: str) -> tuple[bool, bool]:
     ) or bool(
         re.search(
             r"\b(?:you(?: are|'re| were)|it is you who (?:is|are)) "
-            r"(?:so )?(?:slow|lazy|useless|incompetent)\b",
+            r"(?:so )?(?:slow|lazy|useless|incompetent)\b|"
+            r"\b(?:that's|that is) your problem\b",
             pressure_text,
         )
     )
@@ -133,7 +134,10 @@ def _bob_feedback_flags(value: str) -> tuple[bool, bool]:
             r"\bi understand (?:that|how|why|this|it|you|your)\b|"
             r"\b(?:that|it) makes sense\b|"
             r"\bi appreciate (?:you|your|how|that)\b|"
-            r"\bi know\b[^.!?]*\b(?:you|your)\b",
+            r"\bi know\b[^.!?]*\b(?:you|your)\b|"
+            r"\bmust have been (?:really |so )?(?:hard|tough|difficult)\b|"
+            r"\byou(?:'ve| have) carried\b|"
+            r"\b(?:harder|hard|tough|difficult) for you\b",
             value,
         )
     )

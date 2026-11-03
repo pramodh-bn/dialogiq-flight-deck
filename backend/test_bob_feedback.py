@@ -23,6 +23,7 @@ def test_historical_false_positive_is_not_silently_rescored(revision: str) -> No
         "I understand, but you are lazy.",
         "That sounds hard, but it's your fault.",
         "I hear you. You never listen.",
+        "I understand you're worried, but that is your problem.",
     ],
 )
 def test_blame_is_not_praised_as_empathy(message: str) -> None:
@@ -43,6 +44,9 @@ def test_blame_is_not_praised_as_empathy(message: str) -> None:
         "I understand that the changing deadlines have been difficult.",
         "That makes sense with the extra redesigns.",
         "I know the redesigns landed on you with no warning.",  # CS74 B12
+        "It must have been tough carrying that alone.",
+        "You've carried most of the extra work.",
+        "The changes made the schedule harder for you.",
     ],
 )
 def test_specific_supportive_acknowledgment_is_preserved(message: str) -> None:
