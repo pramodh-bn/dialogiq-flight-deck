@@ -106,7 +106,11 @@ setting.
      and repair, and moves back with pressure or blame. It is not a measure of
      real trust or empathy.
 4. Ask for a hint at any turn. A second hint at the same turn tries a different
-   approach. If a call fails, you can retry it.
+   approach; each turn keeps at most two. If the coach provider times out or
+   fails, the server saves a fixed fallback hint for that attempt instead, and
+   that fallback is the saved hint for the attempt (asking again returns it).
+   **Try again** appears only when the request itself fails, such as a network
+   or server error, and repeats that same attempt.
 5. Open the **Flight Recorder** to see the turn tree, select an earlier turn and
    branch from it. Saved hints and stance stay with their turns after reload.
 
@@ -131,13 +135,21 @@ The test suites make no paid calls.
   credit, and needs are revealed by matched wording, not by meaning.
 - **Bob's stance is rule-based**, from wording signals with negation handling. It
   can misread unusual phrasing.
-- **Coach quality** (Sprint 4 measurement on 13 Bob cases, 78 hints):
-  52/78 hints judged usable by a learner, against 23/78 for the previous coach;
-  16/24 against 3/24 on unseen cases. Bob's requests to stop are respected in
-  6/6. Still weak: repairing after the learner's own mistake (5/12) and
-  letting a supportive statement stand without another question (1/12).
-- **Coach latency** on Fireworks varied from about 7 to 22 seconds typical, with
-  rare waits over 25 seconds.
+- **Coach quality** (Sprint 4, small finite samples, graded by the agents):
+  - On the final coach (commit 9afaa54), 13 shared Bob cases, 78 hints: 52/78
+    judged usable by a learner, against 23/78 for the previous coach. Bob's
+    requests to stop were respected in 6/6. Still weak: repairing after the
+    learner's own mistake (5/12) and letting a supportive statement stand
+    without another question (1/12).
+  - On 4 unseen cases (24 hints), 16/24 against 3/24 for the previous coach,
+    but that was measured once on an earlier revision (b022828). It was not
+    rerun on the final stop-rule wording, so it is not evidence about the final
+    coach. The final revision was accepted by the project owner with these
+    known misses, not because the unseen result carried over.
+- **Coach latency** on Fireworks in demo-wait mode, on the same 78-hint final
+  run: median 13.7 s for a first hint and 22.0 s for a second hint, with a
+  slowest hint of 83.9 s. This misses the original goal of a quick hint and is
+  a finite sample, not a guarantee.
 - **Local single user.** There is no login and no multi-user authorization;
   CORS is not authentication.
 
