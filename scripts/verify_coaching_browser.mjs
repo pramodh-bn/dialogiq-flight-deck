@@ -1669,12 +1669,13 @@ async function runBobStance() {
       const composer = await evaluate(`(() => {
         const input = document.querySelector('textarea');
         const submit = [...document.querySelectorAll('button')]
-          .find((button) => button.innerText.trim() === 'Send Response');
+          .find((button) => ['Send Response', 'Send'].includes(button.innerText.trim()));
         return { inputWidth: input?.getBoundingClientRect().width ?? 0,
-          submitRight: submit?.getBoundingClientRect().right ?? Infinity, vw: innerWidth };
+          submitPresent: Boolean(submit),
+          submitRight: submit?.getBoundingClientRect().right ?? 0, vw: innerWidth };
       })()`);
       check("narrow-phone: composer remains usable", composer.inputWidth >= 120, evidence, JSON.stringify(composer));
-      check("narrow-phone: Send stays in the viewport", composer.submitRight <= composer.vw + 1, evidence, JSON.stringify(composer));
+      check("narrow-phone: Send stays in the viewport", composer.submitPresent && composer.submitRight <= composer.vw + 1, evidence, JSON.stringify(composer));
     }
     await screenshot(`stance-${view.name}`);
   }
