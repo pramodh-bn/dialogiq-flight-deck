@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx import Response
 from sqlalchemy.orm import Session as DbSession
 
 import stance
@@ -35,7 +36,7 @@ def scenario_id(client: TestClient, prefix: str) -> int:
     )
 
 
-def create(client: TestClient, prefix: str = "Bob:", **body: object):
+def create(client: TestClient, prefix: str = "Bob:", **body: object) -> Response:
     return client.post(
         "/api/sessions",
         json={"scenario_id": scenario_id(client, prefix), **body},
@@ -54,6 +55,34 @@ def test_shared_contrast_signal(line: dict) -> None:
     got = stance.signal_for(line["learner"])
     assert got in line["signal"]
     assert got != line.get("not_signal")
+
+
+# CS-C475: negation must not invert ordinary meaning. The first four are Codex's
+# reproductions; the rest pin both sides of the boundary.
+NEGATION_CONTRASTS = [
+    ("This is not your fault.", "none"),
+    ("I cannot promise that I can hold the date.", "none"),
+    ("I am not saying that was unfair.", "none"),
+    ("I will not say that I can help you.", "none"),
+    ("It isn't your fault.", "none"),
+    ("I never said you were slow.", "none"),
+    ("I don't think you're slow.", "none"),
+    ("I don't think it sounds hard.", "none"),
+    ("I cannot promise those yet, but I will check.", "clarity"),
+    ("I said everyone else hits their dates, and I take that back.", "repair"),
+    ("I can't promise the date, but I can help you with the setup.", "support"),
+    ("It's your fault.", "pressure"),
+    ("You were slow.", "pressure"),
+    ("Help me understand why you can't keep up with everyone else.", "pressure"),
+    ("I don't think you've had it that tough.", "pressure"),
+    ("She didn't make all this fuss.", "pressure"),
+    ("I'm not leaving until you tell me.", "pressure"),
+]
+
+
+@pytest.mark.parametrize(("text", "expected"), NEGATION_CONTRASTS)
+def test_negation_contrast_signal(text: str, expected: str) -> None:
+    assert stance.signal_for(text) == expected
 
 
 def test_ledger_follows_the_contract_table() -> None:
