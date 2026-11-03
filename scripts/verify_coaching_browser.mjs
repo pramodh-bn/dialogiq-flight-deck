@@ -1665,6 +1665,17 @@ async function runBobStance() {
       JSON.stringify(box),
     );
     check(`${view.name}: no side scroll`, await noSideScroll(), evidence);
+    if (view.width === 390) {
+      const composer = await evaluate(`(() => {
+        const input = document.querySelector('textarea');
+        const submit = [...document.querySelectorAll('button')]
+          .find((button) => button.innerText.trim() === 'Send Response');
+        return { inputWidth: input?.getBoundingClientRect().width ?? 0,
+          submitRight: submit?.getBoundingClientRect().right ?? Infinity, vw: innerWidth };
+      })()`);
+      check("narrow-phone: composer remains usable", composer.inputWidth >= 120, evidence, JSON.stringify(composer));
+      check("narrow-phone: Send stays in the viewport", composer.submitRight <= composer.vw + 1, evidence, JSON.stringify(composer));
+    }
     await screenshot(`stance-${view.name}`);
   }
   await send("Emulation.clearDeviceMetricsOverride");
@@ -1690,6 +1701,8 @@ async function runBobStance() {
   const drawer = await pageText();
   check("recorder: drawer shows the stance at that turn", /simulated stance\s*\n?\s*warming/i.test(drawer), evidence);
   check("recorder: drawer shows the explanation", drawer.includes("acknowledged a specific concern"), evidence);
+  // Let the drawer's entrance animation finish before recording visual evidence.
+  await sleep(700);
   await screenshot("stance-recorder");
   check("no ledger in the public tree", !JSON.stringify(data).includes("stance_ledger"), evidence);
 
