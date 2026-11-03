@@ -78,15 +78,19 @@ if (!["injected", "real", "stub"].includes(args.coach)) {
   throw new Error("--coach: injected, real or stub");
 }
 if (args.coach === "stub" && !args["demo-wait"]) throw new Error("--coach stub needs --demo-wait");
-if (!args["env-file"] && !["lost-response", "recorder-failure", "graph-navigation"].includes(args.journey)) {
+if (
+  !args["env-file"] &&
+  !["lost-response", "recorder-failure", "graph-navigation", "bob-stance"].includes(args.journey)
+) {
   throw new Error("--env-file is required: persona turns need Baseten");
 }
-const JOURNEYS = ["full", "bob", "lost-response", "recorder-failure", "graph-navigation"];
+const JOURNEYS = ["full", "bob", "lost-response", "recorder-failure", "graph-navigation", "bob-stance"];
 if (!JOURNEYS.includes(args.journey)) throw new Error(`--journey: ${JOURNEYS.join(", ")}`);
 const LOST = args.journey === "lost-response";
 const RECORDER_FAILURE = args.journey === "recorder-failure";
 const GRAPH = args.journey === "graph-navigation";
-const STAND_IN = LOST || RECORDER_FAILURE || GRAPH;
+const STANCE = args.journey === "bob-stance";
+const STAND_IN = LOST || RECORDER_FAILURE || GRAPH || STANCE;
 if (!["dev", "production"].includes(args.frontend)) {
   throw new Error("--frontend: dev or production");
 }
@@ -196,7 +200,10 @@ async function evaluate(expression) {
     returnByValue: true,
     awaitPromise: true,
   });
-  if (result?.exceptionDetails) throw new Error(result.exceptionDetails.text);
+  if (result?.exceptionDetails) {
+    const detail = result.exceptionDetails.exception?.description ?? "";
+    throw new Error(`${result.exceptionDetails.text} ${detail.split("\n")[0]} in: ${expression.slice(0, 80)}`);
+  }
   return result?.result?.value;
 }
 
@@ -1581,7 +1588,113 @@ function liveHintStats() {
   };
 }
 
+// ---- Bob stance (CS-77) ------------------------------------------------------------------
+//
+// Stand-in persona and injected coach: zero paid calls. Checks the Hub opts in to s4-bob-r1,
+// the Arena shows the simulated stance and its change, and the Recorder shows both.
+
+const stanceText = () => evaluate(`document.querySelector('[data-testid="stance"]')?.innerText ?? ""`);
+const noSideScroll = () =>
+  evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`);
+
+async function runBobStance() {
+  const evidence = "real-http";
+  await send("Page.navigate", { url: WEB });
+  await waitFor("the hub", () => has("New Session"), 30_000);
+  check("hub: Bob's card counts needs uncovered", await has("needs uncovered"), evidence);
+  check("hub: other cards keep Breakthrough", await has("Breakthrough"), evidence);
+
+  const id = await openBobSession();
+  const created = await getJson(`/api/sessions/${id}`);
+  check(
+    "hub: the session opted in to s4-bob-r1",
+    created.conversation_progress?.behavior_revision === "s4-bob-r1",
+    evidence,
+  );
+  let panel = await stanceText();
+  check("arena: stance panel shown", /simulated stance/i.test(panel) && /guarded/i.test(panel), evidence, panel);
+  check("arena: says it is not a measure of trust", /not a measure of trust/i.test(panel), evidence);
+  check("arena: no resistance meter", !(await has("'s Resistance")), evidence);
+  check("arena: no Live label", !(await has("· Live")), evidence);
+
+  await typeAndSend("Three redesigns in a month sounds exhausting.");
+  await settled(id, 1);
+  panel = await stanceText();
+  check("turn 1: warming", /warming/i.test(panel), evidence, panel);
+  check("turn 1: less guarded than before", panel.includes("Less guarded than the turn before."), evidence);
+  check("turn 1: names the acknowledgment", panel.includes("acknowledged a specific concern"), evidence);
+  await screenshot("stance-warming");
+
+  await typeAndSend("Everyone else stayed late. You are slow.");
+  await settled(id, 2);
+  panel = await stanceText();
+  check("turn 2: guarded again", /guarded/i.test(panel), evidence, panel);
+  check("turn 2: more guarded than before", panel.includes("More guarded than the turn before."), evidence);
+  check("turn 2: names the blame", panel.includes("pressure or blame"), evidence);
+
+  await send("Page.reload");
+  await waitFor("the stance after reload", async () => /simulated stance/i.test(await stanceText()), 20_000);
+  check("reload: same stance and change", (await stanceText()) === panel, evidence);
+
+  // Narrow and magnified layouts keep the panel readable without side scrolling.
+  for (const view of [
+    { name: "narrow-phone", width: 390, height: 844, scale: 1 },
+    { name: "browser-200", width: 700, height: 450, scale: 2 },
+  ]) {
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: view.width,
+      height: view.height,
+      deviceScaleFactor: view.scale,
+      mobile: false,
+    });
+    await sleep(800);
+    const box = await evaluate(`(() => {
+      const el = document.querySelector('[data-testid="stance"]');
+      if (!el) return null;
+      el.scrollIntoView();
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right, width: r.width, vw: innerWidth };
+    })()`);
+    check(
+      `${view.name}: stance panel inside the viewport`,
+      Boolean(box) && box.left >= 0 && box.right <= box.vw + 1 && box.width > 100,
+      evidence,
+      JSON.stringify(box),
+    );
+    check(`${view.name}: no side scroll`, await noSideScroll(), evidence);
+    await screenshot(`stance-${view.name}`);
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
+  await sleep(500);
+
+  // Keyboard: the composer is still reachable and sends with the panel present.
+  await evaluate(`document.activeElement?.blur()`);
+  let reached = false;
+  for (let i = 0; i < 60 && !reached; i++) {
+    await press("Tab", "Tab", 9);
+    reached = await evaluate(`document.activeElement?.tagName === "TEXTAREA"`);
+  }
+  check("keyboard: Tab reaches the composer", reached, evidence);
+
+  const data = await tree(id);
+  const first = data.nodes.find((n) => n.turn_number === 1);
+  await send("Page.navigate", { url: new URL(`/flight-recorder?sessionId=${id}`, WEB).href });
+  await waitFor("the graph", () => evaluate(`document.querySelectorAll(".react-flow__node").length >= 2`), 20_000);
+  check("recorder: Needs uncovered label", await has("Needs uncovered"), evidence);
+  check("recorder: no Breakthrough score label", !(await has("Breakthrough score")), evidence);
+  await clickTreeNode(first.id);
+  await waitFor("the turn drawer", () => has("simulated stance"), 15_000);
+  const drawer = await pageText();
+  check("recorder: drawer shows the stance at that turn", /simulated stance\s*\n?\s*warming/i.test(drawer), evidence);
+  check("recorder: drawer shows the explanation", drawer.includes("acknowledged a specific concern"), evidence);
+  await screenshot("stance-recorder");
+  check("no ledger in the public tree", !JSON.stringify(data).includes("stance_ledger"), evidence);
+  check("stand-in persona only", personaCalls() === 2, evidence, `${personaCalls()} calls`);
+  check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
+}
+
 async function run() {
+  if (STANCE) return runBobStance();
   if (LOST) return runLostResponse();
   if (RECORDER_FAILURE) return runRecorderFailure();
   if (GRAPH) return runGraphNavigation();
