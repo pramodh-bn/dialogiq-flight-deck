@@ -993,6 +993,34 @@ def test_coach_system_prompt_example_line_sentence_and_refusal_exception() -> No
     )
 
 
+def test_coach_system_prompt_behavior_revision_selects_bob_variant() -> None:
+    """CS-73: s4-bob-r1 swaps only the mandatory-question paragraph."""
+    baseline = build_coach_system_prompt("Bob", "Team member").split("\n\n")
+    variant = build_coach_system_prompt(
+        "Bob", "Team member", behavior_revision="s4-bob-r1"
+    ).split("\n\n")
+    assert len(variant) == 7
+    assert variant[:4] == baseline[:4]
+    assert variant[5:] == baseline[5:]
+    assert variant[4] != baseline[4]
+    assert "most useful next move" in variant[4]
+    assert "at most one question" in variant[4]
+    assert "no question about the present moment" in variant[4]
+
+
+def test_coach_system_prompt_behavior_revision_defaults_to_baseline() -> None:
+    """CS-73: omitted or unknown revisions preserve baseline bytes exactly."""
+    baseline = build_coach_system_prompt("Bob", "Team member")
+    assert (
+        build_coach_system_prompt("Bob", "Team member", behavior_revision=None)
+        == baseline
+    )
+    assert (
+        build_coach_system_prompt("Bob", "Team member", behavior_revision="unknown-r9")
+        == baseline
+    )
+
+
 def test_coach_system_prompt_stays_single_variant() -> None:
     """CS-61: only the persona name/role interpolate across personas."""
     first = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
