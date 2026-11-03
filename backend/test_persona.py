@@ -611,7 +611,7 @@ def test_fixture_public_strings_have_no_need_titles():
 
 
 # CS-79: s4-bob-r1 persona variant. Prompt-only checks, zero network.
-def test_bob_variant_absent_keeps_original_bytes():
+def test_bob_variant_absent_keeps_original_bytes() -> None:
     for level in (RESISTANCE_GUARDED, RESISTANCE_WARMING, RESISTANCE_OPEN):
         original = build_persona_system_prompt(_brief(), resistance=level)
         assert (
@@ -631,7 +631,7 @@ def test_bob_variant_absent_keeps_original_bytes():
         )
 
 
-def test_bob_variant_replaces_open_question_rule_and_etiquette():
+def test_bob_variant_replaces_open_question_rule_and_etiquette() -> None:
     prompt = build_persona_system_prompt(
         _brief(),
         resistance=RESISTANCE_GUARDED,
@@ -649,7 +649,7 @@ def test_bob_variant_replaces_open_question_rule_and_etiquette():
     assert "Nothing new is permitted this reply." in prompt
 
 
-def test_bob_variant_levels_and_signals():
+def test_bob_variant_levels_and_signals() -> None:
     from persona import bob_stance_instruction
 
     levels = {
