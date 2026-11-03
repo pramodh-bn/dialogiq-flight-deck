@@ -7,6 +7,7 @@ import unicodedata
 from schemas import State
 
 RULESET_REVISION = "s2-r2.2"
+BOB_FEEDBACK_REVISION = "s2-r2.3-bob"
 OPEN_PREFIXES = (
     "what",
     "how",
@@ -97,12 +98,63 @@ def normalize(text: str) -> str:
     return " ".join(value.replace("’", "'").replace("‘", "'").split())
 
 
+def _bob_feedback_flags(value: str) -> tuple[bool, bool]:
+    """Recognize bounded public wording, not psychological empathy or intent.
+
+    A withdrawn quotation is ignored only after an explicit repair opening.
+    Fresh pressure outside that quotation still overrides acknowledgment.
+    """
+    pressure_text = value.replace("“", '"').replace("”", '"')
+    repair = re.match(
+        r"i (?:shouldn't have said|should not have said|was wrong to say|"
+        r"take back|withdraw|regret saying)\b",
+        pressure_text,
+    )
+    if repair:
+        pressure_text = re.sub(
+            r"""(?<![a-z0-9])(['"])(.+?)\1(?![a-z0-9])""",
+            "",
+            pressure_text,
+        )
+    leading = any(
+        re.search(r"(?<![a-z0-9'])" + re.escape(p) + r"(?![a-z0-9'])", pressure_text)
+        for p in LEADING_PHRASES
+    ) or bool(
+        re.search(
+            r"\b(?:you(?: are|'re| were)|it is you who (?:is|are)) "
+            r"(?:so )?(?:slow|lazy|useless|incompetent)\b|"
+            r"\b(?:that's|that is) your problem\b",
+            pressure_text,
+        )
+    )
+    acknowledgment = bool(
+        re.search(
+            r"\b(?:it|that) sounds (?:like|hard|tough|difficult)\b|"
+            r"\bi hear (?:you|how|that|what)\b|"
+            r"\bi understand (?:that|how|why|this|it|you|your)\b|"
+            r"\b(?:that|it) makes sense\b|"
+            r"\bi appreciate (?:you|your|how|that)\b|"
+            r"\bi know\b[^.!?]*\b(?:you|your)\b|"
+            r"\bmust have been (?:really |so )?(?:hard|tough|difficult)\b|"
+            r"\byou(?:'ve| have) carried\b|"
+            r"\b(?:harder|hard|tough|difficult) for you\b",
+            value,
+        )
+    )
+    return acknowledgment and not leading, leading
+
+
 def classify(
     text: str, ruleset_revision: str = RULESET_REVISION
 ) -> tuple[str, bool, bool]:
     """Classify public user text, including contractions and acknowledgments."""
     value = normalize(text)
-    if ruleset_revision not in {"s2-r2", "s2-r2.1", "s2-r2.2"}:
+    if ruleset_revision not in {
+        "s2-r2",
+        "s2-r2.1",
+        "s2-r2.2",
+        BOB_FEEDBACK_REVISION,
+    }:
         raise ValueError("Unsupported pinned scoring ruleset.")
     legacy = ruleset_revision == "s2-r2"
     if legacy:
@@ -137,7 +189,10 @@ def classify(
         re.search(r"(?<![a-z0-9'])" + re.escape(p) + r"(?![a-z0-9'])", value)
         for p in (LEADING_PHRASES[:7] if legacy else LEADING_PHRASES)
     )
-    return question_type, any(marker in value for marker in EMPATHY), leading
+    empathy = any(marker in value for marker in EMPATHY)
+    if ruleset_revision == BOB_FEEDBACK_REVISION:
+        empathy, leading = _bob_feedback_flags(value)
+    return question_type, empathy, leading
 
 
 def coach_public_text(text: str, ruleset_revision: str = RULESET_REVISION) -> dict:
