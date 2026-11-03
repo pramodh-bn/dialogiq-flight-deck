@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
+  type ReactFlowInstance,
   Background,
   Controls,
   MarkerType,
@@ -152,6 +153,9 @@ type RecorderRequest =
   | ({ route: "rewind" } & CreateBranchRequest)
   | ({ route: "select" } & SelectBranchRequest);
 
+// Matches max-w-sm on the drawer.
+const DRAWER_WIDTH = 384;
+
 function Recorder({ sessionId }: { sessionId: number }) {
   const client = useQueryClient();
   const session = useQuery(sessionQuery(sessionId));
@@ -221,6 +225,8 @@ function RecorderView({
 }) {
   const client = useQueryClient();
   const navigate = useNavigate();
+  const canvas = useRef<HTMLDivElement>(null);
+  const flow = useRef<ReactFlowInstance | null>(null);
   const retained = useMemo(
     () => retainedActions<RecorderRequest>(`recorder:${session.id}`),
     [session.id],
@@ -371,6 +377,25 @@ function RecorderView({
   const spots = blindSpots(chain);
   const tag = selected ? tagFor(selected.coaching) : null;
 
+  // The drawer opens over the canvas, so center the node in what is left. When the drawer
+  // fills the canvas there is nothing left to center in, and closing it shows the node again.
+  function centerBesideDrawer(id: string) {
+    const width = canvas.current?.clientWidth ?? 0;
+    const instance = flow.current;
+    const drawer = Math.min(width, DRAWER_WIDTH);
+    const space = width - drawer;
+    if (!instance || space < 120) return;
+    const zoom = instance.getZoom();
+    const box = instance.getNodesBounds([id]);
+    // A node wider than the space keeps its start in view.
+    const onScreen = Math.max(space / 2, 16 + (box.width * zoom) / 2);
+    instance.setCenter(
+      box.x + box.width / 2 + (width / 2 - onScreen) / zoom,
+      box.y + box.height / 2,
+      { zoom, duration: 250 },
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col bg-background bg-ambient">
       <header className="border-b border-border bg-background/70 backdrop-blur-xl">
@@ -387,6 +412,9 @@ function RecorderView({
             </p>
             <h1 className="font-semibold">{title}</h1>
           </div>
+          <p className="hidden text-xs text-muted-foreground [@media(max-height:640px)]:block">
+            {tree.nodes.length} turns · {viewed?.score ?? 0}/{viewed?.total_needs ?? 7}
+          </p>
           <Link
             to="/arena"
             search={{ sessionId: session.id }}
@@ -395,7 +423,7 @@ function RecorderView({
             Fly again
           </Link>
         </div>
-        <div className="grid gap-3 px-6 pb-4 sm:grid-cols-3">
+        <div className="grid gap-3 px-6 pb-4 sm:grid-cols-3 [@media(max-height:640px)]:hidden">
           <Stat
             label="Total turns"
             value={`${tree.nodes.length}`}
@@ -426,7 +454,7 @@ function RecorderView({
         </div>
       </header>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div ref={canvas} className="relative min-h-0 flex-1 overflow-hidden">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -435,10 +463,19 @@ function RecorderView({
           colorMode="dark"
           nodesDraggable={false}
           nodesConnectable={false}
-          onNodeClick={(_, n) => setSelectedId(n.id === OPENING_ID ? null : Number(n.id))}
+          onInit={(instance) => {
+            flow.current = instance;
+          }}
+          onNodeClick={(_, n) => {
+            const opening = n.id === OPENING_ID;
+            setSelectedId(opening ? null : Number(n.id));
+            if (!opening) centerBesideDrawer(n.id);
+          }}
           onPaneClick={() => setSelectedId(null)}
-          minZoom={0.3}
+          minZoom={0.1}
           maxZoom={2}
+          panOnScroll
+          zoomOnScroll={false}
           proOptions={{ hideAttribution: true }}
           style={{ background: "transparent" }}
         >
