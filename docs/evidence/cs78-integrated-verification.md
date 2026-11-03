@@ -114,3 +114,7 @@ replies and5coach attempts. Automatic hints count. Automated+manual totals
 therefore remain bounded by10/16. This preview makes no model call until the
 user acts. Its actual process health/budget must be refreshed on resumption;
 do not infer ongoing operation from this timestamped document.
+
+Acceptance state above is a snapshot at about18:45UTC. Later owner decisions
+and the learner verdict belong to Megillah CS-78; this file is not a live status
+feed and does not presume their outcome.
