@@ -10,9 +10,15 @@ checked out there, so a current and a candidate commit see the same cases:
 Calls the provider directly with demo settings, on a fixed transcript. It does not touch
 the database, Baseten or a browser. Each hint's text goes to the report for review; case
 text is not printed, so an unseen file stays off the console. Stops at --max-calls.
+
+For a paired run, take the baseline without --behavior-revision, then run the candidate
+from the same source with both of these, so its second hints follow the same first hints:
+
+    --behavior-revision s4-bob-r1 --prior-hints-from <baseline-report.json>
 """
 
 import argparse
+import hashlib
 import json
 import os
 import statistics
@@ -92,6 +98,16 @@ def one_hint(
     return row
 
 
+def load_prior_hints(path: Path) -> dict[tuple[str, int], dict[str, str]]:
+    """Return each case and rep's first hint from an earlier report."""
+    rows = json.loads(path.read_text(encoding="utf-8"))["rows"]
+    return {
+        (row["case"], row["rep"]): row["hint"]
+        for row in rows
+        if row["attempt"] == 1 and row["hint"]
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", required=True)
@@ -99,6 +115,8 @@ def main() -> None:
     parser.add_argument("--reps", type=int, default=3)
     parser.add_argument("--max-calls", type=int, required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--behavior-revision")
+    parser.add_argument("--prior-hints-from")
     args = parser.parse_args()
 
     for key, value in parse_env_file(Path(args.env_file)).items():
@@ -122,7 +140,12 @@ def main() -> None:
     }
     cases = json.loads(Path(args.cases).read_text(encoding="utf-8"))["cases"]
     bob = load_bob_public()
-    system = build_coach_system_prompt(bob["name"], bob["role"])
+    variant = (
+        {"behavior_revision": args.behavior_revision} if args.behavior_revision else {}
+    )
+    system = build_coach_system_prompt(bob["name"], bob["role"], **variant)
+    prior_path = Path(args.prior_hints_from) if args.prior_hints_from else None
+    prior_hints = load_prior_hints(prior_path) if prior_path else None
     client = MetaCoachClient()
 
     rows: list[dict] = []
@@ -156,9 +179,14 @@ def main() -> None:
                     row["finish"],
                     flush=True,
                 )
-                if row["hint"] is None:
+                prior = (
+                    row["hint"]
+                    if prior_hints is None
+                    else prior_hints.get((case["id"], rep))
+                )
+                if prior is None:
                     break
-                previous.append(row["hint"])
+                previous.append(prior)
 
     seconds = [r["seconds"] for r in rows]
     valid = [r for r in rows if r["hint"]]
@@ -168,6 +196,10 @@ def main() -> None:
         "scope": "coach only, fixed reviewer-authored dialogue, no persona or browser",
         "settings": {**settings, "timeout": None, "temperature": "client default"},
         "cases_file": Path(args.cases).name,
+        "behavior_revision": args.behavior_revision,
+        "prior_hints_sha256": (
+            hashlib.sha256(prior_path.read_bytes()).hexdigest() if prior_path else None
+        ),
         "reps": args.reps,
         "calls": calls,
         "stopped": stopped,
