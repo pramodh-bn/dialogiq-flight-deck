@@ -12,6 +12,7 @@
 //                      injected, adds delayed browser checks past 15s and 30s.
 //   --out <dir>        Report and screenshots. Default: a new temp directory.
 //   --python <path>    Default: backend/.venv's interpreter.
+//   --backend-runner <path>  Optional live-backend entry point (e.g. a capped verifier).
 //   --edge <path>      Default: the standard Windows Edge install.
 //   --journey lost-response
 //                      Drop responses after the server commits, with a stand-in persona that
@@ -66,6 +67,7 @@ const { values: args } = parseArgs({
     "demo-wait": { type: "boolean", default: false },
     out: { type: "string" },
     python: { type: "string" },
+    "backend-runner": { type: "string", default: "scripts/run_backend.py" },
     edge: { type: "string" },
     journey: { type: "string", default: "full" },
     cases: { type: "string" },
@@ -119,7 +121,7 @@ const TELEMETRY = join(OUT, "coach-telemetry.jsonl");
 mkdirSync(OUT, { recursive: true });
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-const hintEvidence = STUB ? "stub-provider" : REAL ? "live-meta" : "injected";
+const hintEvidence = STUB ? "stub-provider" : REAL ? "live-provider" : "injected";
 const uiEvidence = REAL ? "real-http" : "injected";
 
 // ---- Results ---------------------------------------------------------------------------
@@ -1538,7 +1540,7 @@ async function runBob() {
     }
     if (ctx.sessionId) await harvestCase(ctx);
     bob.cases.at(-1).failure = failure;
-    check(`case ${item.id} completed`, !failure, "live-meta", failure ?? "");
+    check(`case ${item.id} completed`, !failure, "live-provider", failure ?? "");
     await screenshot(`case-${item.id}`).catch(() => {});
   }
   check(
@@ -1663,6 +1665,18 @@ async function runBobStance() {
       JSON.stringify(box),
     );
     check(`${view.name}: no side scroll`, await noSideScroll(), evidence);
+    if (view.width === 390) {
+      const composer = await evaluate(`(() => {
+        const input = document.querySelector('textarea');
+        const submit = [...document.querySelectorAll('button')]
+          .find((button) => ['Send Response', 'Send'].includes(button.innerText.trim()));
+        return { inputWidth: input?.getBoundingClientRect().width ?? 0,
+          submitPresent: Boolean(submit),
+          submitRight: submit?.getBoundingClientRect().right ?? 0, vw: innerWidth };
+      })()`);
+      check("narrow-phone: composer remains usable", composer.inputWidth >= 120, evidence, JSON.stringify(composer));
+      check("narrow-phone: Send stays in the viewport", composer.submitPresent && composer.submitRight <= composer.vw + 1, evidence, JSON.stringify(composer));
+    }
     await screenshot(`stance-${view.name}`);
   }
   await send("Emulation.clearDeviceMetricsOverride");
@@ -1688,8 +1702,44 @@ async function runBobStance() {
   const drawer = await pageText();
   check("recorder: drawer shows the stance at that turn", /simulated stance\s*\n?\s*warming/i.test(drawer), evidence);
   check("recorder: drawer shows the explanation", drawer.includes("acknowledged a specific concern"), evidence);
+  // Let the drawer's entrance animation finish before recording visual evidence.
+  await sleep(700);
   await screenshot("stance-recorder");
   check("no ledger in the public tree", !JSON.stringify(data).includes("stance_ledger"), evidence);
+
+  // Resume stored legacy Bob and another persona without applying the new opt-in.
+  // Session creation uses the real API; viewing/reloading uses the real client.
+  const scenarios = await getJson("/api/scenarios");
+  for (const name of ["Bob", "Maya"]) {
+    const scenario = scenarios.find((item) => item.persona.name === name);
+    if (!scenario) throw new Error(`no ${name} scenario for legacy check`);
+    const response = await fetch(`${API}/api/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ scenario_id: scenario.id }),
+    });
+    check(`${name} legacy: session created without opt-in`, response.status === 201, evidence);
+    if (response.status !== 201) throw new Error(`legacy session returned ${response.status}`);
+    const legacy = await response.json();
+    check(`${name} legacy: null progress`, legacy.conversation_progress === null, evidence);
+    await send("Page.navigate", {
+      url: new URL(`/arena?sessionId=${legacy.id}&scenarioId=${scenario.id}`, WEB).href,
+    });
+    await waitFor(`${name} legacy Arena`, () => has("Your situation"), 20_000);
+    check(`${name} legacy: no Bob stance panel`, (await stanceText()) === "", evidence);
+    check(`${name} legacy: original resistance display`, await has(`${name}'s Resistance`), evidence);
+    await send("Page.reload");
+    await waitFor(`${name} legacy after reload`, () => has("Your situation"), 20_000);
+    const reloaded = await getJson(`/api/sessions/${legacy.id}`);
+    check(
+      `${name} legacy: reload keeps the pinned session`,
+      reloaded.conversation_progress === null &&
+        reloaded.revision === legacy.revision &&
+        reloaded.active_head_node_id === legacy.active_head_node_id,
+      evidence,
+    );
+    await screenshot(`legacy-${name.toLowerCase()}`);
+  }
   check("stand-in persona only", personaCalls() === 2, evidence, `${personaCalls()} calls`);
   check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
 }
@@ -2081,7 +2131,7 @@ async function main() {
           "--calls-file",
           STUB_CALLS,
         ]
-      : ["scripts/run_backend.py", "--env-file", resolve(args["env-file"]), "--host", BIND],
+      : [args["backend-runner"], "--env-file", resolve(args["env-file"]), "--host", BIND],
     {
       env: {
         ...process.env,
