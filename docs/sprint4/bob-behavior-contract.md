@@ -68,15 +68,15 @@ Save balance and last positive category in each node state, not public DTOs.
 Only public learner text and that branch's ledger may determine signals;
 never needs/stems, score/reveal events or an additional LLM call.
 
-| Precedence | Signal | Evidence boundary | Transition |
-| --- | --- | --- | --- |
-| 1 | pressure | Whole-turn blame/comparison, demand to disclose or dismissive pressure overrides incidental supportive wording | -1; clear prior positive category |
-| 2 | repair | Explicit withdrawal of a prior comparison or ownership of a specific learner action; quoted/withdrawn blame is not fresh pressure | +1, capped at warming on repair turn |
-| 3 | boundary | Accept stop/defer without another present-topic probe | no change |
-| 4 | clarity | Offer a concrete action to settle priority, write/check path/pass criteria, or separate commitment from what must be checked | +1 unless same as prior positive category |
-| 5 | support | Offer a bounded action within speaker control, e.g. help arrange setup or communicate a tradeoff | same +1 rule |
-| 6 | acknowledgment | Reflect a specific expressed concern/difficulty/value rather than generic agreement | same +1 rule |
-| 7 | none | Question alone, ambiguous/negated support, generic praise or unsupported inference | no change |
+| Precedence | Signal         | Evidence boundary                                                                                                                 | Transition                                |
+| ---------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| 1          | pressure       | Whole-turn blame/comparison, demand to disclose or dismissive pressure overrides incidental supportive wording                    | -1; clear prior positive category         |
+| 2          | repair         | Explicit withdrawal of a prior comparison or ownership of a specific learner action; quoted/withdrawn blame is not fresh pressure | +1, capped at warming on repair turn      |
+| 3          | boundary       | Accept stop/defer without another present-topic probe                                                                             | no change                                 |
+| 4          | clarity        | Offer a concrete action to settle priority, write/check path/pass criteria, or separate commitment from what must be checked      | +1 unless same as prior positive category |
+| 5          | support        | Offer a bounded action within speaker control, e.g. help arrange setup or communicate a tradeoff                                  | same +1 rule                              |
+| 6          | acknowledgment | Reflect a specific expressed concern/difficulty/value rather than generic agreement                                               | same +1 rule                              |
+| 7          | none           | Question alone, ambiguous/negated support, generic praise or unsupported inference                                                | no change                                 |
 
 Choose first applicable positive category and count once. Repeated positive
 category does not increase stance; neutral/boundary does not reset it. A
@@ -184,14 +184,14 @@ not depend on this contract. No live demo migration/restart or main promotion.
 
 ## File ownership and sequence
 
-| Owner | Scope | Sequence |
-| --- | --- | --- |
-| Codex | judge.py and versioned judge fixtures | CS72 before CS76; serialize judge edits |
-| Codex | schemas.py, practice.py, snapshot/API tests, API docs | CS56 public pinned persona/capability fields then CS76 opt-in/state; coordinate shared DTO tests |
-| Muse | coach_context.py, coach_service.py, coach.py, provider tests | CS73; coordinate evaluator flag with Claude |
-| Muse | persona.py, persona_fixtures.json, provider tests | CS57 error correction first, CS79 variant after CS76 interface |
+| Owner  | Scope                                                                       | Sequence                                                                                              |
+| ------ | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Codex  | judge.py and versioned judge fixtures                                       | CS72 before CS76; serialize judge edits                                                               |
+| Codex  | schemas.py, practice.py, snapshot/API tests, API docs                       | CS56 public pinned persona/capability fields then CS76 opt-in/state; coordinate shared DTO tests      |
+| Muse   | coach_context.py, coach_service.py, coach.py, provider tests                | CS73; coordinate evaluator flag with Claude                                                           |
+| Muse   | persona.py, persona_fixtures.json, provider tests                           | CS57 error correction first, CS79 variant after CS76 interface                                        |
 | Claude | frontend types/mock adapter, Arena/Recorder/Hub, browser harness, evaluator | CS70/74 delivered; CS55/58/graph preparation independent; CS77 follows adopted API/coach/persona work |
-| Codex | integration and delivered-journey documentation | CS78 combined candidate and CS52 truthful instructions |
+| Codex  | integration and delivered-journey documentation                             | CS78 combined candidate and CS52 truthful instructions                                                |
 
 Do not edit another owner's active files without a handoff. No live demo
 restart/migration, main promotion, voice or unrelated repository cleanup.
