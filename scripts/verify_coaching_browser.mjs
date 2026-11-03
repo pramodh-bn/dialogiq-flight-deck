@@ -1692,6 +1692,40 @@ async function runBobStance() {
   check("recorder: drawer shows the explanation", drawer.includes("acknowledged a specific concern"), evidence);
   await screenshot("stance-recorder");
   check("no ledger in the public tree", !JSON.stringify(data).includes("stance_ledger"), evidence);
+
+  // Resume stored legacy Bob and another persona without applying the new opt-in.
+  // Session creation uses the real API; viewing/reloading uses the real client.
+  const scenarios = await getJson("/api/scenarios");
+  for (const name of ["Bob", "Maya"]) {
+    const scenario = scenarios.find((item) => item.persona.name === name);
+    if (!scenario) throw new Error(`no ${name} scenario for legacy check`);
+    const response = await fetch(`${API}/api/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ scenario_id: scenario.id }),
+    });
+    check(`${name} legacy: session created without opt-in`, response.status === 201, evidence);
+    if (response.status !== 201) throw new Error(`legacy session returned ${response.status}`);
+    const legacy = await response.json();
+    check(`${name} legacy: null progress`, legacy.conversation_progress === null, evidence);
+    await send("Page.navigate", {
+      url: new URL(`/arena?sessionId=${legacy.id}&scenarioId=${scenario.id}`, WEB).href,
+    });
+    await waitFor(`${name} legacy Arena`, () => has("Your situation"), 20_000);
+    check(`${name} legacy: no Bob stance panel`, (await stanceText()) === "", evidence);
+    check(`${name} legacy: original resistance display`, await has(`${name}'s Resistance`), evidence);
+    await send("Page.reload");
+    await waitFor(`${name} legacy after reload`, () => has("Your situation"), 20_000);
+    const reloaded = await getJson(`/api/sessions/${legacy.id}`);
+    check(
+      `${name} legacy: reload keeps the pinned session`,
+      reloaded.conversation_progress === null &&
+        reloaded.revision === legacy.revision &&
+        reloaded.active_head_node_id === legacy.active_head_node_id,
+      evidence,
+    );
+    await screenshot(`legacy-${name.toLowerCase()}`);
+  }
   check("stand-in persona only", personaCalls() === 2, evidence, `${personaCalls()} calls`);
   check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
 }
