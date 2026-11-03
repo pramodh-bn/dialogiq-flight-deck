@@ -57,7 +57,7 @@ In two PowerShell terminals, run these from the repository root:
 $demoNode = Join-Path $env:LOCALAPPDATA 'Author Software/nvm/installs/v26.13.0/node.exe'
 backend/.venv/Scripts/python.exe scripts/start_demo.py --mode backend --node $demoNode --env-file 'D:\path\to\ignored.env'
 
-# Terminal 2: frontend development server, paired demo wait
+# Terminal 2: build and serve the recording frontend, paired demo wait
 $demoNode = Join-Path $env:LOCALAPPDATA 'Author Software/nvm/installs/v26.13.0/node.exe'
 backend/.venv/Scripts/python.exe scripts/start_demo.py --mode frontend --node $demoNode
 ```
@@ -83,8 +83,12 @@ runs in the foreground; Ctrl+C stops that server. The launcher refuses occupied
 ports and never stops another process. The acceptance preview was stopped at the
 owner's request; check for other listeners before launching on 8080/5173.
 
-This launcher serves the frontend in development mode for local rehearsal. The
-accepted production-build evidence is separately retained in
+Frontend mode builds and serves the production output using pinned Wrangler
+4.156.2 on port 5173 (local inspector 9335). It avoids Vite's development SSR
+module loader, which can fail with `vite:invoke` / `fetchModule` transport
+timeouts. The first launch builds the app and may download the pinned runner.
+For development with hot reload, explicitly add `--frontend dev`.
+The accepted production-build evidence is separately retained in
 [CS-78 verification](evidence/cs78-integrated-verification.md). The user accepted
 the current demo with documented quality/latency misses, including one unsupported
 chronology claim; this script does not claim those misses were fixed.

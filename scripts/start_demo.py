@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+WRANGLER_VERSION = "4.156.2"
 
 
 def run(command: list[str], env: dict[str, str]) -> None:
@@ -38,6 +39,12 @@ def main() -> int:
     parser.add_argument("--database", type=Path, default=ROOT / "demo.local/demo.db")
     parser.add_argument("--node", default=shutil.which("node"))
     parser.add_argument("--npm-cli", type=Path)
+    parser.add_argument(
+        "--frontend",
+        choices=("production", "dev"),
+        default="production",
+        help="Production builds before serving; dev opts into Vite's module loader.",
+    )
     args = parser.parse_args()
     env = dict(os.environ)
 
@@ -91,21 +98,52 @@ def main() -> int:
         if not (ROOT / "node_modules").is_dir():
             raise RuntimeError("Run npm ci --ignore-scripts in this worktree first.")
         env.update(VITE_API_BASE_URL="http://127.0.0.1:8080", VITE_COACH_DEMO_WAIT="1")
-        run(
-            [
-                str(node),
-                str(npm_cli),
-                "run",
-                "dev",
-                "--",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                "5173",
-                "--strictPort",
-            ],
-            env,
-        )
+        npm = [str(node), str(npm_cli)]
+        if args.frontend == "production":
+            require_free_port(9335)
+            print("Building the frontend for recording...", flush=True)
+            run([*npm, "run", "build"], env)
+            config = ROOT / ".output/server/wrangler.json"
+            if not config.is_file():
+                raise RuntimeError("Build did not produce the expected Worker config.")
+            env["WRANGLER_SEND_METRICS"] = "false"
+            run(
+                [
+                    *npm,
+                    "exec",
+                    "--yes",
+                    f"--package=wrangler@{WRANGLER_VERSION}",
+                    "--",
+                    "wrangler",
+                    "dev",
+                    "--config",
+                    str(config),
+                    "--local",
+                    "--ip",
+                    "127.0.0.1",
+                    "--port",
+                    "5173",
+                    "--inspector-port",
+                    "9335",
+                    "--show-interactive-dev-session=false",
+                ],
+                env,
+            )
+        else:
+            run(
+                [
+                    *npm,
+                    "run",
+                    "dev",
+                    "--",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    "5173",
+                    "--strictPort",
+                ],
+                env,
+            )
     return 0
 
 
