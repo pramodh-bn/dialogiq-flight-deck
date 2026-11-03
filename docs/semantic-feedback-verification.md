@@ -4,7 +4,70 @@ Issue47, Codex branch codex/semantic-feedback. This candidate changes new Bob
 sessions only when FEEDBACK_ENABLED=1 and the client selects semantic-r1.
 The existing recording app and its private database are not migrated/restarted.
 
-## Current checkpoint after live diagnostics
+## Current checkpoint: Baseten candidate ready for owner review
+
+Pramodh subsequently authorized further testing with sufficient credits on both
+providers (CS-C582), superseding the earlier eight-evaluation ceiling. Finite
+batches remained recorded before calls. No recurring Megillah watch resumed.
+
+Current application source `8fa9749641611ce16e47dde7929337142f800135` selects
+Baseten Muse Spark for feedback by default. Persona-only changes remove the
+old judge's advance-disclosure permission list **only** for semantic-r1 sessions;
+otherwise Bob could not disclose concerns for a post-reply judge to evaluate.
+Old prompt paths still match accepted dev730a3dc in all144tested combinations
+([reproducible comparison](../scripts/check_legacy_persona_prompts.py),
+[result](evidence/cs82/legacy-prompt-comparison.json)).
+
+Actual final checks: **304backend,114frontend,10budget tests**, TypeScript,
+changed-file ESLint,Ruff,production build and realHTTP fixture journey. Two
+existing TestClient deprecation warnings remain. Owner GUI/learner verdict is
+still needed; the supported browser host remains unavailable to Codex.
+
+### Additional live batches
+
+| Source/batch               | Calls                                               | Actual finding                                                                                                                                                                                              |
+| -------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8b6e684 matched comparison | 3Baseten+3FireworksGPT grading                      | All6validate; both keep hesitant Bob from warming. Baseten recognizes specific acknowledgment that GPT misses. Baseten2.359–3.578s;GPT1.782–2.890s. Models/configurations differ: no host-only speed claim. |
+| 8569d88 authored suite     | 12Baseten grading                                   | 12validate;median2.461s/max4.406s. Review finds negated-help mislabeled boundary and a weak generic need quote; both retained, definitions clarified. Shared authored cases, not independent/unseen.        |
+| 8fa9749 full live journey  | 8Basetenpersona+8Basetengrading+4FireworksMusecoach | All8grades available;0fallback/error/retry/blocked. Grade median2.98s/max4.91s; full turn6.454–11.766s. Fourcoach calls median9.97s/max14.27s. Both reload checks preserve exact saved nodes.               |
+| 8fa9749 definition checks  | 2Baseten grading                                    | Direct answer no longer earns a need from generic approval; negated help is none rather than a pause boundary.2.281/2.187s. Reused authored examples, not independent evidence.                             |
+
+Full-journey public evidence shows needs0→1→2→3, an open invitation recognized
+without forcing a reveal, a closed question changing the ratio100→50, and a
+supportive statement earning progress only after Bob discloses a priority need.
+Specific acknowledgment is counted in the second session. The request to inflate
+grades leaves score2unchanged; the pause is respected. Stance movement cites
+Bob's response rather than learner intent. This is a finite authored sample,
+not proof of real empathy/trust or universally correct scoring.
+
+Review retains limits: coach hint1 says "Thanks for pulling that list together"
+when Bob only said "I can pull it into one list". This future-to-completed action
+slip belongs to the known invention family tracked in CS-81; no coach prompt
+was tuned here. Mixed positive/hesitant reactions and rubric category choices
+remain subjective. A valid source ID proves provenance, not the judgment.
+
+Across **all** recorded phases: **36evaluator +12persona +6coach admitted
+requests**,0Meta/SDKretry/blocked. All per-batch caps held. Old timeouts/rejected
+requests still count; absent usage does not prove zero billing. Manual owner
+review is separate from these completed automated batches.
+
+### Owner preview
+
+http://127.0.0.2:5173 serves the new production client with backend8080 and
+Baseten feedback enabled, Fireworks coach/demo wait retained. Backendexec55902,
+frontendexec74265 were running at this checkpoint; refresh health on resume.
+Normal backend runner, **no tiny verification quota**. Fresh private database
+`semantic-evidence.local/owner-review.db`; owner's dialogue is never
+automatically published. The previous127.0.0.1recording app/database is untouched.
+Start a new Bob session; historical sessions are never silently rescored.
+
+Evidence for each batch is in `docs/evidence/cs82/` with matching reports,
+pre-SDK budget logs and credential/prompt-free telemetry. Only intentional
+synthetic public dialogues are retained. CS-82 remains active for owner review;
+PR48is draft and not merged. Earlier pending-budget statements below are
+historical and superseded by CS-C582 and this checkpoint.
+
+## Earlier checkpoint after limited live diagnostics
 
 Latest reaction-gated correction and Baseten adapter:303backend tests passed,114frontend tests,
 TypeScript,changed-file ESLint,Ruff and realHTTP fixture journey passed. These

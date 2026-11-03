@@ -1,0 +1,63 @@
+{
+  "source": "8fa9749641611ce16e47dde7929337142f800135",
+  "provider": "baseten",
+  "model": "meta-models/muse-spark-open-1026",
+  "revision": "semantic-r1",
+  "scope": "small authored qualification, not independent or unseen",
+  "cases": [
+    {
+      "case": 5,
+      "case_id": "direct-answer",
+      "learner": "For this release, the import path comes first. I will confirm the optional export scope with the owner before promising a date.",
+      "persona": "That answers my priority question. I can focus on the import path.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        }
+      ],
+      "decision": {
+        "question_type": "statement",
+        "question_quote": "",
+        "acknowledgment": false,
+        "acknowledgment_quote": "",
+        "pressure": false,
+        "pressure_quote": "",
+        "stance_signal": "clarity",
+        "stance_change": 1,
+        "stance_quote": "For this release, the import path comes first.",
+        "reaction_quote": "That answers my priority question.",
+        "revealed_need": null
+      },
+      "status": "validated",
+      "elapsed_ms": 2281
+    },
+    {
+      "case": 7,
+      "case_id": "negated-support",
+      "learner": "I can't take the release work off your plate, and I won't ask anyone else.",
+      "persona": "Then I still don't see how this gets done.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        }
+      ],
+      "decision": {
+        "question_type": "statement",
+        "question_quote": "",
+        "acknowledgment": false,
+        "acknowledgment_quote": "",
+        "pressure": false,
+        "pressure_quote": "",
+        "stance_signal": "none",
+        "stance_change": 0,
+        "stance_quote": "",
+        "reaction_quote": "Then I still don't see how this gets done.",
+        "revealed_need": null
+      },
+      "status": "validated",
+      "elapsed_ms": 2187
+    }
+  ]
+}
