@@ -1006,6 +1006,9 @@ def test_coach_system_prompt_behavior_revision_selects_bob_variant() -> None:
     assert "most useful next move" in variant[4]
     assert "at most one question" in variant[4]
     assert "no question about the present moment" in variant[4]
+    # CS-73 stop gate, second pass: the 9619b4a run invented "I kept going"
+    # in a first hint too, so the stop rule itself forbids recounting.
+    assert "without apologizing for or describing anything" in variant[4]
     # CS-73 correction: previous hints are not dialogue (CS-C471).
     assert variant[5].startswith(
         baseline[5].removesuffix(" Do not explain your reasoning.")

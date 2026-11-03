@@ -52,7 +52,8 @@ _BOB_MOVE_PARAGRAPH = (
     "other person has asked to stop, to be left alone, or not to "
     "talk now, or is clearly winding down, the example only "
     "acknowledges that and offers to come back later, with no "
-    "question about the present moment."
+    "question about the present moment, and without apologizing for "
+    "or describing anything the learner said or did."
 )
 
 
