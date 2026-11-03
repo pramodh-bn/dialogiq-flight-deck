@@ -58,8 +58,8 @@ must not be turned into openness. Server proves the quote's provenance; semantic
 interpretation of that reaction remains an independent review requirement.
 
 One evaluation attempt after a successful persona call, before immutable node
-commit; no DB transaction held across either call. Fireworks via existing
-server-only provider configuration, separate prompt/client request. SDK retries0,
+commit; no DB transaction held across either call. The selected provider uses
+its own server-only configuration and a separate prompt/client request. SDK retries0,
 4096token cap, low reasoning, JSONobject mode, HTTP12s and total12s deadline, two daemon worker
 slots. Timeout/invalid/unconfigured/upstream/saturation persist unavailable with
 prior known values and increment skipped coverage; the actual persona turn
@@ -93,7 +93,7 @@ The first Muse evaluator trial timed out2/2. A catalog-listed Llama model was
 not present in the account list and rejected2requests; neither trial is a
 successful grading result. Keep those failures with later evidence.
 
-## Baseten selection (prepared, not live-measured)
+## Baseten selection (current candidate)
 
 FEEDBACK_PROVIDER selects baseten(default) or fireworks; an unknown value is
 inert and does not fall back. FEEDBACK_MODEL is an evaluator-only model override.
@@ -103,5 +103,7 @@ is used as a Baseten fallback. The evaluator is a separate request/prompt from
 the persona, even when both use Baseten Muse Spark. COACH_PROVIDER and the
 persona's BASETEN_MODEL are unaffected. The same strict output/evidence checks,
 4096token limit, low reasoning, JSONobject request and12s deadline apply.
-Mocked SDK/credential isolation is verified; exact model support for these
-request options and real classification latency remain to be measured.
+Mocked SDK/credential isolation is verified. The recorded comparison, authored
+qualification, definition checks and full journey completed25Baseten grader
+requests with these settings. The final8turn journey measured median2.98s and
+max4.91s for grading; this is finite sample evidence, not a latency guarantee.
