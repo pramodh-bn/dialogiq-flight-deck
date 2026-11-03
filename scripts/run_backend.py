@@ -33,6 +33,9 @@ def record_coach_calls(log_path: str) -> None:
     def respond(self: coach.MetaCoachClient, **kwargs: Any) -> Any:
         start = time.monotonic()
         row = {
+            # CS-80: which provider and model this call actually used (never keys).
+            "provider": getattr(self, "provider", None),
+            "model": getattr(self, "model", None),
             "max_tokens": kwargs.get("max_tokens"),
             "timeout": kwargs.get("timeout", "default"),
             "reasoning_effort": kwargs.get("reasoning_effort"),

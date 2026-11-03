@@ -135,6 +135,25 @@ are not automatically loaded by the current backend: load configuration into
 the backend process environment without printing values. Fireworks is CS-43
 in Sprint 3 and does not block deterministic Sprint 2 coaching.
 
+Live coach configuration (CS-80) is server-only and selected by
+`COACH_PROVIDER`:
+
+- `meta` (default): `META_MODEL_API_KEY`, `META_MODEL_API_BASE` (required,
+  plain https), optional `META_MODEL_API_MODEL` (default `muse-spark-1.3`).
+- `fireworks`: `FIREWORKS_API_KEY`, optional `FIREWORKS_API_BASE` (default
+  `https://api.fireworks.ai/inference/v1`) and `FIREWORKS_MODEL` (default
+  `accounts/fireworks/models/muse-spark-open`).
+
+Keys never cross providers, and any other `COACH_PROVIDER` value leaves the
+coach unconfigured, so every hint is deterministic. Since Nov 3, 2026 the Meta
+API returns HTTP 402 (billing), and the accepted setting is Fireworks with
+`COACH_DEMO_WAIT=1`: 16384 max tokens, `reasoning_effort` low, no client
+cutoff. A 3-call smoke test timed out twice in normal mode (8s, no
+reasoning_effort); that is recorded as a limit, not a claim that normal mode
+can never work. The hint DTO keeps `source: "meta"` for any provider-generated
+hint; it is a wire value from s3-coach-r2, not proof of the upstream provider.
+Evidence reports name the provider and model actually called.
+
 ## Wire conventions and state
 
 - JSON uses snake_case, UTF-8, and `application/json`. No SSE or partial turns.
