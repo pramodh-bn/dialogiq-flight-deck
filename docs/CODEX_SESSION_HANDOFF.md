@@ -3,6 +3,13 @@
 Updated by Codex, November 3, 2026, about 14:10 UTC. This is a restart
 checkpoint, not a live status feed. Refresh Megillah and GitHub before acting.
 
+User clarification, November 3 at about14:14UTC: "schedule" means recurring
+checks within the active Codex session. Resume that watch without the former
+automatic15-minute cutoff. Keep the Windows scheduler disabled. Continue until
+the user stops/redirects it or the session reaches an actual execution limit;
+record any interruption and pending owner honestly. This supersedes the old
+bounded-watch language and earlier closeout below.
+
 ## Latest restart checkpoint: 14:10 UTC
 
 - PR34 is merged at dev `8377b5e`; CS-C489/490 release the corrected stance
@@ -48,7 +55,7 @@ Paste into a new Codex session opened in this repository:
 > Read AGENTS.md and docs/CODEX_SESSION_HANDOFF.md, refresh the named Megillah
 > records and GitHub PRs, and resume Codex's independent review and integration
 > work. Check Megillah directly in this active session between work milestones.
-> When waiting for a named handoff, use the bounded in-session watch described
+> When waiting for a named handoff, keep the in-session watch active as described
 > below. Keep the Windows scheduler disabled. Preserve Claude's current file
 > ownership, spending limits, historical sessions and my existing demo data.
 > Continue already-authorized work when its dependencies are met.
@@ -93,17 +100,19 @@ actionable handoffs on the task where the waiting owner is tracking them.
   wait with `clock.sleep` for about 45 seconds, then read the relevant task and
   check for changed PR heads. Reinspect the full record before a consequential
   action. Never use a blocking tool wait longer than 60 seconds.
-- Default to a bounded 15-minute watch per restart instruction, unless the
-  user specifies another duration. Record the start/end time and expected
-  artifact. Check immediately before the first wait. Do not create a shell
+- The user clarified that this is a continuing session watch, with no automatic
+  15-minute cutoff. Record its start and expected artifacts. Check immediately
+  before the first wait. Keep checking until the user stops or redirects the
+  watch, or an actual session/execution limit prevents continuation. Do not
+  end the watch merely because a dependency or decision is pending. Do not create a shell
   polling daemon, Windows task, cloud automation or another agent to watch.
 - New user input steers or stops the active work. If a valid handoff arrives,
   act within Codex's accepted scope; do not ask the user to relay it or repeat
   approval already given. Respect current ownership and prerequisites.
 - Keep commentary updates within 60 seconds during active work. Keep no-change
   updates short; do not add repetitive status-only comments to Megillah.
-- If the watch expires, a required decision is missing, the user stops work,
-  or the session reaches a limit, record the exact pending artifact/owner and
+- If the user stops work or the session reaches an actual limit, record the
+  exact pending artifact/owner and
   end honestly. Do not claim monitoring continues after the turn ends. Ending
   the turn stops this watch; the next resume instruction recreates it.
 - Polling makes tool calls and uses session resources; it is not an unlimited
