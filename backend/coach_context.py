@@ -73,8 +73,12 @@ _BOB_REPEAT_PARAGRAPH = (
     "used, ignored, or went against a previous hint, and never say or "
     "imply the learner pushed, pressed, or kept going unless the "
     "transcript shows it, in that order. A request for another hint "
-    "is not evidence of anything in the conversation. Do not explain "
-    "your reasoning."
+    "is not evidence of anything in the conversation. If the other "
+    "person's latest line asks to stop, to be left alone, or not to "
+    "talk now, nothing has happened since that request: a later hint "
+    "may again simply accept the pause and leave a way back, in fresh "
+    "words, and must not apologize for or describe anything the "
+    "learner did after the request. Do not explain your reasoning."
 )
 
 

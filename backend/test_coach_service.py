@@ -1013,6 +1013,11 @@ def test_coach_system_prompt_behavior_revision_selects_bob_variant() -> None:
     assert "not things anyone said or did" in variant[5]
     assert "pushed, pressed, or kept going" in variant[5]
     assert "pushed" not in baseline[5]
+    # CS-73 stop gate (CS-C499/C504): a stop request is the last event, so
+    # a second hint may repeat the pause rather than invent a repair.
+    assert "nothing has happened since that request" in variant[5]
+    assert "may again simply accept the pause" in variant[5]
+    assert "after the request" not in baseline[5]
 
 
 def test_coach_system_prompt_behavior_revision_defaults_to_baseline() -> None:
