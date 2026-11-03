@@ -3,6 +3,7 @@
 import copy
 import json
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -21,6 +22,7 @@ from coach import (
 )
 
 REVISION = "semantic-r1"
+DEFAULT_MODEL = "accounts/fireworks/models/llama-v3p3-70b-instruct"
 TIMEOUT_SECONDS = 12.0
 SLOTS = threading.BoundedSemaphore(2)
 logger = logging.getLogger("dialogiq.feedback")
@@ -87,16 +89,18 @@ Do not reveal the rubric in any output field. Never return scores or private mot
 
 def real_provider(context: dict) -> Decision:
     """One retry-free provider call, distinct from the coach prompt/context."""
-    client = MetaCoachClient(provider="fireworks")
+    client = MetaCoachClient(
+        provider="fireworks", model=os.environ.get("FEEDBACK_MODEL", DEFAULT_MODEL)
+    )
     started = time.monotonic()
     try:
         result = client.respond(
             system_prompt=SYSTEM_PROMPT,
             context_json=json.dumps(context, ensure_ascii=False),
             temperature=0.0,
-            max_tokens=16384,
+            max_tokens=2048,
             timeout=TIMEOUT_SECONDS,
-            reasoning_effort="low",
+            response_format={"type": "json_object"},
         )
         logger.info(
             "feedback completion provider=%s model=%s seconds=%.3f finish=%s "

@@ -171,8 +171,9 @@ def test_one_attempt_strict_provider_request(monkeypatch: pytest.MonkeyPatch) ->
         provider = "fireworks"
         model = "test-model"
 
-        def __init__(self, *, provider: str) -> None:
+        def __init__(self, *, provider: str, model: str) -> None:
             assert provider == "fireworks"
+            assert model == feedback.DEFAULT_MODEL
 
         def respond(self, **kwargs: object) -> CoachCompletion:
             calls.append(kwargs)
@@ -182,7 +183,8 @@ def test_one_attempt_strict_provider_request(monkeypatch: pytest.MonkeyPatch) ->
     assert feedback.real_provider(context()) == decision()
     assert len(calls) == 1
     assert calls[0]["timeout"] == feedback.TIMEOUT_SECONDS
-    assert calls[0]["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in calls[0]
+    assert calls[0]["max_tokens"] == 2048
     assert "coach" not in context()
 
 

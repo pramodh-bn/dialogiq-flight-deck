@@ -280,6 +280,7 @@ class MetaCoachClient:
         max_tokens: int = COACH_MAX_TOKENS,
         timeout: float | None = COACH_TIMEOUT_SECONDS,
         reasoning_effort: str | None = None,
+        response_format: dict[str, object] | None = None,
     ) -> CoachCompletion:
         """Return one raw completion for serialized coach context.
 
@@ -322,6 +323,8 @@ class MetaCoachClient:
         }
         if reasoning_effort is not None:
             create_kwargs["reasoning_effort"] = reasoning_effort
+        if response_format is not None:
+            create_kwargs["response_format"] = response_format
         try:
             completion = client.chat.completions.create(**create_kwargs)  # type: ignore[arg-type]
         except APITimeoutError as exc:
