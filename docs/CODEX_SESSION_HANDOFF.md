@@ -1,5 +1,18 @@
 # Codex session restart and Megillah handoff
 
+## Superseding checkpoint: main promotion authorized
+
+PR43 and PR37 merged; accepted dev is `1d1cf44b4861cbbf497cb9b916e81d08bdbc6ce7`.
+Pramodh then explicitly requested dev→main promotion and a README/docs review.
+Codex owns codex/main-promotion in .worktrees/main-promotion. Reconciliation
+merge06cc318 preserves main's five older Lovable commits while keeping the
+entire accepted dev source tree unchanged; those prototype routes are superseded
+by the verified runtime. Release follow-up updates README, API status, demo
+instructions and this checkpoint only. Refer to Megillah CS78 for resulting PRs
+and merge revisions; earlier no-main-promotion statements below are historical.
+The user-requested application shutdown remains in effect; no paid calls or
+server restart is needed for exact-runtime-byte and documentation checks.
+
 ## Superseding checkpoint: accepted demo, application stopped
 
 Pramodh explicitly asked Codex to stop the application. Codex stopped its own

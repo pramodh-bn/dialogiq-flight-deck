@@ -53,10 +53,13 @@ In two PowerShell terminals, run these from the repository root:
 
 ```powershell
 # Terminal 1: real backend, normal runner, Fireworks + demo wait
-backend/.venv/Scripts/python.exe scripts/start_demo.py --mode backend --env-file 'D:\path\to\ignored.env'
+# For this machine's Author nvm installation, select the executable, not its shim.
+$demoNode = Join-Path $env:LOCALAPPDATA 'Author Software/nvm/installs/v26.13.0/node.exe'
+backend/.venv/Scripts/python.exe scripts/start_demo.py --mode backend --node $demoNode --env-file 'D:\path\to\ignored.env'
 
 # Terminal 2: frontend development server, paired demo wait
-backend/.venv/Scripts/python.exe scripts/start_demo.py --mode frontend
+$demoNode = Join-Path $env:LOCALAPPDATA 'Author Software/nvm/installs/v26.13.0/node.exe'
+backend/.venv/Scripts/python.exe scripts/start_demo.py --mode frontend --node $demoNode
 ```
 
 For preflight only, use `--mode check` (the default). Always invoke it with your
@@ -65,6 +68,7 @@ Python 3.12 backend venv. If Node/npm are not resolved correctly, pass
 `--npm-cli 'D:\path\to\node\node_modules\npm\bin\npm-cli.js'`.
 The launcher is Python so it also works from PowerShell where `.ps1` execution
 is disabled; it changes no execution policy.
+Use your own Node installation path if it differs from the example.
 
 The env file needs `BASETEN_API_KEY` and `FIREWORKS_API_KEY` plus any custom
 provider endpoint settings from your existing configuration. The launcher sets
@@ -76,8 +80,8 @@ The default database is this checkout's ignored `demo.local/demo.db`; use
 `--database 'D:\path\to\demo.db'` in the backend terminal to choose another.
 Data is retained, not reset. This does not migrate old Bob sessions. Each server
 runs in the foreground; Ctrl+C stops that server. The launcher refuses occupied
-ports and never stops another process. Stop the existing acceptance preview in
-its own terminals before launching on 8080/5173.
+ports and never stops another process. The acceptance preview was stopped at the
+owner's request; check for other listeners before launching on 8080/5173.
 
 This launcher serves the frontend in development mode for local rehearsal. The
 accepted production-build evidence is separately retained in

@@ -2,8 +2,10 @@
 
 Sprint 4 Bob proposal: [CS-75 behavior contract](sprint4/bob-behavior-contract.md),
 revision `s4-bob-r1`, specifies opt-in pinned Bob behavior, separate simulated
-stance and adaptive coaching. Adopted on CS-75 in CS-C441; runtime delivery
-and integration remain separate downstream gates.
+stance and adaptive coaching. Adopted on CS-75 in CS-C441; runtime delivery,
+dev integration and owner acceptance are complete on CS-78 (November 3, 2026),
+with documented misses. See the [current README](../README.md#demo-and-verification)
+and [exact-source verification](evidence/cs78-integrated-verification.md).
 
 Versioned parser extension: [CS-71 dash-separated questions](cs71-question-parser-delta.md),
 revision `s2-r2.2`, defines dash-clause recognition for fresh seed catalogs.
@@ -11,9 +13,10 @@ Review/adoption and actual-source verification are recorded on CS-71. Existing
 complete catalogs and pinned sessions retain their old behavior; the Sprint 2
 classification agreement below describes `s2-r2.1`.
 
-Demo reasoning proposal: [CS-62 low reasoning](cs62-demo-reasoning-delta.md),
-delta `s3-coach-r2.demo-reasoning-low.1`. This is pending the controlled result,
-owner review and explicit adoption on CS-62; it is not a runtime claim.
+Demo reasoning extension: [CS-62 low reasoning](cs62-demo-reasoning-delta.md),
+delta `s3-coach-r2.demo-reasoning-low.1`. The proposal's pending-review wording
+is historical. The integrated live run recorded low reasoning, 16384 tokens
+and no application timeout in demo mode; see the exact-source evidence above.
 
 Demo token extension: [CS-62 demo token budget](cs62-demo-token-delta.md),
 delta `s3-coach-r2.demo-tokens-16384.1`, defines 16384 for exact-1 demo mode,
@@ -189,20 +192,20 @@ Evidence reports name the provider and model actually called.
 The following field lists are exhaustive; each listed field is required.
 Arrays may be empty. Objects must not expose ORM rows wholesale.
 
-| DTO          | Fields and meanings                                                                                                                                                                                                  |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scenario     | `id`, `title` string, `description` string or null, `persona` Persona, `behavior_revisions` string array (CS-56; empty until CS-76 registers a variant)                                                                                                                                                |
-| Persona      | `name`, `role`, `initials`, `opening_message`, `public_context` (strings); `tags` string array of public display traits; `practice_hints` string array of generic communication advice                               |
-| RevealedNeed | `id` string (scenario-local `n1`…`n7`), `title` string, `description` string; only actually revealed entries                                                                                                         |
-| Metrics      | `turns`, `open_questions`, `closed_questions`, `empathy_turns` (nonnegative integers); `open_question_ratio` number 0–1, open/(open+closed), 0 when denominator is 0                                                 |
-| Coaching     | `source` literal `deterministic`; `question_type` `open`/`closed`/`statement`; `empathy` and `leading` booleans; `outcome` `breakthrough`/`deadend`/`neutral`; `alternatives` string array; `whispers` Whisper array |
-| Whisper      | `kind` `good`/`warn`/`tip`, `text` string                                                                                                                                                                            |
-| State        | `score` integer 0–7, `total_needs` literal 7, `revealed_needs` RevealedNeed array in n1…n7 order, `resistance` `guarded`/`warming`/`open`, `metrics` Metrics, `conversation_progress` ConversationProgress or null (null on legacy sessions)                                                         |
-| Session      | `id`, `scenario_id`, `active_branch_id`, `active_head_node_id` (node ID or null), `revision`, `persona` Persona pinned at creation (CS-56), plus all State fields                                                                                                  |
-| Node         | `id`, `session_id`, `parent_id` (node ID or null), `turn_number` (chain depth, starts 1), `user_text`, `character_text` (strings), `coaching` Coaching, plus all State fields                                        |
-| Branch       | `id`, `session_id`, `fork_node_id` (node ID or null), `head_node_id` (node ID or null), plus all State fields                                                                                                        |
+| DTO                  | Fields and meanings                                                                                                                                                                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scenario             | `id`, `title` string, `description` string or null, `persona` Persona, `behavior_revisions` string array (CS-56; empty until CS-76 registers a variant)                                                                                                              |
+| Persona              | `name`, `role`, `initials`, `opening_message`, `public_context` (strings); `tags` string array of public display traits; `practice_hints` string array of generic communication advice                                                                               |
+| RevealedNeed         | `id` string (scenario-local `n1`…`n7`), `title` string, `description` string; only actually revealed entries                                                                                                                                                         |
+| Metrics              | `turns`, `open_questions`, `closed_questions`, `empathy_turns` (nonnegative integers); `open_question_ratio` number 0–1, open/(open+closed), 0 when denominator is 0                                                                                                 |
+| Coaching             | `source` literal `deterministic`; `question_type` `open`/`closed`/`statement`; `empathy` and `leading` booleans; `outcome` `breakthrough`/`deadend`/`neutral`; `alternatives` string array; `whispers` Whisper array                                                 |
+| Whisper              | `kind` `good`/`warn`/`tip`, `text` string                                                                                                                                                                                                                            |
+| State                | `score` integer 0–7, `total_needs` literal 7, `revealed_needs` RevealedNeed array in n1…n7 order, `resistance` `guarded`/`warming`/`open`, `metrics` Metrics, `conversation_progress` ConversationProgress or null (null on legacy sessions)                         |
+| Session              | `id`, `scenario_id`, `active_branch_id`, `active_head_node_id` (node ID or null), `revision`, `persona` Persona pinned at creation (CS-56), plus all State fields                                                                                                    |
+| Node                 | `id`, `session_id`, `parent_id` (node ID or null), `turn_number` (chain depth, starts 1), `user_text`, `character_text` (strings), `coaching` Coaching, plus all State fields                                                                                        |
+| Branch               | `id`, `session_id`, `fork_node_id` (node ID or null), `head_node_id` (node ID or null), plus all State fields                                                                                                                                                        |
 | ConversationProgress | `behavior_revision` literal `s4-bob-r1`; `stance` `guarded`/`warming`/`open`, always equal to `resistance`; `last_signal` `initial`/`clarity`/`support`/`acknowledgment`/`repair`/`pressure`/`boundary`/`none`; `explanation` fixed public text up to 240 characters |
-| Tree         | `session_id`, `revision`, `active_branch_id`, `branches` Branch array, `nodes` Node array                                                                                                                            |
+| Tree                 | `session_id`, `revision`, `active_branch_id`, `branches` Branch array, `nodes` Node array                                                                                                                                                                            |
 
 Persona.tags is required display data, never private personality instructions.
 Session.persona is projected field by field from the persona pinned when the

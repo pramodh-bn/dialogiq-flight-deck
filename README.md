@@ -117,10 +117,37 @@ setting.
 Sessions keep the behavior they were created with. Older Bob sessions and other
 personas keep their original behavior; only new Bob sessions use `s4-bob-r1`.
 
+## Demo and verification
+
+The [three-minute demo script](docs/demo-script.md) includes presenter narration,
+suggested dialogue, hints, branching and a saved-session fallback. The
+[local demo launcher](scripts/start_demo.py) starts the backend and frontend in
+separate terminals with Fireworks and paired demo-wait settings. Follow the
+script's setup instructions; its default database is `demo.local/demo.db`,
+separate from the direct backend recipe above. On Windows with an nvm shim,
+pass `--node` with the actual Node installation path as shown in the demo guide.
+
+The project owner accepted the final Bob preview on November 3, 2026, with
+the documented coaching and latency limits. The
+[integrated verification report](docs/evidence/cs78-integrated-verification.md)
+records exact source revisions, reproducible configuration, public scripted
+conversations and separate unit, browser and live-provider evidence. Its
+pending-acceptance wording is a timestamped snapshot; the later acceptance is
+recorded on Megillah CS-78. Acceptance does not mean every quality target passed.
+
+The verification preview had a finite model-call allowance. After three manual
+persona replies, two later attempts were blocked locally and displayed
+`persona_unavailable`; that incident was not an observed provider outage.
+The normal demo launcher does not impose that verification cap. User turns and
+live hints, including automatic hints, can incur provider charges.
+
 ## Tests
 
 ```powershell
-cd backend; .venv/Scripts/python.exe -m pytest -q; .venv/Scripts/python.exe -m ruff check .
+Push-Location backend
+.venv/Scripts/python.exe -m pytest -q
+.venv/Scripts/python.exe -m ruff check .
+Pop-Location
 npx tsc --noEmit
 npm.cmd test
 ```
@@ -151,6 +178,11 @@ The test suites make no paid calls.
   run: median 13.7 s for a first hint and 22.0 s for a second hint, with a
   slowest hint of 83.9 s. This misses the original goal of a quick hint and is
   a finite sample, not a guarantee.
+- **Grounding is imperfect.** Final integrated review found one hint asserting
+  that a spec changed after an update was sent, although the public dialogue did
+  not establish that order. The owner accepted this additional known miss; it
+  was documented, not fixed. See the
+  [public text review](docs/evidence/cs78-live-text-review.md).
 - **Local single user.** There is no login and no multi-user authorization;
   CORS is not authentication.
 
