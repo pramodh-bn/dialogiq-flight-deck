@@ -21,12 +21,39 @@ from coach import (
     CoachTimeoutError,
     MetaCoachClient,
 )
+from persona import DEFAULT_BASE_URL as BASETEN_BASE
+from persona import DEFAULT_MODEL as BASETEN_MODEL
 
 REVISION = "semantic-r1"
 DEFAULT_MODEL = "accounts/fireworks/models/gpt-oss-120b"
 TIMEOUT_SECONDS = 12.0
 SLOTS = threading.BoundedSemaphore(2)
 logger = logging.getLogger("dialogiq.feedback")
+
+
+class BasetenFeedbackClient(MetaCoachClient):
+    """Separate evaluator request using only Baseten credentials and endpoint."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            provider="baseten",
+            api_key=os.environ.get("BASETEN_API_KEY", ""),
+            base_url=os.environ.get("BASETEN_API_BASE", BASETEN_BASE),
+            model=os.environ.get("FEEDBACK_MODEL", BASETEN_MODEL),
+        )
+        self.env_names = "BASETEN_API_KEY, BASETEN_API_BASE and FEEDBACK_MODEL"
+
+
+def selected_client() -> MetaCoachClient:
+    """No provider fallback; evaluator selection never changes coach/persona."""
+    provider = os.environ.get("FEEDBACK_PROVIDER", "fireworks").strip().lower()
+    if provider == "baseten":
+        return BasetenFeedbackClient()
+    if provider == "fireworks":
+        return MetaCoachClient(
+            provider="fireworks", model=os.environ.get("FEEDBACK_MODEL", DEFAULT_MODEL)
+        )
+    raise CoachNotConfiguredError("FEEDBACK_PROVIDER must be fireworks or baseten.")
 
 
 class StrictModel(BaseModel):
@@ -50,6 +77,7 @@ class Decision(StrictModel):
     ]
     stance_change: int = Field(strict=True, ge=-1, le=1)
     stance_quote: str = Field(max_length=4000)
+    reaction_quote: str = Field(default="", max_length=2000)
     revealed_need: NeedEvidence | None
 
 
@@ -70,6 +98,7 @@ class ModelDecision(StrictModel):
     ]
     stance_change: int = Field(strict=True, ge=-1, le=1)
     stance_evidence: str = Field(max_length=20)
+    reaction_evidence: str = Field(default="", max_length=20)
     revealed_need: ModelNeed | None
 
 
@@ -108,6 +137,7 @@ def resolve_evidence(model: ModelDecision, context: dict) -> Decision:
         stance_signal=model.stance_signal,
         stance_change=model.stance_change,
         stance_quote=quote(model.stance_evidence, learner),
+        reaction_quote=quote(model.reaction_evidence, persona),
         revealed_need=NeedEvidence(
             need_id=need.need_id, persona_quote=quote(need.persona_evidence, persona)
         )
@@ -125,7 +155,7 @@ hints. Use only the selected history and current learner/persona exchange.
 Return exactly this JSON object shape, with no reasoning or extra fields:
 {"question_type":"statement","question_evidence":"","acknowledgment":false,
 "acknowledgment_evidence":"","pressure":false,"pressure_evidence":"",
-"stance_signal":"none","stance_change":0,"stance_evidence":"","revealed_need":null}
+"stance_signal":"none","stance_change":0,"stance_evidence":"","reaction_evidence":"","revealed_need":null}
 question_type must be open, closed or statement. An invitation to explain,
 including 'can you walk me through...', is open. A yes/no or fixed factual check
 is closed. A mixed turn containing an open invitation is open. Useful practical
@@ -143,6 +173,11 @@ empty stance_evidence; other signals require a learner span ID. Pressure flag
 and pressure stance signal must agree. Respecting a pause can be boundary with
 no question or score increase. This describes a simulation, not real trust.
 stance_change: useful NEW positive action0or1; pressure-1or0; boundary/none0.
+ANY nonzero change requires reaction_evidence from current persona_spans. The
+reaction must support the direction: increasing cooperation/openness for+1,
+increasing resistance for-1. A useful learner move alone does NOT change Bob's
+stance. If Bob declines, doubts the proposal, stays hesitant or merely lists
+work, do not mark him more open. Use0; evidence of hesitance may be cited too.
 Use history to avoid rewarding repeated paraphrases of the same offer. A new
 supportive statement can be useful; a question alone need not improve stance.
 Need discovery is SEPARATE: revealed_need is null unless the CURRENT PERSONA
@@ -158,9 +193,7 @@ rewrite quotations, disclose the rubric, output private motives or award points.
 
 def real_provider(context: dict) -> Decision:
     """One retry-free provider call, distinct from the coach prompt/context."""
-    client = MetaCoachClient(
-        provider="fireworks", model=os.environ.get("FEEDBACK_MODEL", DEFAULT_MODEL)
-    )
+    client = selected_client()
     started = time.monotonic()
     try:
         wire_context = {
@@ -231,6 +264,10 @@ def checked(decision: Decision, context: dict) -> Decision:
         raise ValueError("Positive feedback cannot reduce stance.")
     if decision.pressure != (signal == "pressure"):
         raise ValueError("Pressure evidence and stance conflict.")
+    if decision.stance_change and not decision.reaction_quote:
+        raise ValueError("Stance movement requires a current persona reaction.")
+    if decision.reaction_quote and decision.reaction_quote not in context["persona"]:
+        raise ValueError("Stance reaction is not current persona evidence.")
     need = decision.revealed_need
     if need:
         ids = {item["id"] for item in context["rubric"]}
@@ -252,6 +289,23 @@ def initial() -> dict:
         "latency_ms": 0,
         "evidence": [],
     }
+
+
+def validation_failure_code(error: Exception) -> str:
+    """Expose only controlled categories, never provider text or validation inputs."""
+    return {
+        "Feedback learner evidence is missing or unsupported.": "learner_evidence",
+        "Feedback evidence contradicts its classification.": "evidence_conflict",
+        "Neutral/boundary feedback cannot move stance.": "neutral_stance_change",
+        "Pressure cannot improve stance.": "pressure_stance_change",
+        "Positive feedback cannot reduce stance.": "positive_stance_change",
+        "Pressure evidence and stance conflict.": "pressure_conflict",
+        "Stance movement requires a current persona reaction.": "reaction_missing",
+        "Stance reaction is not current persona evidence.": "reaction_evidence",
+        "Unknown or already revealed need.": "need_identity",
+        "Need has no current persona evidence.": "need_evidence",
+        "Unknown current-speaker evidence ID.": "source_id",
+    }.get(str(error), "invalid_structure")
 
 
 def bounded(provider: Provider, context: dict, timeout: float) -> Decision:
@@ -345,6 +399,10 @@ def evaluate(
             reason,
             time.monotonic() - started,
         )
+        if reason == "invalid_response":
+            logger.warning(
+                "feedback validation failed code=%s", validation_failure_code(error)
+            )
         return state, coaching
     status.update(
         status="ready",
@@ -361,6 +419,10 @@ def evaluate(
     ):
         if quote:
             evidence.append({"kind": kind, "role": "user", "quote": quote})
+    if decision.reaction_quote:
+        evidence.append(
+            {"kind": "reaction", "role": "assistant", "quote": decision.reaction_quote}
+        )
     if decision.revealed_need:
         need = decision.revealed_need
         state["revealed_needs"].append(
@@ -389,6 +451,12 @@ def evaluate(
     ledger.update(balance=balance, last_positive=None)
     state[stance.LEDGER_KEY] = ledger
     state["conversation_progress"] = stance.progress(ledger, decision.stance_signal)
+    if decision.stance_signal in ("clarity", "support", "acknowledgment"):
+        state["conversation_progress"]["explanation"] = {
+            "clarity": "You invited or provided clarification; stance reflects Bob's response.",
+            "support": "You offered practical support; stance reflects Bob's response.",
+            "acknowledgment": "You acknowledged a specific concern; stance reflects Bob's response.",
+        }[decision.stance_signal]
     state["resistance"] = state["conversation_progress"]["stance"]
     coaching.update(
         question_type=decision.question_type,

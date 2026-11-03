@@ -34,6 +34,7 @@ def decision(**changes: object) -> feedback.Decision:
             "stance_signal": "support",
             "stance_change": 1,
             "stance_quote": "Let's share the release work",
+            "reaction_quote": "I need help with that part.",
             "revealed_need": {
                 "need_id": "n1",
                 "persona_quote": "The release review has no owner.",
@@ -84,6 +85,7 @@ def test_statement_support_and_persona_evidence_can_progress() -> None:
         {"stance_change": 2},
         {"acknowledgment": True, "acknowledgment_quote": ""},
         {"pressure": True},
+        {"reaction_quote": ""},
         {"stance_signal": "none", "stance_quote": "", "stance_change": 1},
         {"question_type": "open", "question_quote": PERSONA},
         {"revealed_need": {"need_id": "invented", "persona_quote": PERSONA}},
@@ -96,11 +98,96 @@ def test_untrusted_output_rejected(changes: dict) -> None:
         feedback.checked(decision(**changes), context())
 
 
+def test_baseten_evaluator_never_uses_fireworks_or_meta_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FEEDBACK_PROVIDER", "baseten")
+    monkeypatch.delenv("BASETEN_API_KEY", raising=False)
+    monkeypatch.delenv("FEEDBACK_MODEL", raising=False)
+    monkeypatch.delenv("BASETEN_API_BASE", raising=False)
+    monkeypatch.setenv("FIREWORKS_API_KEY", "other-provider-test-key")
+    monkeypatch.setenv("META_MODEL_API_KEY", "other-provider-test-key")
+    client = feedback.selected_client()
+    assert client.provider == "baseten"
+    assert client.model == feedback.BASETEN_MODEL
+    assert not client.configured
+    from coach import CoachNotConfiguredError
+
+    with pytest.raises(CoachNotConfiguredError):
+        client.respond(system_prompt="classification", context_json="{}")
+    monkeypatch.setenv("BASETEN_API_KEY", "baseten-test-key")
+    configured = feedback.selected_client()
+    assert configured.configured and configured.api_key == "baseten-test-key"
+    assert configured.base_url == feedback.BASETEN_BASE
+
+
+def test_baseten_feedback_uses_separate_bounded_json_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    import coach
+
+    monkeypatch.setenv("FEEDBACK_PROVIDER", "baseten")
+    monkeypatch.setenv("BASETEN_API_KEY", "baseten-test-only")
+    monkeypatch.delenv("BASETEN_API_BASE", raising=False)
+    monkeypatch.delenv("FEEDBACK_MODEL", raising=False)
+    sdk = Mock()
+    sdk.chat.completions.create.return_value = SimpleNamespace(
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(content="{}"), finish_reason="stop")
+        ],
+        usage=SimpleNamespace(completion_tokens=10, completion_tokens_details=None),
+    )
+    constructor = Mock(return_value=sdk)
+    monkeypatch.setattr(coach, "OpenAI", constructor)
+    result = feedback.selected_client().respond(
+        system_prompt="classify public exchange",
+        context_json="{}",
+        temperature=0,
+        max_tokens=4096,
+        timeout=12,
+        reasoning_effort="low",
+        response_format={"type": "json_object"},
+    )
+    assert result.content == "{}"
+    constructor.assert_called_once_with(
+        base_url=feedback.BASETEN_BASE, api_key="baseten-test-only", max_retries=0
+    )
+    request = sdk.chat.completions.create.call_args.kwargs
+    assert request["model"] == feedback.BASETEN_MODEL
+    assert request["response_format"] == {"type": "json_object"}
+    assert request["timeout"] == 12
+    assert request["messages"][0]["content"] == "classify public exchange"
+
+
+def test_unknown_evaluator_provider_is_inert(monkeypatch: pytest.MonkeyPatch) -> None:
+    from coach import CoachNotConfiguredError
+
+    monkeypatch.setenv("FEEDBACK_PROVIDER", "unknown")
+    with pytest.raises(CoachNotConfiguredError):
+        feedback.selected_client()
+
+
 def test_already_revealed_need_is_not_new_discovery() -> None:
     prior = context()
     prior["revealed_ids"] = ["n1"]
     with pytest.raises(ValueError):
         feedback.checked(decision(), prior)
+
+
+def test_validation_telemetry_does_not_echo_private_error_inputs() -> None:
+    assert (
+        feedback.validation_failure_code(ValueError("PRIVATE-RUBRIC-TEXT"))
+        == "invalid_structure"
+    )
+    assert (
+        feedback.validation_failure_code(
+            ValueError("Stance movement requires a current persona reaction.")
+        )
+        == "reaction_missing"
+    )
 
 
 @pytest.mark.parametrize("identifier", ["L1", "P99", "the hidden rubric"])
@@ -205,6 +292,7 @@ def test_one_attempt_strict_provider_request(monkeypatch: pytest.MonkeyPatch) ->
                 stance_signal="support",
                 stance_change=1,
                 stance_evidence="L1",
+                reaction_evidence="P2",
                 revealed_need=feedback.ModelNeed(need_id="n1", persona_evidence="P1"),
             )
             return CoachCompletion(model.model_dump_json(), "stop", 100, 20)

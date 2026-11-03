@@ -46,6 +46,10 @@ data, never model output. No evidence means no reveal. Server derives counters,
 coverage, score and bounded stance from validated results and parent state.
 Bound stance to one step per turn; repair alone cannot reach open. Respectful
 pauses need not increase score. Repeated offers/thanks do not require movement.
+Any stance movement additionally requires a current persona reaction source ID.
+A useful learner action alone is not evidence Bob warmed; hesitance or refusal
+must not be turned into openness. Server proves the quote's provenance; semantic
+interpretation of that reaction remains an independent review requirement.
 
 One evaluation attempt after a successful persona call, before immutable node
 commit; no DB transaction held across either call. Fireworks via existing
@@ -81,3 +85,16 @@ server-only override, independent from the Muse coach and Baseten persona.
 The first Muse evaluator trial timed out2/2. A catalog-listed Llama model was
 not present in the account list and rejected2requests; neither trial is a
 successful grading result. Keep those failures with later evidence.
+
+## Baseten selection (prepared, not live-measured)
+
+FEEDBACK_PROVIDER selects fireworks(default) or baseten; an unknown value is
+inert and does not fall back. FEEDBACK_MODEL is an evaluator-only model override.
+Baseten defaults to meta-models/muse-spark-open-1026 and uses BASETEN_API_KEY and
+BASETEN_API_BASE(default https://inference.baseten.co/v1). No Fireworks/Meta key
+is used as a Baseten fallback. The evaluator is a separate request/prompt from
+the persona, even when both use Baseten Muse Spark. COACH_PROVIDER and the
+persona's BASETEN_MODEL are unaffected. The same strict output/evidence checks,
+4096token limit, low reasoning, JSONobject request and12s deadline apply.
+Mocked SDK/credential isolation is verified; exact model support for these
+request options and real classification latency remain to be measured.

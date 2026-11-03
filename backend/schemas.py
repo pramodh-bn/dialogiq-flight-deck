@@ -64,7 +64,9 @@ class ConversationProgress(WireModel):
 
 
 class FeedbackEvidence(WireModel):
-    kind: Literal["question", "acknowledgment", "pressure", "stance", "need"]
+    kind: Literal[
+        "question", "acknowledgment", "pressure", "stance", "reaction", "need"
+    ]
     role: Literal["user", "assistant"]
     quote: str = Field(min_length=1, max_length=4000)
     need_id: str | None = None

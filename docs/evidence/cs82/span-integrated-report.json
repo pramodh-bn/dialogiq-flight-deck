@@ -1,0 +1,136 @@
+{
+  "source_revision": "5f267a2920d8580464b8ff70425ab4f705fbe1c1",
+  "transport": "real HTTP",
+  "cases": [
+    {
+      "case": "span-evidence-integrated",
+      "opening": "You wanted to see me? If this is about Q3, I already sent the update.",
+      "public_context": "You are meeting to discuss missed deadlines.",
+      "session_id": 1,
+      "turns": [
+        {
+          "elapsed_ms": 7125,
+          "node": {
+            "score": 0,
+            "total_needs": 7,
+            "revealed_needs": [],
+            "resistance": "warming",
+            "metrics": {
+              "turns": 1,
+              "open_questions": 1,
+              "closed_questions": 0,
+              "empathy_turns": 0,
+              "open_question_ratio": 1.0
+            },
+            "conversation_progress": {
+              "behavior_revision": "s4-bob-r1",
+              "stance": "warming",
+              "last_signal": "clarity",
+              "explanation": "Your wording offered a concrete clarification."
+            },
+            "feedback": {
+              "revision": "semantic-r1",
+              "status": "ready",
+              "evaluated_turns": 1,
+              "skipped_turns": 0,
+              "failure_reason": null,
+              "latency_ms": 1610,
+              "evidence": [
+                {
+                  "kind": "question",
+                  "role": "user",
+                  "quote": "Could you walk me through what's still unresolved for this release?",
+                  "need_id": null
+                },
+                {
+                  "kind": "stance",
+                  "role": "user",
+                  "quote": "Could you walk me through what's still unresolved for this release?",
+                  "need_id": null
+                }
+              ]
+            },
+            "id": 1,
+            "session_id": 1,
+            "parent_id": null,
+            "turn_number": 1,
+            "user_text": "Could you walk me through what's still unresolved for this release?",
+            "character_text": "Yeah. Backend sync for the new flow is still open, migration script needs rework after the spec changed, and QA is blocked until that's done. Docs are half-finished. That's the list.",
+            "coaching": {
+              "source": "semantic",
+              "question_type": "open",
+              "empathy": false,
+              "leading": false,
+              "outcome": "neutral",
+              "alternatives": [],
+              "whispers": []
+            }
+          },
+          "session_revision": 1
+        },
+        {
+          "elapsed_ms": 7422,
+          "node": {
+            "score": 0,
+            "total_needs": 7,
+            "revealed_needs": [],
+            "resistance": "open",
+            "metrics": {
+              "turns": 2,
+              "open_questions": 1,
+              "closed_questions": 0,
+              "empathy_turns": 0,
+              "open_question_ratio": 1.0
+            },
+            "conversation_progress": {
+              "behavior_revision": "s4-bob-r1",
+              "stance": "open",
+              "last_signal": "support",
+              "explanation": "Your wording offered practical support."
+            },
+            "feedback": {
+              "revision": "semantic-r1",
+              "status": "ready",
+              "evaluated_turns": 2,
+              "skipped_turns": 0,
+              "failure_reason": null,
+              "latency_ms": 1422,
+              "evidence": [
+                {
+                  "kind": "stance",
+                  "role": "user",
+                  "quote": "Let's put the remaining work on one page and identify who can share it.",
+                  "need_id": null
+                }
+              ]
+            },
+            "id": 2,
+            "session_id": 1,
+            "parent_id": 1,
+            "turn_number": 2,
+            "user_text": "Let's put the remaining work on one page and identify who can share it.",
+            "character_text": "We could list it out, sure. My concern is just that splitting it now adds a bunch of handoff overhead \u2014 I'd have to walk someone through the migration rework and the sync edge cases from the last spec change. So I'm not sure sharing it actually saves time at this point.",
+            "coaching": {
+              "source": "semantic",
+              "question_type": "statement",
+              "empathy": false,
+              "leading": false,
+              "outcome": "neutral",
+              "alternatives": [],
+              "whispers": []
+            }
+          },
+          "session_revision": 2
+        }
+      ],
+      "hints": [],
+      "reload_preserved": true
+    }
+  ],
+  "plan": {
+    "persona": 2,
+    "feedback": 2,
+    "coach": 0
+  },
+  "scope": "Codex authored synthetic shared sample, not independent or unseen"
+}

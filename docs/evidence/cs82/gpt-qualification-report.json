@@ -1,0 +1,55 @@
+{
+  "source": "fa05610b0b48ca50bdfe2617facf38ebd8e2f90c",
+  "model": "accounts/fireworks/models/gpt-oss-120b",
+  "revision": "semantic-r1",
+  "scope": "small authored qualification, not independent or unseen",
+  "cases": [
+    {
+      "case": 1,
+      "learner": "Could you walk me through what's still unresolved for this release?",
+      "persona": "Three things, really. API migration's mostly done but still needs integration testing, docs are maybe halfway, and the flag cleanup got bumped after the design changes. So timelines are off by a week or so depending what you count.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        }
+      ],
+      "status": "failed",
+      "error": "ValueError",
+      "elapsed_ms": 1484
+    },
+    {
+      "case": 2,
+      "learner": "Let's put the remaining work on one page and identify who can share it.",
+      "persona": "Okay. I can put the three items on one page with where they stand.\n\nNot sure who actually has bandwidth to take anything on right now though.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        },
+        {
+          "role": "user",
+          "content": "Could you walk me through what's still unresolved for this release?"
+        },
+        {
+          "role": "assistant",
+          "content": "Three things, really. API migration's mostly done but still needs integration testing, docs are maybe halfway, and the flag cleanup got bumped after the design changes. So timelines are off by a week or so depending what you count."
+        }
+      ],
+      "decision": {
+        "question_type": "statement",
+        "question_quote": "",
+        "acknowledgment": false,
+        "acknowledgment_quote": "",
+        "pressure": false,
+        "pressure_quote": "",
+        "stance_signal": "support",
+        "stance_change": 1,
+        "stance_quote": "Let's put the remaining work on one page and identify who can share it.",
+        "revealed_need": null
+      },
+      "status": "validated",
+      "elapsed_ms": 1766
+    }
+  ]
+}

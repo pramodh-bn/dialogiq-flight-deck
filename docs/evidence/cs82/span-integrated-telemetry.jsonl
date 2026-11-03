@@ -1,0 +1,2 @@
+{"purpose": "feedback", "provider": "fireworks", "model": "accounts/fireworks/models/gpt-oss-120b", "max_tokens": 4096, "timeout": 12.0, "reasoning_effort": "low", "ok": true, "finish": "stop", "completion_tokens": 303, "reasoning_tokens": 220, "seconds": 1.61}
+{"purpose": "feedback", "provider": "fireworks", "model": "accounts/fireworks/models/gpt-oss-120b", "max_tokens": 4096, "timeout": 12.0, "reasoning_effort": "low", "ok": true, "finish": "stop", "completion_tokens": 254, "reasoning_tokens": 175, "seconds": 1.41}

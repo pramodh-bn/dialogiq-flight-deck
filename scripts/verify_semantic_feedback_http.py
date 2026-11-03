@@ -57,6 +57,7 @@ def serve(database: str, events: Path) -> None:
                 "pressure_quote": "",
                 "stance_signal": ("none", "acknowledgment", "support", "none")[index],
                 "stance_change": 1 if index in (1, 2) else 0,
+                "reaction_quote": REPLIES[index] if index in (1, 2) else "",
                 "stance_quote": LEARNERS[index]
                 if index in (1, 2)
                 else "Fabricated evidence"
