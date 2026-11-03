@@ -56,6 +56,28 @@ _BOB_MOVE_PARAGRAPH = (
 )
 
 
+_BASELINE_REPEAT_PARAGRAPH = (
+    "Do not repeat or rephrase an approach already present in "
+    "previous_hints; when earlier hints exist, offer a genuinely "
+    "different move. Do not explain your reasoning."
+)
+
+# CS-73 correction (CS-C471/CS-C473): second hints invented that the
+# learner "kept pushing" after a stop request. Previous hints are only
+# suggestions the learner was shown; asking for another is not an event.
+_BOB_REPEAT_PARAGRAPH = (
+    "Do not repeat or rephrase an approach already present in "
+    "previous_hints; when earlier hints exist, offer a genuinely "
+    "different move. previous_hints are suggestions the learner was "
+    "shown, not things anyone said or did: never claim the learner "
+    "used, ignored, or went against a previous hint, and never say or "
+    "imply the learner pushed, pressed, or kept going unless the "
+    "transcript shows it, in that order. A request for another hint "
+    "is not evidence of anything in the conversation. Do not explain "
+    "your reasoning."
+)
+
+
 def build_coach_system_prompt(
     persona_name: str,
     persona_role: str,
@@ -68,15 +90,14 @@ def build_coach_system_prompt(
     Includes the CS-C196 non-repeat requirement for all scores.
 
     ``behavior_revision="s4-bob-r1"`` (CS-73, contract s4-bob-r1)
-    replaces only the mandatory what/how paragraph with a
-    useful-next-move paragraph; omitted or unknown revisions return
-    the baseline bytes exactly.
+    replaces the mandatory what/how paragraph with a useful-next-move
+    paragraph and adds to the non-repeat paragraph that previous hints
+    are not dialogue; omitted or unknown revisions return the baseline
+    bytes exactly.
     """
-    move_paragraph = (
-        _BOB_MOVE_PARAGRAPH
-        if behavior_revision == BEHAVIOR_REVISION_BOB
-        else _BASELINE_MOVE_PARAGRAPH
-    )
+    bob = behavior_revision == BEHAVIOR_REVISION_BOB
+    move_paragraph = _BOB_MOVE_PARAGRAPH if bob else _BASELINE_MOVE_PARAGRAPH
+    repeat_paragraph = _BOB_REPEAT_PARAGRAPH if bob else _BASELINE_REPEAT_PARAGRAPH
     return "\n\n".join(
         [
             (
@@ -112,11 +133,7 @@ def build_coach_system_prompt(
                 "continuation as if already spoken."
             ),
             move_paragraph,
-            (
-                "Do not repeat or rephrase an approach already present in "
-                "previous_hints; when earlier hints exist, offer a genuinely "
-                "different move. Do not explain your reasoning."
-            ),
+            repeat_paragraph,
             (
                 "Reply with exactly one JSON object holding exactly these keys: "
                 '"approach" (1-240 characters), "example" (1-320 characters), '

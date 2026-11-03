@@ -390,7 +390,11 @@ def _prepare_provider_input(
         turns=[(node.user_text or "", node.character_text or "") for node in chain],
         previous_hints=previous,
     )
-    system_prompt = build_coach_system_prompt(persona["name"], persona["role"])
+    system_prompt = build_coach_system_prompt(
+        persona["name"],
+        persona["role"],
+        behavior_revision=config.get("behavior_revision"),
+    )
     fallback = _fallback_fields(len(earlier), payload.head_node_id, payload.attempt)
     return system_prompt, serialize_coach_context(context), fallback
 
