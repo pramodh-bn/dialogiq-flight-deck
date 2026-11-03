@@ -107,10 +107,10 @@ setting.
      real trust or empathy.
 4. Ask for a hint at any turn. A second hint at the same turn tries a different
    approach; each turn keeps at most two. If the coach provider times out or
-   fails, the server saves a fixed fallback hint for that attempt instead, and
-   that fallback is the saved hint for the attempt (asking again returns it).
-   **Try again** appears only when the request itself fails, such as a network
-   or server error, and repeats that same attempt.
+   fails, the server saves a fixed fallback hint as that attempt's hint; it is
+   kept like any other hint and still counts toward the two. **Try again**
+   appears only when the request itself fails, such as a network or server
+   error, and repeats that same attempt.
 5. Open the **Flight Recorder** to see the turn tree, select an earlier turn and
    branch from it. Saved hints and stance stay with their turns after reload.
 
@@ -136,9 +136,10 @@ The test suites make no paid calls.
 - **Bob's stance is rule-based**, from wording signals with negation handling. It
   can misread unusual phrasing.
 - **Coach quality** (Sprint 4, small finite samples, graded by the agents):
-  - On the final coach (commit 9afaa54), 13 shared Bob cases, 78 hints: 52/78
-    judged usable by a learner, against 23/78 for the previous coach. Bob's
-    requests to stop were respected in 6/6. Still weak: repairing after the
+  - On the final coach (merged as a740eea, measured on branch 9afaa54 with the
+    same coach code), 13 shared Bob cases, 78 hints: 52/78 judged usable by a
+    learner, against 23/78 for the previous coach. Bob's requests to stop were
+    respected in 6/6. Still weak: repairing after the
     learner's own mistake (5/12) and letting a supportive statement stand
     without another question (1/12).
   - On 4 unseen cases (24 hints), 16/24 against 3/24 for the previous coach,
