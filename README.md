@@ -60,5 +60,15 @@ FIREWORKS_API_KEY=...        # model accounts/fireworks/models/muse-spark-open
 COACH_DEMO_WAIT=1            # required for Fireworks: low reasoning, no cutoff
 ```
 
+Demo wait is a paired flag. The frontend needs the matching settings when it
+is served or built, or the client keeps its normal wait while the server has no
+cutoff. Vite reads them at startup, so restart after changing them. In PowerShell:
+
+```powershell
+$env:VITE_API_BASE_URL = 'http://127.0.0.1:8080'   # backend on 8080
+$env:VITE_COACH_DEMO_WAIT = '1'                     # matches COACH_DEMO_WAIT=1
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
 The Meta API (`COACH_PROVIDER=meta` with `META_MODEL_API_*`) is kept for when
 its billing is restored. See `docs/api_contract.md` for every setting.
