@@ -28,11 +28,16 @@ on CS-60. Historical pending-review text below is superseded by CS-C198 for r2
 and CS-C218 for the 2048-token provider delta.
 
 Sprint 3 extension: [CS-45 contextual coaching](cs45-coaching-contract.md),
-revision `s3-coach-r2`, **DRAFT — reviewer approval outstanding**. It defines
+revision `s3-coach-r2`, **accepted** in CS-C198, with the 2048-token provider
+delta accepted in CS-C218; its original "draft" label is history. It defines
 new coach endpoints and storage without changing the accepted Sprint 2 routes,
 judge, persona or immutable node DTOs below. The Sprint 2 baseline descriptions
-are historical; CS-40 delivered their implementation. Do not interpret the
-Sprint 3 draft or fixture examples as implemented or accepted behavior.
+are historical; CS-40 delivered their implementation.
+
+Sprint 4 status (CS-52, Nov 3, 2026): `s4-bob-r1` is implemented for new Bob
+sessions (stance CS-76, coach variant CS-73, persona CS-79, UI CS-77). The coach
+runs on Fireworks with demo wait (CS-80). Current run steps and known limits
+are in the [README](../README.md).
 
 CS-36 · Codex · 2026-10-30 · revision 2.1, **accepted**.
 
