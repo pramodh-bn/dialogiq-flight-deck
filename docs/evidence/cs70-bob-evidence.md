@@ -28,7 +28,7 @@ path. They do not measure coach quality; CS-74 defines those cases.
 Every stalled turn draws an automatic hint, so count Meta calls as stalled turns
 plus second attempts, not hint steps alone. A rewind to a stalled turn also draws
 one. The default cases used 11 Meta calls and 7 Baseten turns per run. The report
-gives the observed Meta count in `meta_calls_observed`.
+gives the observed coach call count in `coach_calls_observed` (named `meta_calls_observed` before CS-80).
 
 ## Reading the report
 

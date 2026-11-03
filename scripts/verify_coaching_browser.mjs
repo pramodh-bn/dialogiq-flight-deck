@@ -1556,6 +1556,7 @@ function sourceSettings() {
     "sys.path.insert(0, 'backend')",
     "import coach as c",
     "print(json.dumps({'model_default': c.DEFAULT_MODEL, 'temperature': c.COACH_TEMPERATURE,",
+    "  'provider_model_defaults': {k: v.default_model for k, v in getattr(c, 'PROVIDERS', {}).items()},",
     "  'max_tokens': c.COACH_MAX_TOKENS, 'demo_max_tokens': c.COACH_DEMO_MAX_TOKENS,",
     "  'demo_reasoning_effort': c.COACH_DEMO_REASONING_EFFORT,",
     "  'timeout_seconds': c.COACH_TIMEOUT_SECONDS}))",
@@ -2229,7 +2230,10 @@ async function main() {
     bind: BIND,
     wire_contract: "s3-coach-r2",
     provider_settings: providerSettings,
-    meta_calls_observed: telemetry?.length ?? null,
+    coach_calls_observed: telemetry?.length ?? null,
+    hint_source_note:
+      "hint.source 'meta' is the s3-coach-r2 wire value for any provider-generated hint, " +
+      "not proof of upstream identity; provider_settings.emitted names the provider and model called",
     source_revision: revision.stdout.trim(),
     uncommitted_changes: dirty.stdout.trim().length > 0,
     database: "disposable, removed after this run",
