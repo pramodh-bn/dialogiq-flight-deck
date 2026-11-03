@@ -158,7 +158,9 @@ def main() -> None:
         }
         try:
             result = feedback.bounded(
-                feedback.real_provider, context, feedback.TIMEOUT_SECONDS
+                feedback.real_provider,
+                {key: value for key, value in context.items() if key != "case_id"},
+                feedback.TIMEOUT_SECONDS,
             )
             row["decision"] = result.model_dump()
             row["status"] = "validated"
