@@ -98,6 +98,25 @@ def normalize(text: str) -> str:
     return " ".join(value.replace("’", "'").replace("‘", "'").split())
 
 
+# Named so stance.py (CS-76) can apply clause-scoped negation to the same wording.
+BOB_BLAME = re.compile(
+    r"\b(?:you(?: are|'re| were)|it is you who (?:is|are)) "
+    r"(?:so )?(?:slow|lazy|useless|incompetent)\b|"
+    r"\b(?:that's|that is) your problem\b"
+)
+BOB_ACKNOWLEDGMENT = re.compile(
+    r"\b(?:it|that) sounds (?:like|hard|tough|difficult)\b|"
+    r"\bi hear (?:you|how|that|what)\b|"
+    r"\bi understand (?:that|how|why|this|it|you|your)\b|"
+    r"\b(?:that|it) makes sense\b|"
+    r"\bi appreciate (?:you|your|how|that)\b|"
+    r"\bi know\b[^.!?]*\b(?:you|your)\b|"
+    r"\bmust have been (?:really |so )?(?:hard|tough|difficult)\b|"
+    r"\byou(?:'ve| have) carried\b|"
+    r"\b(?:harder|hard|tough|difficult) for you\b"
+)
+
+
 def _bob_feedback_flags(value: str) -> tuple[bool, bool]:
     """Recognize bounded public wording, not psychological empathy or intent.
 
@@ -119,28 +138,8 @@ def _bob_feedback_flags(value: str) -> tuple[bool, bool]:
     leading = any(
         re.search(r"(?<![a-z0-9'])" + re.escape(p) + r"(?![a-z0-9'])", pressure_text)
         for p in LEADING_PHRASES
-    ) or bool(
-        re.search(
-            r"\b(?:you(?: are|'re| were)|it is you who (?:is|are)) "
-            r"(?:so )?(?:slow|lazy|useless|incompetent)\b|"
-            r"\b(?:that's|that is) your problem\b",
-            pressure_text,
-        )
-    )
-    acknowledgment = bool(
-        re.search(
-            r"\b(?:it|that) sounds (?:like|hard|tough|difficult)\b|"
-            r"\bi hear (?:you|how|that|what)\b|"
-            r"\bi understand (?:that|how|why|this|it|you|your)\b|"
-            r"\b(?:that|it) makes sense\b|"
-            r"\bi appreciate (?:you|your|how|that)\b|"
-            r"\bi know\b[^.!?]*\b(?:you|your)\b|"
-            r"\bmust have been (?:really |so )?(?:hard|tough|difficult)\b|"
-            r"\byou(?:'ve| have) carried\b|"
-            r"\b(?:harder|hard|tough|difficult) for you\b",
-            value,
-        )
-    )
+    ) or bool(BOB_BLAME.search(pressure_text))
+    acknowledgment = bool(BOB_ACKNOWLEDGMENT.search(value))
     return acknowledgment and not leading, leading
 
 
