@@ -11,6 +11,7 @@ import {
   followRecord,
   forbiddenKeys,
   hintRecord,
+  providerPriorHints,
   publicTurn,
   selectedPath,
 } from "./coach_evidence.mjs";
@@ -65,7 +66,7 @@ test("a root hint has an empty transcript and keeps the opening", () => {
     opening: "Opening line",
     nodes,
     headNodeId: null,
-    hints: [first],
+    entries: [{ head_node_id: null, hint: first }],
     hint: first,
   });
   assert.deepEqual(record.transcript, []);
@@ -74,8 +75,8 @@ test("a root hint has an empty transcript and keeps the opening", () => {
 
 test("a second hint carries the first as prior context, and the first carries none", () => {
   const [first, second] = [hint(1, 1), hint(2, 2)];
-  const hints = [second, first];
-  const base = { identity, opening: "O", nodes, headNodeId: 2, hints };
+  const entries = [second, first].map((h) => ({ head_node_id: 2, hint: h }));
+  const base = { identity, opening: "O", nodes, headNodeId: 2, entries };
   assert.deepEqual(hintRecord({ ...base, hint: first }).prior_hints, []);
   const record = hintRecord({ ...base, hint: second });
   assert.deepEqual(
@@ -83,6 +84,49 @@ test("a second hint carries the first as prior context, and the first carries no
     [1],
   );
   assert.equal(record.transcript.at(-1).persona, "Reply to source branch");
+});
+
+// A straight run of three turns, with node 4 forked from node 1.
+const chain = [
+  { id: 1, parent_id: null },
+  { id: 2, parent_id: 1 },
+  { id: 3, parent_id: 2 },
+  { id: 4, parent_id: 1 },
+];
+const on = (head, id, attempt) => ({ head_node_id: head, hint: hint(id, attempt) });
+const priorIds = (headNodeId, entries, target) =>
+  providerPriorHints({ nodes: chain, headNodeId, entries, hint: target }).map((e) => e.hint.id);
+
+test("a first hint on a later turn receives ancestor hints", () => {
+  const entries = [on(1, 1, 1), on(2, 2, 1), on(3, 3, 1)];
+  assert.deepEqual(priorIds(3, entries, hint(3, 1)), [1, 2]);
+});
+
+test("root hints count as ancestors, and a root hint has none", () => {
+  const entries = [on(null, 1, 1), on(1, 2, 1), on(2, 3, 1)];
+  assert.deepEqual(priorIds(2, entries, hint(3, 1)), [1, 2]);
+  assert.deepEqual(priorIds(null, entries, hint(1, 1)), []);
+});
+
+test("only the latest two reach the provider, ordered root first", () => {
+  const entries = [on(null, 1, 1), on(1, 2, 1), on(1, 3, 2), on(2, 4, 1), on(3, 5, 1), on(3, 6, 2)];
+  assert.deepEqual(priorIds(3, entries, hint(6, 2)), [4, 5]);
+  assert.deepEqual(priorIds(3, entries, hint(5, 1)), [3, 4]);
+});
+
+test("a second hint ends with its own first attempt", () => {
+  const entries = [on(1, 1, 1), on(2, 2, 1), on(2, 3, 2)];
+  assert.deepEqual(priorIds(2, entries, hint(3, 2)), [1, 2]);
+});
+
+test("a fork does not see a sibling's hints", () => {
+  const entries = [on(1, 1, 1), on(2, 2, 1), on(3, 3, 1), on(4, 4, 1)];
+  assert.deepEqual(priorIds(4, entries, hint(4, 1)), [1]);
+});
+
+test("a hint saved later was not context for an earlier one", () => {
+  const entries = [on(1, 5, 2), on(1, 1, 1), on(2, 3, 1)];
+  assert.deepEqual(priorIds(2, entries, hint(3, 1)), [1]);
 });
 
 test("private fields on the wire do not reach a record", () => {
