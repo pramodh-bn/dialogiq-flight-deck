@@ -362,6 +362,15 @@ def send_turn(
         )
         # No ORM objects/read transaction survive the slow provider operation.
         db.rollback()
+        variant: dict[str, str] = {}
+        if config.get("behavior_revision"):
+            # CS-79: the pinned revision selects Bob's persona variant, which reacts
+            # to the same public signal the stance just recorded. Legacy sessions
+            # pass neither keyword, so their provider call is unchanged.
+            variant = {
+                "behavior_revision": config["behavior_revision"],
+                "stance_signal": state["conversation_progress"]["last_signal"],
+            }
         response = provider(
             brief=brief,
             user_text=payload.user_message,
@@ -370,6 +379,7 @@ def send_turn(
             newly_revealed_titles=newly,
             resistance=state["resistance"],
             timeout=30.0,
+            **variant,
         )
         if not isinstance(response, str) or not response.strip():
             from persona import PersonaInvalidResponseError

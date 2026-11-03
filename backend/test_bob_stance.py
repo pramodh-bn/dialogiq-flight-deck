@@ -213,3 +213,19 @@ def test_create_replay_keeps_the_opt_in_in_the_idempotent_body(
         "/api/sessions", json={"scenario_id": body["scenario_id"]}, headers=key
     )
     assert changed.status_code == 409
+
+
+def test_persona_variant_keywords_only_for_opted_in_bob(harness: Harness) -> None:
+    """CS-79: opted-in Bob gets the variant and this turn's signal; legacy gets none."""
+    client, _, recorder = harness
+    send(client, new_bob(client), "Three redesigns in a month sounds exhausting.")
+    opted = recorder.calls[-1]
+    assert opted["behavior_revision"] == "s4-bob-r1"
+    assert opted["stance_signal"] == "acknowledgment"
+
+    legacy = create(client)
+    assert legacy.status_code == 201, legacy.text
+    send(client, legacy.json(), "Three redesigns in a month sounds exhausting.")
+    plain = recorder.calls[-1]
+    assert "behavior_revision" not in plain
+    assert "stance_signal" not in plain
