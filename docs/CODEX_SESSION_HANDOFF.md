@@ -43,7 +43,7 @@ checkpoint, not a live status feed. Refresh Megillah and GitHub before acting.
   with paired demo-wait flags, separate review DB under the Codex worktree's
   `cs78-evidence.local/review/`. Verify process health rather than assuming it.
   Only original budget remainder is allocated:5coach/3persona at startup,
-  zero at18:48. Read the budget log before quoting current remaining counts.
+  zero consumed at18:48. Read the budget log before quoting current remaining counts.
   Original automated11/7 plus manual remainder cannot exceed16/10.
   Do not reset the budget file or restart with a fresh allowance.
 - Do not publish manual-review conversation text automatically. Only scripted
