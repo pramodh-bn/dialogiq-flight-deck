@@ -1,0 +1,91 @@
+{
+  "purpose": "CS-72 and CS-76 contrast lines, requested in CS-C444. Written by Claude, who read the s4-bob-r1 contract but not judge.py's word lists, Bob's need catalog or any candidate rules. Learner lines only; bob_before is context for the reader.",
+  "fields": {
+    "praise": "Should the learner see positive empathy feedback? yes, no, or either when both are defensible.",
+    "signal": "Stance signals acceptable under the contract's precedence table. The first is the expected one.",
+    "not_signal": "Signal that would be wrong even where the line is otherwise ambiguous."
+  },
+  "use": "Report pass or fail per line. A failed line is a lexical limit to disclose, not a line to reword or drop. These lines are visible to the implementer, so they are not held out.",
+  "groups": [
+    {
+      "group": "blame carrying supportive words",
+      "lines": [
+        {"id": "F01", "bob_before": "The spec moved again.", "learner": "Everybody here has had a hard month and they still hit their dates.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F02", "bob_before": "I'm behind on the migration.", "learner": "Priya had a tough quarter too and she didn't make all this fuss.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F03", "bob_before": "This week has been rough.", "learner": "I get that it's difficult, but the rest of the team coped, so why can't you?", "praise": "no", "signal": ["pressure"]},
+        {"id": "F04", "bob_before": "We missed the date.", "learner": "Sorry, but you're the reason the team is behind.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F05", "bob_before": "I'm stressed about Thursday.", "learner": "I understand you're stressed, but that's your problem to fix.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F06", "bob_before": "I couldn't get the setup working.", "learner": "You found it hard because you didn't prepare.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F07", "bob_before": "I'd rather not get into it.", "learner": "Help me understand why you can't keep up with everyone else.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F08", "bob_before": "I left at six yesterday.", "learner": "Must be nice to go home on time while the others struggle.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F09", "bob_before": "I'm tired.", "learner": "Poor you. We're all exhausted.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F10", "bob_before": "It's fine.", "learner": "Tell me what's really going on. I'm not leaving until you do.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F11", "bob_before": "The last change broke the build.", "learner": "You make everything harder than it needs to be.", "praise": "no", "signal": ["pressure"]}
+      ]
+    },
+    {
+      "group": "genuine acknowledgment",
+      "lines": [
+        {"id": "F20", "bob_before": "That's the third redesign this month.", "learner": "Three redesigns in a month sounds exhausting.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F21", "bob_before": "I redid all of it. Again.", "learner": "It sounds like the rework has been really hard on you.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F22", "bob_before": "I was on call the whole time.", "learner": "Being the only one on call through all that must have been tough.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F23", "bob_before": "Last time I asked, it looked like I couldn't do my job.", "learner": "So asking for setup help felt risky after what happened.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F24", "bob_before": "The spec moved twice this week.", "learner": "It makes sense that you're frustrated with the spec moving twice.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F25", "bob_before": "I've been holding all of this myself.", "learner": "That's a lot to carry on your own.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F26", "bob_before": "I took on the migration as well.", "learner": "The whole team has had a hard month, and you've carried the biggest share of it.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F27", "bob_before": "Nobody told me the plan had changed.", "learner": "This was made harder for you than it needed to be, and that wasn't fair.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F28", "bob_before": "I care about shipping things that hold up.", "learner": "Quality clearly matters to you, and patching whatever is loudest cuts against that.", "praise": "either", "signal": ["acknowledgment"]}
+      ]
+    },
+    {
+      "group": "negation",
+      "lines": [
+        {"id": "F30", "bob_before": "This is a lot.", "learner": "This isn't hard. Just finish it.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F31", "bob_before": "It's been a tough few weeks.", "learner": "I don't think you've had it that tough.", "praise": "no", "signal": ["pressure"]},
+        {"id": "F32", "bob_before": "Could I get a hand with setup?", "learner": "I can't help you with that.", "praise": "no", "signal": ["none", "pressure"], "not_signal": "support"},
+        {"id": "F33", "bob_before": "Could someone arrange the environment?", "learner": "I'm not going to arrange that for you.", "praise": "no", "signal": ["none", "pressure"], "not_signal": "support"},
+        {"id": "F34", "bob_before": "Why did you ask me that in front of everyone?", "learner": "I'm not sorry I asked.", "praise": "no", "signal": ["none", "pressure"], "not_signal": "repair"},
+        {"id": "F35", "bob_before": "The spec keeps moving.", "learner": "It isn't easy working with a spec that keeps moving.", "praise": "yes", "signal": ["acknowledgment"]},
+        {"id": "F36", "bob_before": "I'm annoyed about the spec.", "learner": "I don't blame you for being annoyed about the spec.", "praise": "yes", "signal": ["acknowledgment"], "not_signal": "pressure"},
+        {"id": "F37", "bob_before": "That's three times I've redone it.", "learner": "Nobody should have to redo the same work three times.", "praise": "yes", "signal": ["acknowledgment"], "not_signal": "pressure"}
+      ]
+    },
+    {
+      "group": "repair and false repair",
+      "lines": [
+        {"id": "F40", "bob_before": "Noted.", "learner": "I called you slow earlier. That was unfair, and I take it back.", "praise": "either", "signal": ["repair"], "not_signal": "pressure"},
+        {"id": "F41", "bob_before": "Okay.", "learner": "Comparing you with the others was a mistake on my part.", "praise": "either", "signal": ["repair"], "not_signal": "pressure"},
+        {"id": "F42", "bob_before": "You added it and the date didn't move.", "learner": "I added the Monday review and didn't move the date. That one's on me.", "praise": "either", "signal": ["repair"]},
+        {"id": "F43", "bob_before": "Noted.", "learner": "I shouldn't have said everyone else stayed late.", "praise": "either", "signal": ["repair"], "not_signal": "pressure"},
+        {"id": "F44", "bob_before": "That was in front of the whole team.", "learner": "I was wrong to push you in front of the team.", "praise": "either", "signal": ["repair"], "not_signal": "pressure"},
+        {"id": "F45", "bob_before": "That felt unfair.", "learner": "Sorry you feel that way, but you're still behind everyone else.", "praise": "no", "signal": ["pressure"], "not_signal": "repair"},
+        {"id": "F46", "bob_before": "You called me slow.", "learner": "I take it back, you're not slow, everyone else is just faster.", "praise": "no", "signal": ["pressure"], "not_signal": "repair"}
+      ]
+    },
+    {
+      "group": "isolated words and neutral lines",
+      "lines": [
+        {"id": "F50", "bob_before": "We missed the date.", "learner": "I'm sorry.", "praise": "no", "signal": ["none"]},
+        {"id": "F51", "bob_before": "Do you want the long version?", "learner": "Sorry, go on.", "praise": "no", "signal": ["none"]},
+        {"id": "F52", "bob_before": "Is it this week?", "learner": "The hard deadline is Friday.", "praise": "no", "signal": ["none"]},
+        {"id": "F53", "bob_before": "When will we know?", "learner": "Hard to say when we'll know.", "praise": "no", "signal": ["none"]},
+        {"id": "F54", "bob_before": "Anything else?", "learner": "Help me with the slides for Thursday.", "praise": "no", "signal": ["none"], "not_signal": "support"},
+        {"id": "F55", "bob_before": "I'm working through it.", "learner": "Need help?", "praise": "no", "signal": ["none"]},
+        {"id": "F56", "bob_before": "I finished the migration.", "learner": "Great job, you're the best.", "praise": "no", "signal": ["none"]},
+        {"id": "F57", "bob_before": "The review is in the tracker.", "learner": "Did you finish the review?", "praise": "no", "signal": ["none"], "not_signal": "pressure"}
+      ]
+    },
+    {
+      "group": "other stance signals",
+      "lines": [
+        {"id": "F60", "bob_before": "Which comes first, the feature or the migration?", "learner": "I'll check with the product lead which comes first and tell you by noon.", "praise": "either", "signal": ["clarity"]},
+        {"id": "F61", "bob_before": "What counts as a pass?", "learner": "Let's write down what has to work for the demo to pass.", "praise": "either", "signal": ["clarity"]},
+        {"id": "F62", "bob_before": "Can you promise me those two things?", "learner": "I can hold my part of the spec, but I need to check on the test environment first.", "praise": "either", "signal": ["clarity"]},
+        {"id": "F63", "bob_before": "I'm stuck on setup.", "learner": "I can sit with you and sort out the setup this afternoon.", "praise": "either", "signal": ["support"]},
+        {"id": "F64", "bob_before": "The review cost me two days.", "learner": "I'll tell the team the review is what moved the date.", "praise": "either", "signal": ["support"]},
+        {"id": "F65", "bob_before": "Can we stop?", "learner": "Okay, let's stop here. We can pick it up whenever works for you.", "praise": "either", "signal": ["boundary"]},
+        {"id": "F66", "bob_before": "Can we stop?", "learner": "Okay, we can stop, but first tell me why you're upset.", "praise": "no", "signal": ["pressure", "none"], "not_signal": "boundary"}
+      ]
+    }
+  ]
+}
