@@ -25,12 +25,79 @@ TURN_STRING_CHARS = 1500
 HINT_FIELDS = ("approach", "example", "reason")
 
 
-def build_coach_system_prompt(persona_name: str, persona_role: str) -> str:
+BEHAVIOR_REVISION_BOB = "s4-bob-r1"
+
+_BASELINE_MOVE_PARAGRAPH = (
+    "Make the example line one short acknowledgment of what the "
+    "other person just said, followed by one open question that "
+    "starts with what or how and invites their view. Exception: if "
+    "the other person has asked to stop, to be left alone, or not "
+    "to talk now, the example only acknowledges that and offers to "
+    "come back later, with no question about the present moment."
+)
+
+_BOB_MOVE_PARAGRAPH = (
+    "Choose the single most useful next move and make the example "
+    "line carry it out: answer a direct request the other person "
+    "made, clarify a priority or what counts as a pass, reflect and "
+    "check an interpretation, offer credible conditional help or a "
+    "concrete action, repair a misstep, explore something that "
+    "matters to them, ask one purposeful question when a question "
+    "is genuinely helpful, or respectfully pause. Address the other "
+    "person's latest request before changing topics. The example "
+    "does not need to ask a question; when it does, ask at most one "
+    "question. Never invent priorities, product details, authority "
+    "or guarantees: when something is unknown, the example can offer "
+    "to decide, check, or write down the criteria instead. If the "
+    "other person has asked to stop, to be left alone, or not to "
+    "talk now, or is clearly winding down, the example only "
+    "acknowledges that and offers to come back later, with no "
+    "question about the present moment."
+)
+
+
+_BASELINE_REPEAT_PARAGRAPH = (
+    "Do not repeat or rephrase an approach already present in "
+    "previous_hints; when earlier hints exist, offer a genuinely "
+    "different move. Do not explain your reasoning."
+)
+
+# CS-73 correction (CS-C471/CS-C473): second hints invented that the
+# learner "kept pushing" after a stop request. Previous hints are only
+# suggestions the learner was shown; asking for another is not an event.
+_BOB_REPEAT_PARAGRAPH = (
+    "Do not repeat or rephrase an approach already present in "
+    "previous_hints; when earlier hints exist, offer a genuinely "
+    "different move. previous_hints are suggestions the learner was "
+    "shown, not things anyone said or did: never claim the learner "
+    "used, ignored, or went against a previous hint, and never say or "
+    "imply the learner pushed, pressed, or kept going unless the "
+    "transcript shows it, in that order. A request for another hint "
+    "is not evidence of anything in the conversation. Do not explain "
+    "your reasoning."
+)
+
+
+def build_coach_system_prompt(
+    persona_name: str,
+    persona_role: str,
+    *,
+    behavior_revision: str | None = None,
+) -> str:
     """Return the single fixed system instruction for every score.
 
     Only the persona name/role interpolate; the variant never changes.
     Includes the CS-C196 non-repeat requirement for all scores.
+
+    ``behavior_revision="s4-bob-r1"`` (CS-73, contract s4-bob-r1)
+    replaces the mandatory what/how paragraph with a useful-next-move
+    paragraph and adds to the non-repeat paragraph that previous hints
+    are not dialogue; omitted or unknown revisions return the baseline
+    bytes exactly.
     """
+    bob = behavior_revision == BEHAVIOR_REVISION_BOB
+    move_paragraph = _BOB_MOVE_PARAGRAPH if bob else _BASELINE_MOVE_PARAGRAPH
+    repeat_paragraph = _BOB_REPEAT_PARAGRAPH if bob else _BASELINE_REPEAT_PARAGRAPH
     return "\n\n".join(
         [
             (
@@ -65,19 +132,8 @@ def build_coach_system_prompt(persona_name: str, persona_role: str) -> str:
                 "learner. Do not impersonate the other person and do not write a "
                 "continuation as if already spoken."
             ),
-            (
-                "Make the example line one short acknowledgment of what the "
-                "other person just said, followed by one open question that "
-                "starts with what or how and invites their view. Exception: if "
-                "the other person has asked to stop, to be left alone, or not "
-                "to talk now, the example only acknowledges that and offers to "
-                "come back later, with no question about the present moment."
-            ),
-            (
-                "Do not repeat or rephrase an approach already present in "
-                "previous_hints; when earlier hints exist, offer a genuinely "
-                "different move. Do not explain your reasoning."
-            ),
+            move_paragraph,
+            repeat_paragraph,
             (
                 "Reply with exactly one JSON object holding exactly these keys: "
                 '"approach" (1-240 characters), "example" (1-320 characters), '
