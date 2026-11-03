@@ -58,3 +58,10 @@ the total is the hint wait alone. `latency_ms_wire` saturates at 10000, so use `
 - `coach-telemetry.jsonl` covers the coach client. It does not cover Baseten.
 - The report cannot reconstruct older runs, so the disputed "yesterday" detail
   in CS-A73 stays unverified.
+- `prior_hints` mirrors the backend's selection: strict ancestors on the branch,
+  the same head's first attempt for a second hint, latest two. It is derived from
+  the saved listing, not captured from the provider request, so a hint saved under
+  another contract revision would need separate review. Reports made before this
+  correction, including the CS-70 and CS-74 journey reports, list same-head hints
+  only and understate the provider's context on later turns. The CS-74 graded cases
+  are unaffected: each is one head, built by `scripts/evaluate_bob.py` itself.
