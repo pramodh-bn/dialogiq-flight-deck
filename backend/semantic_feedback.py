@@ -25,6 +25,7 @@ from persona import DEFAULT_BASE_URL as BASETEN_BASE
 from persona import DEFAULT_MODEL as BASETEN_MODEL
 
 REVISION = "semantic-r1"
+DEFAULT_PROVIDER = "baseten"
 DEFAULT_MODEL = "accounts/fireworks/models/gpt-oss-120b"
 TIMEOUT_SECONDS = 12.0
 SLOTS = threading.BoundedSemaphore(2)
@@ -46,7 +47,7 @@ class BasetenFeedbackClient(MetaCoachClient):
 
 def selected_client() -> MetaCoachClient:
     """No provider fallback; evaluator selection never changes coach/persona."""
-    provider = os.environ.get("FEEDBACK_PROVIDER", "fireworks").strip().lower()
+    provider = os.environ.get("FEEDBACK_PROVIDER", DEFAULT_PROVIDER).strip().lower()
     if provider == "baseten":
         return BasetenFeedbackClient()
     if provider == "fireworks":

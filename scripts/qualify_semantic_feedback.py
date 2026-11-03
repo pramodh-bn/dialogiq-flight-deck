@@ -25,9 +25,12 @@ def main() -> None:
     parser.add_argument("--prior-report", type=Path, required=True)
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--max-calls", type=int, choices=(1, 2, 3, 4, 5, 6), default=4)
+    parser.add_argument("--max-calls", type=int, default=4)
+    parser.add_argument("--suite", choices=("shared", "authored"), default="shared")
     parser.add_argument(
-        "--provider", choices=("fireworks", "baseten"), default="fireworks"
+        "--provider",
+        choices=("fireworks", "baseten"),
+        default=feedback.DEFAULT_PROVIDER,
     )
     parser.add_argument("--model")
     parser.add_argument(
@@ -35,6 +38,8 @@ def main() -> None:
         help="Comma-separated1-based case indices for a matched comparison.",
     )
     args = parser.parse_args()
+    if not 1 <= args.max_calls <= 50:
+        parser.error("--max-calls must be between1and50.")
     if args.out.exists():
         raise ValueError("Refusing to replace prior evidence.")
     values = parse_env_file(args.env_file)
@@ -107,6 +112,18 @@ def main() -> None:
                     "revealed_ids": [],
                 }
             )
+    if args.suite == "authored":
+        contexts = [
+            {
+                "history": [{"role": "assistant", "content": prior["opening"]}],
+                "learner": item["learner"],
+                "persona": item["persona"],
+                "rubric": rubric,
+                "revealed_ids": [],
+                "case_id": item["id"],
+            }
+            for item in authored["cases"]
+        ]
     report = {
         "source": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
@@ -128,12 +145,13 @@ def main() -> None:
         or len(set(indices)) != len(indices)
         or any(i < 0 or i >= len(contexts) for i in indices)
     ):
-        raise ValueError("Choose unique case indices1through6.")
+        raise ValueError("Choose unique in-range case indices.")
     for index in indices[: args.max_calls]:
         context = contexts[index]
         started = time.monotonic()
         row = {
             "case": index + 1,
+            "case_id": context.get("case_id", str(index + 1)),
             "learner": context["learner"],
             "persona": context["persona"],
             "history": context["history"],

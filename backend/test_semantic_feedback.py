@@ -270,6 +270,8 @@ def test_saturation_is_bounded_and_makes_no_call(
 def test_one_attempt_strict_provider_request(monkeypatch: pytest.MonkeyPatch) -> None:
     from coach import CoachCompletion
 
+    monkeypatch.setenv("FEEDBACK_PROVIDER", "fireworks")
+
     calls = []
 
     class Client:
