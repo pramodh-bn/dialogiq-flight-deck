@@ -25,7 +25,7 @@ def main() -> None:
 
     calls = Path(args.calls_file)
 
-    def counted_respond(self, **_kwargs):  # type: ignore[no-untyped-def]
+    def counted_respond(self: object, **_kwargs: object) -> str:
         with calls.open("a", encoding="utf-8") as log:
             log.write("call\n")
         number = len(calls.read_text(encoding="utf-8").splitlines())
