@@ -221,11 +221,13 @@ function ArenaSession({
     if (!entry) return;
     sending.current = true;
     setPending(entry.action);
-    void reconcile(entry, "Your last message may not have sent. It's still here to send again.")
-      .finally(() => {
-        sending.current = false;
-        setPending(null);
-      });
+    void reconcile(
+      entry,
+      "Your last message may not have sent. It's still here to send again.",
+    ).finally(() => {
+      sending.current = false;
+      setPending(null);
+    });
     // reconcile only reads stable values, and this runs once per visit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retained, session.data]);
@@ -407,50 +409,54 @@ function ArenaSession({
           </div>
 
           <div className="border-t border-border p-3">
-            <div className="flex items-end gap-2">
-              <button
-                onClick={() => setMic((v) => !v)}
-                aria-label="Toggle microphone"
-                className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border transition-colors ${mic ? "border-accent bg-accent/15 text-accent" : "border-border text-muted-foreground hover:text-foreground"}`}
-              >
-                🎙
-              </button>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                rows={1}
-                maxLength={4000}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                placeholder={`Respond to ${persona?.name ?? "the persona"}…`}
-                className="max-h-32 min-h-10 flex-1 resize-none rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-primary/60"
-              />
-              <button
-                disabled={!coachPosition || pending !== null || coach.pending || coach.exhausted}
-                onClick={coach.requestHelp}
-                className={`h-10 shrink-0 rounded-lg border border-border px-3 text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40 ${coach.exhausted ? "max-w-36 text-[11px] leading-tight" : "text-sm"}`}
-              >
-                {coach.exhausted
-                  ? "Two approaches saved for this turn"
-                  : coach.pending
-                    ? "Getting a hint…"
-                    : coach.canRetry
-                      ? "Try again"
-                      : coach.hints.length
-                        ? "Try another approach"
-                        : "Get a hint"}
-              </button>
-              <button
-                onClick={() => void send()}
-                disabled={!input.trim() || busy || !ready}
-                className="h-10 shrink-0 rounded-lg bg-brand px-4 text-sm font-semibold text-primary-foreground glow transition-opacity disabled:opacity-40"
-              >
-                Send Response
-              </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="flex min-w-0 flex-1 items-end gap-2">
+                <button
+                  onClick={() => setMic((v) => !v)}
+                  aria-label="Toggle microphone"
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border transition-colors ${mic ? "border-accent bg-accent/15 text-accent" : "border-border text-muted-foreground hover:text-foreground"}`}
+                >
+                  🎙
+                </button>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  rows={1}
+                  maxLength={4000}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                  placeholder={`Respond to ${persona?.name ?? "the persona"}…`}
+                  className="max-h-32 min-h-10 min-w-0 flex-1 resize-none rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-primary/60"
+                />
+              </div>
+              <div className="flex shrink-0 items-end justify-end gap-2">
+                <button
+                  disabled={!coachPosition || pending !== null || coach.pending || coach.exhausted}
+                  onClick={coach.requestHelp}
+                  className={`h-10 shrink-0 rounded-lg border border-border px-3 text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40 ${coach.exhausted ? "max-w-36 text-[11px] leading-tight" : "text-sm"}`}
+                >
+                  {coach.exhausted
+                    ? "Two approaches saved for this turn"
+                    : coach.pending
+                      ? "Getting a hint…"
+                      : coach.canRetry
+                        ? "Try again"
+                        : coach.hints.length
+                          ? "Try another approach"
+                          : "Get a hint"}
+                </button>
+                <button
+                  onClick={() => void send()}
+                  disabled={!input.trim() || busy || !ready}
+                  className="h-10 shrink-0 rounded-lg bg-brand px-4 text-sm font-semibold text-primary-foreground glow transition-opacity disabled:opacity-40"
+                >
+                  Send Response
+                </button>
+              </div>
             </div>
           </div>
         </section>
