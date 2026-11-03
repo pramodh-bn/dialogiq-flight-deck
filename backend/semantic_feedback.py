@@ -173,6 +173,9 @@ or none: the primary concrete action the learner actually takes. None requires
 empty stance_evidence; other signals require a learner span ID. Pressure flag
 and pressure stance signal must agree. Respecting a pause can be boundary with
 no question or score increase. This describes a simulation, not real trust.
+Boundary specifically means offering/respecting a pause or space in this
+conversation. Declining practical help or refusing to involve others is not
+that boundary; classify the actual action, or none, without inventing a pause.
 stance_change: useful NEW positive action0or1; pressure-1or0; boundary/none0.
 ANY nonzero change requires reaction_evidence from current persona_spans. The
 reaction must support the direction: increasing cooperation/openness for+1,
@@ -184,6 +187,8 @@ supportive statement can be useful; a question alone need not improve stance.
 Need discovery is SEPARATE: revealed_need is null unless the CURRENT PERSONA
 reply actually discloses an unrevealed rubric need. A learner guess, a prior
 reply, an opening, a denial or an irrelevant excerpt is not new disclosure.
+Select a span containing the substantive concern/need, not generic approval or
+a remark that a question has been answered. Do not infer a need from politeness.
 If justified, return exactly {"need_id":"rubric ID","persona_evidence":"P1"}.
 Select persona_evidence ONLY from current persona_spans. Never use a learner ID,
 history or rubric text as persona evidence. At most one new need per exchange.

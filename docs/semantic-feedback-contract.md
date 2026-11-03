@@ -28,6 +28,12 @@ Generate the persona reply first, with prior known state and no lexical reveal
 or invented stance signal injected for semantic sessions. Then evaluate exactly
 one completed exchange with selected-branch public history, public opening,
 current learner and Bob text, and the evaluator-only private need rubric.
+The semantic-only persona flag removes the legacy judge's advance-topic
+permission list. Otherwise a post-reply judge would wait for disclosures that
+the persona was told were never permitted. Individual concerns may emerge
+gradually from roleplay; private brief/IDs/rubric disclosure remains forbidden,
+and helpful wording never forces agreement. Omitted/unknown feedback flags
+retain the original prompt bytes and topic permission rules.
 The evaluator never receives the private persona prompt, coach hints, sibling
 branches, credentials or model reasoning. The coach never receives the rubric.
 The evaluator returns classifications, not scores or free-form reasoning:
@@ -79,8 +85,9 @@ then branch/reload/replay, unavailable/timeout/late-result behavior and coverage
 Keep a separate reviewer-authored sample for the eventual frozen candidate.
 Real8080/5173/disposableDB/browser and bounded provider measurements are separate
 gates from unit/mock checks. No live-readiness/delivery claim before those gates.
-Default evaluator is Fireworks `accounts/fireworks/models/gpt-oss-120b`, verified
-present in the account's live models list. `FEEDBACK_MODEL` is an explicit
+The candidate default evaluator is Baseten Muse Spark after the matched
+configuration check. Fireworks `accounts/fireworks/models/gpt-oss-120b` remains
+available for explicit comparison. `FEEDBACK_MODEL` is an explicit
 server-only override, independent from the Muse coach and Baseten persona.
 The first Muse evaluator trial timed out2/2. A catalog-listed Llama model was
 not present in the account list and rejected2requests; neither trial is a
@@ -88,7 +95,7 @@ successful grading result. Keep those failures with later evidence.
 
 ## Baseten selection (prepared, not live-measured)
 
-FEEDBACK_PROVIDER selects fireworks(default) or baseten; an unknown value is
+FEEDBACK_PROVIDER selects baseten(default) or fireworks; an unknown value is
 inert and does not fall back. FEEDBACK_MODEL is an evaluator-only model override.
 Baseten defaults to meta-models/muse-spark-open-1026 and uses BASETEN_API_KEY and
 BASETEN_API_BASE(default https://inference.baseten.co/v1). No Fireworks/Meta key

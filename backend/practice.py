@@ -408,6 +408,8 @@ def send_turn(
                 if semantic
                 else state["conversation_progress"]["last_signal"],
             }
+            if semantic:
+                variant["feedback_revision"] = semantic_feedback.REVISION
         response = provider(
             brief=brief,
             user_text=payload.user_message,

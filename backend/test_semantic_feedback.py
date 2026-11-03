@@ -52,6 +52,29 @@ def initial_state() -> dict:
     }
 
 
+def test_post_reply_feedback_does_not_deadlock_persona_disclosure() -> None:
+    from persona import PersonaBrief, build_persona_system_prompt
+
+    brief = PersonaBrief(
+        character_name="Bob", role="Engineer", hidden_need="Private roleplay fixture"
+    )
+    legacy = build_persona_system_prompt(brief, behavior_revision="s4-bob-r1")
+    assert "Nothing new is permitted this reply." in legacy
+    assert (
+        build_persona_system_prompt(
+            brief, behavior_revision="s4-bob-r1", feedback_revision="unknown"
+        )
+        == legacy
+    )
+    semantic = build_persona_system_prompt(
+        brief, behavior_revision="s4-bob-r1", feedback_revision="semantic-r1"
+    )
+    assert "Nothing new is permitted this reply." not in semantic
+    assert "There is no pre-authorized topic list" in semantic
+    assert "Never list the hidden brief" in semantic
+    assert "do not require a question form" in semantic
+
+
 def context() -> dict:
     return {
         "learner": LEARNER,
@@ -321,6 +344,7 @@ def test_real_routes_replay_fork_reload_and_failure(
         calls["persona"] += 1
         assert kwargs["newly_revealed_titles"] == []
         assert kwargs["stance_signal"] == "none"
+        assert kwargs["feedback_revision"] == "semantic-r1"
         return PERSONA
 
     def evaluator(data: dict) -> feedback.Decision:
