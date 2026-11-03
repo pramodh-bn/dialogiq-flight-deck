@@ -51,13 +51,40 @@ export function publicHint(hint) {
   };
 }
 
+// How many earlier hints the provider receives. Mirrors `earlier[-2:]` in coach_service.py.
+const PROVIDER_PRIOR_HINTS = 2;
+
+// The hints the provider received for `hint`, mirroring _earlier_hint_rows: strict ancestors
+// of the head on this branch, root included, plus the same head's first attempt when writing
+// the second. Root first, then attempt, then id, keeping the latest two. A hint saved after
+// this one did not exist yet, so a lower id is required. `entries` are one branch's listing,
+// because the backend scopes the same way.
+export function providerPriorHints({ nodes, headNodeId, entries, hint }) {
+  const positions = new Map([[null, 0]]);
+  if (headNodeId != null) {
+    selectedPath(nodes, headNodeId).forEach((node, index) => positions.set(node.id, index + 1));
+  }
+  const eligible = entries.filter(({ head_node_id: head, hint: other }) => {
+    if (other.id >= hint.id || !positions.has(head)) return false;
+    return head === headNodeId ? hint.attempt === 2 && other.attempt === 1 : true;
+  });
+  return eligible
+    .sort(
+      (a, b) =>
+        positions.get(a.head_node_id) - positions.get(b.head_node_id) ||
+        a.hint.attempt - b.hint.attempt ||
+        a.hint.id - b.hint.id,
+    )
+    .slice(-PROVIDER_PRIOR_HINTS);
+}
+
 // One saved hint with everything needed to judge it: the dialogue it answered, and the hints
 // it was told not to repeat. `timing` holds true elapsed times; wire latency saturates.
-export function hintRecord({ identity, opening, nodes, headNodeId, hints, hint, timing }) {
-  const prior = hints
-    .filter((other) => other.attempt < hint.attempt)
-    .sort((a, b) => a.attempt - b.attempt)
-    .map(publicHint);
+export function hintRecord({ identity, opening, nodes, headNodeId, entries, hint, timing }) {
+  const prior = providerPriorHints({ nodes, headNodeId, entries, hint }).map((entry) => ({
+    head_node_id: entry.head_node_id,
+    ...publicHint(entry.hint),
+  }));
   return {
     ...identity,
     head_node_id: headNodeId,
