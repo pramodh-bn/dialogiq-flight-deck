@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -14,20 +14,30 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { api, type Coaching, type PracticeSession, type Tree, type TurnNode } from "@/lib/api";
+import {
+  api,
+  type Coaching,
+  type CreateBranchRequest,
+  type PracticeSession,
+  type SelectBranchRequest,
+  type Tree,
+  type TurnNode,
+} from "@/lib/api";
 import {
   blindSpots,
   branchChain,
   containingBranch,
   failureAction,
   failureMessage,
+  reconcileAction,
+  retainedActions,
+  type RetainedAction,
   layoutTree,
   refreshSession,
   scenarioQuery,
   sessionQuery,
   storeSession,
   treeQuery,
-  useActionKeys,
 } from "@/lib/practice";
 
 type RecorderSearch = { sessionId?: number | undefined };
@@ -138,6 +148,10 @@ function FlightRecorder() {
   return <Recorder key={sessionId} sessionId={sessionId} />;
 }
 
+type RecorderRequest =
+  | ({ route: "rewind" } & CreateBranchRequest)
+  | ({ route: "select" } & SelectBranchRequest);
+
 function Recorder({ sessionId }: { sessionId: number }) {
   const client = useQueryClient();
   const session = useQuery(sessionQuery(sessionId));
@@ -191,7 +205,11 @@ function RecorderView({
 }) {
   const client = useQueryClient();
   const navigate = useNavigate();
-  const keys = useActionKeys();
+  const retained = useMemo(
+    () => retainedActions<RecorderRequest>(`recorder:${session.id}`),
+    [session.id],
+  );
+  const checkedRetained = useRef(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -240,20 +258,74 @@ function RecorderView({
     [tree.nodes],
   );
 
-  async function act(action: string, run: (key: string) => Promise<PracticeSession>) {
+  function perform(entry: RetainedAction<RecorderRequest>): Promise<PracticeSession> {
+    const { route, ...body } = entry.request;
+    return route === "rewind"
+      ? api
+          .createBranch(session.id, body as CreateBranchRequest, entry.key)
+          .then((res) => res.session)
+      : api.selectBranch(session.id, body as SelectBranchRequest, entry.key);
+  }
+
+  async function finish(next: PracticeSession) {
+    storeSession(client, next);
+    await refreshSession(client, session.id);
+    await navigate({ to: "/arena", search: { sessionId: session.id } });
+  }
+
+  // Returns a message when the learner needs one. A branch that was created is finished as
+  // normal, and one that was not can be requested again unchanged.
+  async function reconcile(entry: RetainedAction<RecorderRequest>): Promise<string | null> {
+    const outcome = await reconcileAction(
+      entry,
+      () => api.getSession(session.id).then((s) => s.revision),
+      () => perform(entry),
+    );
+    if (outcome.kind === "recovered") {
+      retained.settle(entry);
+      await finish(outcome.result);
+      return null;
+    }
+    if (outcome.kind === "state_changed") {
+      retained.settle(entry);
+      void refreshSession(client, session.id);
+      return failureMessage(outcome.error);
+    }
+    void refreshSession(client, session.id);
+    return "Couldn't confirm that action. Try again.";
+  }
+
+  // A reload can leave an action unresolved.
+  useEffect(() => {
+    if (checkedRetained.current) return;
+    checkedRetained.current = true;
+    const entry = retained.peek();
+    if (!entry) return;
+    setWorking(true);
+    void reconcile(entry)
+      .then(setNotice)
+      .finally(() => setWorking(false));
+    // reconcile only reads stable values, and this runs once per visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retained]);
+
+  async function act(action: string, build: () => RecorderRequest) {
     if (working) return;
     setWorking(true);
     setNotice(null);
+    const entry = retained.begin(action, build);
     try {
-      const next = await run(keys.keyFor(action));
-      keys.release(action);
-      storeSession(client, next);
-      await refreshSession(client, session.id);
-      await navigate({ to: "/arena", search: { sessionId: session.id } });
+      const next = await perform(entry);
+      retained.settle(entry);
+      await finish(next);
     } catch (error) {
-      if (failureAction(error) !== "retry") keys.release(action);
-      setNotice(failureMessage(error));
-      void refreshSession(client, session.id);
+      if (failureAction(error) === "retry") {
+        setNotice(await reconcile(entry));
+      } else {
+        retained.settle(entry);
+        setNotice(failureMessage(error));
+        void refreshSession(client, session.id);
+      }
     } finally {
       setWorking(false);
     }
@@ -262,26 +334,22 @@ function RecorderView({
   function rewindTo(target: number | null) {
     if (!viewed) return;
     const source = viewed.id;
-    void act(`rewind:${source}:${target}`, async (key) => {
-      const res = await api.createBranch(
-        session.id,
-        {
-          source_branch_id: source,
-          rewind_to_node_id: target,
-          expected_revision: tree.revision,
-        },
-        key,
-      );
-      return res.session;
-    });
+    void act(`rewind:${source}:${target}`, () => ({
+      route: "rewind",
+      source_branch_id: source,
+      rewind_to_node_id: target,
+      expected_revision: tree.revision,
+    }));
   }
 
   function resumeBranch() {
     if (!viewed) return;
     const branch = viewed.id;
-    void act(`select:${branch}`, (key) =>
-      api.selectBranch(session.id, { branch_id: branch, expected_revision: tree.revision }, key),
-    );
+    void act(`select:${branch}`, () => ({
+      route: "select",
+      branch_id: branch,
+      expected_revision: tree.revision,
+    }));
   }
 
   const spots = blindSpots(chain);
