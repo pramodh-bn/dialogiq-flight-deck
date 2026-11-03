@@ -9,13 +9,14 @@ It is rehearsal, not surveillance: nothing records or scores real conversations.
 
 ## How it works
 
-| Part         | What it does                                                               | Runs on                                                                    |
-| ------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Persona      | Plays the character, such as Bob, a guarded engineer behind on Q3          | Baseten, `meta-models/muse-spark-open-1026`                                |
-| Coach        | Suggests one next move as approach, example line and reason                | Fireworks, `accounts/fireworks/models/muse-spark-open` (Meta API optional) |
-| Judge        | Scores which of the character's 7 hidden needs your turns have uncovered   | Local code, deterministic and lexical, no model                            |
-| Stance (Bob) | Tracks Bob's simulated stance (guarded / warming / open) from what you say | Local code, deterministic, no model                                        |
-| Recorder     | Keeps every turn as a tree so you can rewind and branch                    | FastAPI + SQLite                                                           |
+| Part                           | What it does                                                                         | Runs on                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Persona                        | Plays the character, such as Bob, a guarded engineer behind on Q3                    | Baseten, `meta-models/muse-spark-open-1026`                                |
+| Coach                          | Suggests one next move as approach, example line and reason                          | Fireworks, `accounts/fireworks/models/muse-spark-open` (Meta API optional) |
+| Legacy judge                   | Scores which of the character's 7 hidden needs your turns have uncovered             | Local code, deterministic and lexical, no model                            |
+| Semantic feedback (opt-in Bob) | Classifies the completed exchange and cites public evidence; server derives counters | Baseten Muse Spark by default; Fireworks GPT-OSS optional                  |
+| Stance (Bob)                   | Tracks Bob's simulated stance (guarded / warming / open) from what you say           | Local code, deterministic, no model                                        |
+| Recorder                       | Keeps every turn as a tree so you can rewind and branch                              | FastAPI + SQLite                                                           |
 
 The coach never sees the character's hidden needs or private prompt, and the
 persona never sees the coach's hints.
@@ -117,6 +118,39 @@ setting.
 Sessions keep the behavior they were created with. Older Bob sessions and other
 personas keep their original behavior; only new Bob sessions use `s4-bob-r1`.
 
+### Opt-in semantic feedback
+
+The semantic candidate replaces phrase matching for **new Bob sessions** when
+the backend is started with these settings (or loads them from the ignored env
+file through `scripts/run_backend.py`):
+
+```sh
+FEEDBACK_ENABLED=1
+FEEDBACK_PROVIDER=baseten
+# optional evaluator-only override:
+FEEDBACK_MODEL=meta-models/muse-spark-open-1026
+```
+
+The grader uses a separate prompt/request from Bob, even on the same provider.
+It reads the selected public conversation and evaluator-only rubric. The coach
+does not receive that rubric. Server-assigned excerpts ground the displayed
+evidence; a source quote does not guarantee the AI interpretation is correct.
+Bob may gradually disclose relevant concerns without the old judge's advance
+permission list. The grader then checks his actual reply, so a useful statement
+or closed question can uncover a need, and a question need not earn points.
+
+The UI labels the observable acknowledgment measure **Acknowledgment** rather
+than treating it as psychological empathy. Simulated stance changes also cite
+Bob's reaction. Evaluations have a12second deadline; failures save the turn,
+retain prior knowledge and display unavailable feedback with coverage instead
+of false zeros. Existing sessions remain pinned and are never silently rescored.
+
+`FEEDBACK_PROVIDER=fireworks` selects the separately configured Fireworks
+grader; its default is `accounts/fireworks/models/gpt-oss-120b`. No provider key
+falls back across services. Keep `COACH_PROVIDER=fireworks` and the paired demo
+wait flags for the coach. See the [contract](docs/semantic-feedback-contract.md)
+and [actual checks and limits](docs/semantic-feedback-verification.md).
+
 ## Demo and verification
 
 The [three-minute demo script](docs/demo-script.md) includes presenter narration,
@@ -156,13 +190,17 @@ The test suites make no paid calls.
 
 ## Known limits
 
-- **The judge is lexical.** It counts open questions by their opening words
+- **The legacy judge is lexical.** It counts open questions by their opening words
   (what, how, why, tell me, walk me through, describe and similar). A useful
   question that starts with where, when, who or which gets no open-question
   credit, and needs are revealed by matched wording, not by meaning.
-- **Bob's stance is rule-based**, from wording signals with negation handling. It
-  can misread unusual phrasing.
+- **Legacy Bob stance is rule-based**, from wording signals with negation handling.
+  Semantic sessions use AI classifications and a bounded ledger; both can misread
+  language and neither measures real trust. The eight-turn semantic sample had
+  grading median2.98s/max4.91s, not a reliability guarantee.
 - **Coach quality** (Sprint 4, small finite samples, graded by the agents):
+  - These earlier measurements predate semantic-feedback sessions and remain
+    historical evidence, not a benchmark of the new complete journey.
   - On the final coach (merged as a740eea, measured on branch 9afaa54 with the
     same coach code), 13 shared Bob cases, 78 hints: 52/78 judged usable by a
     learner, against 23/78 for the previous coach. Bob's requests to stop were
