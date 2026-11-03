@@ -1,5 +1,9 @@
 # DialogIQ V2 API contract
 
+Sprint 4 Bob proposal: [CS-75 behavior contract](sprint4/bob-behavior-contract.md),
+revision `s4-bob-r1`, specifies opt-in pinned Bob behavior, separate simulated
+stance and adaptive coaching. Review proposal only; not adopted runtime.
+
 Versioned parser extension: [CS-71 dash-separated questions](cs71-question-parser-delta.md),
 revision `s2-r2.2`, defines dash-clause recognition for fresh seed catalogs.
 Review/adoption and actual-source verification are recorded on CS-71. Existing
