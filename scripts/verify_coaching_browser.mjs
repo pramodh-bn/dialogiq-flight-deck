@@ -1208,7 +1208,7 @@ async function harvestCase(ctx) {
           opening,
           nodes: data.nodes,
           headNodeId: head,
-          hints: listed.filter((h) => h.head_node_id === head).map((h) => h.hint),
+          entries: listed,
           hint,
           timing: ctx.timing.get(`${branch.id}:${head}:${hint.attempt}`),
         }),
