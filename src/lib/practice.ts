@@ -58,7 +58,8 @@ export function storeSession(client: QueryClient, session: PracticeSession) {
 
 export function applyTurn(tree: Tree, res: ChatTurnResponse): Tree {
   if (res.session.revision <= tree.revision) return tree;
-  const { score, total_needs, revealed_needs, resistance, metrics } = res.node;
+  const { score, total_needs, revealed_needs, resistance, metrics, conversation_progress } =
+    res.node;
   return {
     ...tree,
     revision: res.session.revision,
@@ -73,6 +74,7 @@ export function applyTurn(tree: Tree, res: ChatTurnResponse): Tree {
             revealed_needs,
             resistance,
             metrics,
+            conversation_progress,
           }
         : b,
     ),

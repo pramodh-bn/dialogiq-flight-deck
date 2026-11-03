@@ -10,6 +10,7 @@ from uuid import uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session as DbSession
 
+import stance
 from api_errors import ApiError, conflict, not_found
 from conversation_context import ancestor_chain, build_history
 from judge import evaluate
@@ -68,15 +69,37 @@ def get_node(
 
 
 def state_at(db: DbSession, session_id: int, node_id: int | None) -> dict:
+    """Stored State at a node, including the private stance ledger on new Bob.
+
+    An empty new-Bob branch starts from the initial stance object; legacy stays null.
+    """
     node = get_node(db, session_id, node_id)
-    return copy.deepcopy(node.state) if node else State().model_dump()
+    if node:
+        return copy.deepcopy(node.state)
+    initial = State().model_dump()
+    if get_session(db, session_id).scenario_config.get("behavior_revision"):
+        initial.update(stance.initial_state_fields())
+    return initial
+
+
+def public_state(state: dict) -> dict:
+    """State as the public DTOs carry it: the stance ledger never leaves storage."""
+    return {key: value for key, value in state.items() if key != stance.LEDGER_KEY}
+
+
+# The seed's fixture key for Bob (seed.py keys scenarios by it); not a display match.
+BOB_SCENARIO_KEY = "Bob: Defensive Team Member"
 
 
 def behavior_revisions(scenario: Scenario) -> list[str]:
     """Versions a new session may opt into (contract s4-bob-r1).
 
-    Empty until CS-76 registers the complete Bob variant, so no client opts in early.
+    Only the complete Bob scenario offers the registered variant; anything else,
+    including an incomplete Bob configuration, offers nothing.
     """
+    complete = len(scenario.needs or []) == 7 and bool(scenario.public_persona)
+    if scenario.title == BOB_SCENARIO_KEY and complete:
+        return [stance.BEHAVIOR_REVISION]
     return []
 
 
@@ -108,7 +131,7 @@ def session_dto(db: DbSession, session: Session) -> dict:
         active_head_node_id=branch.head_node_id,
         revision=session.revision,
         persona=pinned_persona(session),
-        **state_at(db, session.id, branch.head_node_id),
+        **public_state(state_at(db, session.id, branch.head_node_id)),
     ).model_dump()
 
 
@@ -118,7 +141,7 @@ def branch_dto(db: DbSession, branch: Branch) -> dict:
         session_id=branch.session_id,
         fork_node_id=branch.fork_node_id,
         head_node_id=branch.head_node_id,
-        **state_at(db, branch.session_id, branch.head_node_id),
+        **public_state(state_at(db, branch.session_id, branch.head_node_id)),
     ).model_dump()
 
 
@@ -131,7 +154,7 @@ def node_dto(node: ConversationNode) -> dict:
         user_text=node.user_text or "",
         character_text=node.character_text or "",
         coaching=node.coaching,
-        **copy.deepcopy(node.state),
+        **public_state(copy.deepcopy(node.state)),
     ).model_dump()
 
 
@@ -246,18 +269,26 @@ def mutate(
         raise
 
 
-def create_session(db: DbSession, scenario_id: int, key: str) -> tuple[int, dict]:
+def create_session(
+    db: DbSession, scenario_id: int, key: str, behavior_revision: str | None = None
+) -> tuple[int, dict]:
     def operation(owner: str) -> tuple[int, dict]:
         write_lock(db)
         scenario = db.get(Scenario, scenario_id)
         if scenario is None:
             raise not_found("scenario")
+        if behavior_revision and behavior_revision not in behavior_revisions(scenario):
+            raise ApiError(
+                422,
+                "validation_error",
+                "That behavior revision is not available for this scenario.",
+            )
         session = Session(
             user_id=get_or_create_demo_user(db).id,
             scenario_id=scenario_id,
             score=0,
             revision=0,
-            scenario_config=pin_scenario(scenario),
+            scenario_config=pin_scenario(scenario, behavior_revision),
         )
         db.add(session)
         db.flush()
@@ -268,9 +299,10 @@ def create_session(db: DbSession, scenario_id: int, key: str) -> tuple[int, dict
         db.flush()
         return finish(db, key, owner, 201, session_dto(db, session))
 
-    return mutate(
-        db, key, "POST", "/api/sessions", {"scenario_id": scenario_id}, operation
-    )
+    body: dict = {"scenario_id": scenario_id}
+    if behavior_revision:
+        body["behavior_revision"] = behavior_revision
+    return mutate(db, key, "POST", "/api/sessions", body, operation)
 
 
 @dataclass(frozen=True)
@@ -318,6 +350,9 @@ def send_turn(
             context.config["revision"].split(":", 1)[0],
         )
         config = context.config
+        if config.get("behavior_revision"):
+            # Stance comes from public wording and this branch's ledger, not score.
+            state = stance.apply_turn(state, context.previous, payload.user_message)
         brief = PersonaBrief(
             character_name=config["persona"]["name"],
             role=config["persona"]["role"],

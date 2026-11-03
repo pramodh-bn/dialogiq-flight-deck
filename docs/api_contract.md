@@ -173,10 +173,11 @@ Arrays may be empty. Objects must not expose ORM rows wholesale.
 | Metrics      | `turns`, `open_questions`, `closed_questions`, `empathy_turns` (nonnegative integers); `open_question_ratio` number 0–1, open/(open+closed), 0 when denominator is 0                                                 |
 | Coaching     | `source` literal `deterministic`; `question_type` `open`/`closed`/`statement`; `empathy` and `leading` booleans; `outcome` `breakthrough`/`deadend`/`neutral`; `alternatives` string array; `whispers` Whisper array |
 | Whisper      | `kind` `good`/`warn`/`tip`, `text` string                                                                                                                                                                            |
-| State        | `score` integer 0–7, `total_needs` literal 7, `revealed_needs` RevealedNeed array in n1…n7 order, `resistance` `guarded`/`warming`/`open`, `metrics` Metrics                                                         |
+| State        | `score` integer 0–7, `total_needs` literal 7, `revealed_needs` RevealedNeed array in n1…n7 order, `resistance` `guarded`/`warming`/`open`, `metrics` Metrics, `conversation_progress` ConversationProgress or null (null on legacy sessions)                                                         |
 | Session      | `id`, `scenario_id`, `active_branch_id`, `active_head_node_id` (node ID or null), `revision`, `persona` Persona pinned at creation (CS-56), plus all State fields                                                                                                  |
 | Node         | `id`, `session_id`, `parent_id` (node ID or null), `turn_number` (chain depth, starts 1), `user_text`, `character_text` (strings), `coaching` Coaching, plus all State fields                                        |
 | Branch       | `id`, `session_id`, `fork_node_id` (node ID or null), `head_node_id` (node ID or null), plus all State fields                                                                                                        |
+| ConversationProgress | `behavior_revision` literal `s4-bob-r1`; `stance` `guarded`/`warming`/`open`, always equal to `resistance`; `last_signal` `initial`/`clarity`/`support`/`acknowledgment`/`repair`/`pressure`/`boundary`/`none`; `explanation` fixed public text up to 240 characters |
 | Tree         | `session_id`, `revision`, `active_branch_id`, `branches` Branch array, `nodes` Node array                                                                                                                            |
 
 Persona.tags is required display data, never private personality instructions.
@@ -230,6 +231,20 @@ persona handoff below for the exact fixture fields and ownership.
 { "scenario_id": 1 }
 ```
 
+Optional `"behavior_revision": "s4-bob-r1"` opts a new session into the Bob
+behavior revision (CS-76). Send it only when the scenario lists it in
+`behavior_revisions`; any other value, or a scenario that does not list it, is
+422 validation_error. The field is part of the idempotent body, so a replay
+with a different body is 409. Opting in pins judge revision `s2-r2.3-bob` and
+the behavior revision in the session snapshot; the catalog and older sessions
+are unchanged. On such sessions every Session, Node and Branch carries a
+non-null `conversation_progress`, starting `guarded`/`initial` on any branch with
+no turns, and `resistance` follows that stance instead of the score. The stance
+comes from a small lexical reading of the learner's public wording and the
+branch's own history (expression lists in `backend/stance.py`); it never reads
+needs, scores or reveals and is not a measure of trust. Legacy sessions keep
+score-based resistance and `conversation_progress: null`.
+
 → 201 Session, also on replay. Create exactly one initial branch with null fork
 and head, score 0, no revealed needs, guarded resistance, zero metrics, revision 0.
 Unknown scenario → 404. Explicit New Session is the only UI action that creates
@@ -276,6 +291,7 @@ Initial Session example:
   "total_needs": 7,
   "revealed_needs": [],
   "resistance": "guarded",
+  "conversation_progress": null,
   "metrics": {
     "turns": 0,
     "open_questions": 0,
@@ -358,6 +374,7 @@ Complete success example:
       }
     ],
     "resistance": "guarded",
+    "conversation_progress": null,
     "metrics": {
       "turns": 1,
       "open_questions": 1,
@@ -391,6 +408,7 @@ Complete success example:
       }
     ],
     "resistance": "guarded",
+    "conversation_progress": null,
     "metrics": {
       "turns": 1,
       "open_questions": 1,

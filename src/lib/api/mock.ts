@@ -122,6 +122,7 @@ const INITIAL_STATE: State = {
   total_needs: 7,
   revealed_needs: [],
   resistance: "guarded",
+  conversation_progress: null,
   metrics: {
     turns: 0,
     open_questions: 0,
@@ -181,6 +182,7 @@ function nextState(prev: State, coaching: Coaching): State {
       ? [...prev.revealed_needs, placeholderNeed(score)]
       : prev.revealed_needs,
     resistance: resistanceFor(score),
+    conversation_progress: null,
     metrics: {
       turns: prev.metrics.turns + 1,
       open_questions: open,
@@ -227,8 +229,8 @@ function fail(status: number, path: string, code: string, retryable = false): Ap
 }
 
 function pickState(s: State): State {
-  const { score, total_needs, revealed_needs, resistance, metrics } = s;
-  return { score, total_needs, revealed_needs, resistance, metrics };
+  const { score, total_needs, revealed_needs, resistance, metrics, conversation_progress } = s;
+  return { score, total_needs, revealed_needs, resistance, metrics, conversation_progress };
 }
 
 export function createMockApi(random: () => number = Math.random): DialogApi {

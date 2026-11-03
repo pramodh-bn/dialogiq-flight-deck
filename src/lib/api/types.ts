@@ -32,12 +32,31 @@ export type Metrics = {
 
 export type Resistance = "guarded" | "warming" | "open";
 
+export type ProgressSignal =
+  | "initial"
+  | "clarity"
+  | "support"
+  | "acknowledgment"
+  | "repair"
+  | "pressure"
+  | "boundary"
+  | "none";
+
+// Bob's simulated stance on s4-bob-r1 sessions, separate from the needs score.
+export type ConversationProgress = {
+  behavior_revision: string;
+  stance: Resistance;
+  last_signal: ProgressSignal;
+  explanation: string;
+};
+
 export type State = {
   score: number;
   total_needs: number;
   revealed_needs: RevealedNeed[];
   resistance: Resistance;
   metrics: Metrics;
+  conversation_progress: ConversationProgress | null;
 };
 
 export type PracticeSession = State & {
@@ -90,7 +109,7 @@ export type Tree = {
   nodes: TurnNode[];
 };
 
-export type CreateSessionRequest = { scenario_id: number };
+export type CreateSessionRequest = { scenario_id: number; behavior_revision?: string };
 
 export type ChatTurnRequest = {
   session_id: number;

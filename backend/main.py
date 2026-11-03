@@ -205,7 +205,11 @@ def create_app(
 
     @application.post("/api/sessions", response_model=SessionResponse, status_code=201)
     def create(payload: SessionCreateRequest, key: KeyDep, db: DbDep) -> JSONResponse:
-        return reply(practice.create_session(db, payload.scenario_id, key))
+        return reply(
+            practice.create_session(
+                db, payload.scenario_id, key, payload.behavior_revision
+            )
+        )
 
     @application.get("/api/sessions", response_model=list[SessionResponse])
     def sessions(request: Request, db: DbDep) -> list[dict]:
