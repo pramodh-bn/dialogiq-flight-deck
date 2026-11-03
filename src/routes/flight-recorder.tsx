@@ -176,6 +176,22 @@ function Recorder({ sessionId }: { sessionId: number }) {
       </RecorderMessage>
     );
   }
+  if (scenario.error && !scenario.data) {
+    return (
+      <RecorderMessage
+        title="Couldn't load this scenario"
+        detail="Your recorded turns are safe. The scenario details are unavailable right now."
+      >
+        <button
+          disabled={scenario.isFetching}
+          onClick={() => void scenario.refetch()}
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow disabled:opacity-60"
+        >
+          {scenario.isFetching ? "Trying again…" : "Try again"}
+        </button>
+      </RecorderMessage>
+    );
+  }
   if (!session.data || !tree.data || !scenario.data) {
     return <RecorderMessage title="Loading session…" detail="Reading the recorded turns." />;
   }

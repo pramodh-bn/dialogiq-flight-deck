@@ -16,6 +16,9 @@
 //   --journey lost-response
 //                      Drop responses after the server commits, with a stand-in persona that
 //                      counts its calls. Needs no provider, spends nothing and ignores --coach.
+//   --journey recorder-failure
+//                      Fail the Recorder's scenario request, then let it recover, with the same
+//                      stand-in persona. Needs no provider, spends nothing and ignores --coach.
 //   --journey bob      Run the --cases step lists against Bob instead of the full journey.
 //                      Needs --coach real. Saves each hint beside the public dialogue it
 //                      answered. Case text is never printed, so a held-out file stays out
@@ -72,12 +75,14 @@ if (!["injected", "real", "stub"].includes(args.coach)) {
   throw new Error("--coach: injected, real or stub");
 }
 if (args.coach === "stub" && !args["demo-wait"]) throw new Error("--coach stub needs --demo-wait");
-if (!args["env-file"] && args.journey !== "lost-response") {
+if (!args["env-file"] && !["lost-response", "recorder-failure"].includes(args.journey)) {
   throw new Error("--env-file is required: persona turns need Baseten");
 }
-const JOURNEYS = ["full", "bob", "lost-response"];
+const JOURNEYS = ["full", "bob", "lost-response", "recorder-failure"];
 if (!JOURNEYS.includes(args.journey)) throw new Error(`--journey: ${JOURNEYS.join(", ")}`);
 const LOST = args.journey === "lost-response";
+const RECORDER_FAILURE = args.journey === "recorder-failure";
+const STAND_IN = LOST || RECORDER_FAILURE;
 if (!["dev", "production"].includes(args.frontend)) {
   throw new Error("--frontend: dev or production");
 }
@@ -293,6 +298,7 @@ async function onPaused({ requestId, request, responseStatusCode }) {
   const { method, url, postData, headers } = request;
   if (method === "OPTIONS") return send("Fetch.continueRequest", { requestId });
   if (LOST) return onMutation({ requestId, request, responseStatusCode });
+  if (RECORDER_FAILURE) return onScenarioRequest(requestId);
 
   if (method === "GET") {
     coachGets.push(url);
@@ -872,6 +878,96 @@ async function runLostResponse() {
   check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
 }
 
+// ---- Recorder scenario failure -----------------------------------------------------------
+
+let scenarioFault = null;
+let scenarioRequests = 0;
+
+function onScenarioRequest(requestId) {
+  scenarioRequests += 1;
+  if (scenarioFault === "network") {
+    return send("Fetch.failRequest", { requestId, errorReason: "ConnectionFailed" });
+  }
+  if (scenarioFault === "503") {
+    return send("Fetch.fulfillRequest", {
+      requestId,
+      responseCode: 503,
+      responseHeaders: [
+        { name: "Content-Type", value: "application/json" },
+        { name: "Access-Control-Allow-Origin", value: new URL(WEB).origin },
+      ],
+      body: Buffer.from('{"detail":"unavailable"}').toString("base64"),
+    });
+  }
+  return send("Fetch.continueRequest", { requestId });
+}
+
+async function runRecorderFailure() {
+  const evidence = "real-http";
+  const recorder = (id) => new URL(`/flight-recorder?sessionId=${id}`, WEB).href;
+  const failed = "Couldn't load this scenario";
+  const loading = "Loading session";
+
+  const id = await openBobSession();
+  await waitFor("the composer", () => evaluate(`Boolean(document.querySelector("textarea"))`));
+  await typeAndSend("First line.");
+  await settled(id, 1);
+  await typeAndSend("Second line.");
+  await settled(id, 2);
+  const before = await tree(id);
+
+  // A full navigation empties the query cache, so the scenario must be fetched again.
+  scenarioFault = "503";
+  await send("Page.navigate", { url: recorder(id) });
+  await waitFor("loading while the query is pending", () => has(loading), 15_000);
+  check("pending: loading is shown", true, evidence);
+  await waitFor("the scenario failure", () => has(failed), 20_000);
+  check("503: the failure is explicit", await has("Your recorded turns are safe"), evidence);
+  check("503: loading has stopped", !(await has(loading)), evidence);
+  check("503: retry is offered", (await buttonState("Try again")) === "enabled", evidence);
+
+  // A retry that also fails returns to the same state, with the button usable.
+  scenarioFault = "network";
+  let start = scenarioRequests;
+  await click("Try again");
+  await waitFor("the retry request", () => scenarioRequests > start, 10_000);
+  await waitFor("the retry to finish", async () => (await buttonState("Try again")) === "enabled", 20_000);
+  check("still failing: the retry refetched the scenario", scenarioRequests > start, evidence, `${scenarioRequests - start} requests`);
+  check("still failing: the failure stays explicit", (await has(failed)) && !(await has(loading)), evidence);
+
+  // Recovery lands on the same session and branch.
+  scenarioFault = null;
+  start = scenarioRequests;
+  await click("Try again");
+  const nodeId = selectedPath(before.nodes, headOf(before))[0].id;
+  await clickTreeNode(nodeId);
+  check("recovered: the scenario was refetched", scenarioRequests > start, evidence, `${scenarioRequests - start} requests`);
+  check("recovered: the failure is gone", !(await has(failed)) && !(await has(loading)), evidence);
+  check(
+    "recovered: same session in the URL",
+    await evaluate(`new URLSearchParams(location.search).get("sessionId") === "${id}"`),
+    evidence,
+  );
+  const after = await tree(id);
+  check("recovered: same active branch", after.active_branch_id === before.active_branch_id, evidence);
+  check("recovered: same revision", after.revision === before.revision, evidence, `${after.revision}`);
+  check("recovered: same turns", after.nodes.length === before.nodes.length, evidence, `${after.nodes.length}`);
+
+  // The recovered screen works, not only renders.
+  await click("Branch from here");
+  await waitFor("the Arena on the new branch", () => evaluate(`location.pathname === "/arena"`), 15_000);
+  await sleep(1_000);
+  const branched = await tree(id);
+  check("recovered: a branch can be made", branched.branches.length === before.branches.length + 1, evidence, `${branched.branches.length}`);
+
+  // A missing session stays a different failure from a missing scenario.
+  await send("Page.navigate", { url: recorder(999_999) });
+  await waitFor("the missing session", () => has("Couldn't load this session"), 20_000);
+  check("missing session: told apart from a scenario failure", !(await has(failed)) && !(await has(loading)), evidence);
+
+  check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
+}
+
 // ---- Bob evidence ------------------------------------------------------------------------
 //
 // Each case is a list of steps, so an independent runner can supply unseen cases:
@@ -1206,6 +1302,7 @@ function liveHintStats() {
 
 async function run() {
   if (LOST) return runLostResponse();
+  if (RECORDER_FAILURE) return runRecorderFailure();
   if (args.journey === "bob") return runBob();
   if (STUB) {
     await runLongWait();
@@ -1576,7 +1673,7 @@ async function main() {
   startLogged(
     "backend",
     PYTHON,
-    LOST
+    STAND_IN
       ? ["scripts/run_backend_stub_persona.py", "--calls-file", PERSONA_CALLS, "--host", BIND]
       : STUB
       ? [
@@ -1680,7 +1777,7 @@ async function main() {
     if (message.method === "Runtime.consoleAPICalled" && message.params.type === "error") {
       const line = message.params.args.map((a) => a.value ?? a.description).join(" ");
       // Injected failures make the browser log them; those are the point of the check.
-      if (!/ERR_FAILED|ConnectionFailed|status of (409|500)/.test(line))
+      if (!/ERR_FAILED|ConnectionFailed|status of (404|409|500|503)/.test(line))
         problems.push(line.slice(0, 200));
     }
   };
@@ -1692,7 +1789,9 @@ async function main() {
           { urlPattern, requestStage: "Request" },
           { urlPattern, requestStage: "Response" },
         ])
-      : [{ urlPattern: "*coach-hints*" }],
+      : RECORDER_FAILURE
+        ? [{ urlPattern: "*/api/scenarios/*" }]
+        : [{ urlPattern: "*coach-hints*" }],
   });
 
   let crashed = null;
@@ -1739,7 +1838,7 @@ async function main() {
     source_revision: revision.stdout.trim(),
     uncommitted_changes: dirty.stdout.trim().length > 0,
     database: "disposable, removed after this run",
-    persona: LOST ? "stand-in" : "live Baseten",
+    persona: STAND_IN ? "stand-in" : "live Baseten",
     coach_posts: coachPosts.length,
     injected_posts: coachPosts.filter((p) => p.injected).length,
     timings,
@@ -1748,6 +1847,9 @@ async function main() {
     live_hint_stats: REAL ? liveHintStats() : undefined,
     saved_hints: savedHints,
     bob: bobEvidence,
+    recorder_failure: RECORDER_FAILURE
+      ? { scenario_requests: scenarioRequests, persona_calls: personaCalls() }
+      : undefined,
     lost_response: LOST
       ? {
           persona: "stand-in, counted, no provider call",
