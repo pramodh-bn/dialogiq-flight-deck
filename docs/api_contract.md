@@ -1,5 +1,11 @@
 # DialogIQ V2 API contract
 
+CS-82 candidate: [semantic feedback v1](semantic-feedback-contract.md) defines
+the new-session-only `semantic-r1` opt-in, additive DTO fields, exact public
+evidence validation and bounded failure behavior. Ports/routes stay unchanged.
+This is an isolated implementation contract; existing runtime and historical
+sessions retain their accepted rules until the candidate is verified/integrated.
+
 Sprint 4 Bob proposal: [CS-75 behavior contract](sprint4/bob-behavior-contract.md),
 revision `s4-bob-r1`, specifies opt-in pinned Bob behavior, separate simulated
 stance and adaptive coaching. Adopted on CS-75 in CS-C441; runtime delivery,

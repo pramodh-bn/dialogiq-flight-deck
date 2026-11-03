@@ -1,6 +1,7 @@
 """Run the real API with verification-only provider attempt caps.
 
 Requires VERIFY_MAX_COACH_CALLS, VERIFY_MAX_PERSONA_CALLS and VERIFY_BUDGET_LOG.
+Semantic-feedback verification additionally requires VERIFY_MAX_FEEDBACK_CALLS.
 Every attempt reserves capacity before entering the SDK client. This includes
 automatic hints and failed calls. SDK retries remain disabled by the clients.
 No credentials, prompts or conversation text enter the budget log.
@@ -83,6 +84,28 @@ def required_cap(name: str) -> int:
     return int(value)
 
 
+def bounded_feedback_client(
+    original: Callable[..., Any],
+    budget: CallBudget,
+) -> Callable[..., Any]:
+    """Separate evaluator and coach capacity before their shared SDK boundary."""
+    from coach import CoachUnavailableError
+    from semantic_feedback import SYSTEM_PROMPT
+
+    @wraps(original)
+    def respond(*args: Any, **kwargs: Any) -> Any:
+        kind = "feedback" if kwargs.get("system_prompt") == SYSTEM_PROMPT else "coach"
+        if kind not in budget.limits:
+            raise CoachUnavailableError(
+                "No verification budget for this provider role."
+            )
+        if not budget.reserve(kind):
+            raise CoachUnavailableError("Verification provider attempt cap reached.")
+        return original(*args, **kwargs)
+
+    return respond
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root / "backend"))
@@ -94,12 +117,14 @@ def main() -> None:
         "coach": required_cap("VERIFY_MAX_COACH_CALLS"),
         "persona": required_cap("VERIFY_MAX_PERSONA_CALLS"),
     }
+    if os.environ.get("FEEDBACK_ENABLED") == "1":
+        limits["feedback"] = required_cap("VERIFY_MAX_FEEDBACK_CALLS")
     log_path = os.environ.get("VERIFY_BUDGET_LOG")
     if not log_path:
         raise ValueError("Set VERIFY_BUDGET_LOG to a new verification log path.")
     budget = CallBudget(limits, Path(log_path))
-    coach.MetaCoachClient.respond = bounded(
-        coach.MetaCoachClient.respond, budget, "coach", coach.CoachUnavailableError
+    coach.MetaCoachClient.respond = bounded_feedback_client(
+        coach.MetaCoachClient.respond, budget
     )
     persona.BasetenPersonaClient.respond = bounded(
         persona.BasetenPersonaClient.respond,

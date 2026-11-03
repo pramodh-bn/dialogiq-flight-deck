@@ -1,6 +1,6 @@
 import type { DialogApi } from "./types";
 
-// Must outlast the backend's 30-second persona timeout, so the server decides that case.
+// Outlast the 30-second persona timeout plus optional 12-second feedback deadline.
 const REQUEST_TIMEOUT_MS = 45_000;
 
 // The contract's client budget for one coach action, across all its attempts.

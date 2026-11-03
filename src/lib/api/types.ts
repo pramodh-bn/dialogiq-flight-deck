@@ -18,6 +18,7 @@ export type Scenario = {
   persona: Persona;
   // Versions a new session may opt into; empty until CS-76 registers one.
   behavior_revisions: string[];
+  feedback_revisions?: string[];
 };
 
 export type RevealedNeed = { id: string; title: string; description: string };
@@ -57,6 +58,18 @@ export type State = {
   resistance: Resistance;
   metrics: Metrics;
   conversation_progress: ConversationProgress | null;
+  feedback?: FeedbackStatus | null;
+};
+
+export type FeedbackStatus = {
+  revision: "semantic-r1";
+  status: "not_evaluated" | "ready" | "unavailable";
+  evaluated_turns: number;
+  skipped_turns: number;
+  failure_reason:
+    "timeout" | "not_configured" | "invalid_response" | "unavailable" | "saturated" | null;
+  latency_ms: number;
+  evidence: { kind: string; role: "user" | "assistant"; quote: string; need_id?: string | null }[];
 };
 
 export type PracticeSession = State & {
@@ -74,11 +87,11 @@ export type Whisper = { kind: "good" | "warn" | "tip"; text: string };
 export type QuestionType = "open" | "closed" | "statement";
 
 export type Coaching = {
-  source: "deterministic";
-  question_type: QuestionType;
-  empathy: boolean;
-  leading: boolean;
-  outcome: "breakthrough" | "deadend" | "neutral";
+  source: "deterministic" | "semantic";
+  question_type: QuestionType | "unavailable";
+  empathy: boolean | null;
+  leading: boolean | null;
+  outcome: "breakthrough" | "deadend" | "neutral" | "unavailable";
   alternatives: string[];
   whispers: Whisper[];
 };
@@ -109,7 +122,11 @@ export type Tree = {
   nodes: TurnNode[];
 };
 
-export type CreateSessionRequest = { scenario_id: number; behavior_revision?: string };
+export type CreateSessionRequest = {
+  scenario_id: number;
+  behavior_revision?: string;
+  feedback_revision?: "semantic-r1";
+};
 
 export type ChatTurnRequest = {
   session_id: number;

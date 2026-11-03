@@ -241,10 +241,12 @@ class MetaCoachClient:
         base_url: str | None = None,
         model: str | None = None,
         api_key: str | None = None,
+        *,
+        provider: str | None = None,
     ) -> None:
         # CS-80: COACH_PROVIDER picks which env names to read. An unknown
         # provider reads nothing, so the client stays inert.
-        self.provider = selected_provider()
+        self.provider = (provider or selected_provider()).strip().lower()
         env = PROVIDERS.get(self.provider)
         env_base = os.environ.get(env.base, env.default_base) if env else ""
         env_model = os.environ.get(env.model, env.default_model) if env else ""

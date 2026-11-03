@@ -21,18 +21,22 @@ META_ENV_KEYS = (
     "FIREWORKS_API_BASE",
     "FIREWORKS_MODEL",
 )
-COACH_DEMO_ENV_KEYS = ("COACH_DEMO_WAIT",)
+COACH_DEMO_ENV_KEYS = ("COACH_DEMO_WAIT", "FEEDBACK_ENABLED")
 
 
 def record_coach_calls(log_path: str) -> None:
     """Append what each coach call really sent and got back, without any of its text."""
     import coach
+    from semantic_feedback import SYSTEM_PROMPT
 
     original = coach.MetaCoachClient.respond
 
     def respond(self: coach.MetaCoachClient, **kwargs: Any) -> Any:
         start = time.monotonic()
         row = {
+            "purpose": "feedback"
+            if kwargs.get("system_prompt") == SYSTEM_PROMPT
+            else "coach",
             # CS-80: which provider and model this call actually used (never keys).
             "provider": getattr(self, "provider", None),
             "model": getattr(self, "model", None),

@@ -28,6 +28,7 @@ class ScenarioResponse(WireModel):
     description: str | None
     persona: Persona
     behavior_revisions: list[str]
+    feedback_revisions: list[str] = Field(default_factory=list)
 
 
 class RevealedNeed(WireModel):
@@ -62,6 +63,28 @@ class ConversationProgress(WireModel):
     explanation: str = Field(max_length=240)
 
 
+class FeedbackEvidence(WireModel):
+    kind: Literal["question", "acknowledgment", "pressure", "stance", "need"]
+    role: Literal["user", "assistant"]
+    quote: str = Field(min_length=1, max_length=4000)
+    need_id: str | None = None
+
+
+class FeedbackStatus(WireModel):
+    revision: Literal["semantic-r1"]
+    status: Literal["not_evaluated", "ready", "unavailable"]
+    evaluated_turns: int = Field(ge=0)
+    skipped_turns: int = Field(ge=0)
+    failure_reason: (
+        Literal[
+            "timeout", "not_configured", "invalid_response", "unavailable", "saturated"
+        ]
+        | None
+    )
+    latency_ms: int = Field(ge=0)
+    evidence: list[FeedbackEvidence]
+
+
 class State(WireModel):
     score: int = Field(ge=0, le=7, default=0)
     total_needs: Literal[7] = 7
@@ -69,6 +92,7 @@ class State(WireModel):
     resistance: Literal["guarded", "warming", "open"] = "guarded"
     metrics: Metrics = Field(default_factory=Metrics)
     conversation_progress: ConversationProgress | None = None
+    feedback: FeedbackStatus | None = None
 
 
 class Whisper(WireModel):
@@ -77,11 +101,11 @@ class Whisper(WireModel):
 
 
 class Coaching(WireModel):
-    source: Literal["deterministic"] = "deterministic"
-    question_type: Literal["open", "closed", "statement"]
-    empathy: bool
-    leading: bool
-    outcome: Literal["breakthrough", "deadend", "neutral"]
+    source: Literal["deterministic", "semantic"] = "deterministic"
+    question_type: Literal["open", "closed", "statement", "unavailable"]
+    empathy: bool | None
+    leading: bool | None
+    outcome: Literal["breakthrough", "deadend", "neutral", "unavailable"]
     alternatives: list[str]
     whispers: list[Whisper]
 
@@ -123,6 +147,7 @@ class TreeResponse(WireModel):
 class SessionCreateRequest(WireModel):
     scenario_id: Identifier
     behavior_revision: Literal["s4-bob-r1"] | None = None
+    feedback_revision: Literal["semantic-r1"] | None = None
 
 
 class ChatTurnRequest(WireModel):
