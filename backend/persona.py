@@ -257,8 +257,35 @@ class BasetenPersonaClient:
             raise PersonaInvalidResponseError(
                 f"BasetenPersonaClient request to model {self.model} failed."
             ) from exc
-        content = completion.choices[0].message.content
-        if not content or not content.strip():
+        try:
+            choices = completion.choices
+        except AttributeError:
+            choices = None
+        if not choices:
+            raise PersonaInvalidResponseError(
+                f"BasetenPersonaClient received a malformed reply from model {self.model}."
+            )
+        try:
+            first_choice = choices[0]
+        except (IndexError, KeyError, TypeError):
+            raise PersonaInvalidResponseError(
+                f"BasetenPersonaClient received a malformed reply from model {self.model}."
+            ) from None
+        message = getattr(first_choice, "message", None)
+        if message is None or not hasattr(message, "content"):
+            raise PersonaInvalidResponseError(
+                f"BasetenPersonaClient received a malformed reply from model {self.model}."
+            )
+        content = message.content
+        if content is None:
+            raise PersonaInvalidResponseError(
+                f"BasetenPersonaClient received an empty reply from model {self.model}."
+            )
+        if not isinstance(content, str):
+            raise PersonaInvalidResponseError(
+                f"BasetenPersonaClient received a malformed reply from model {self.model}."
+            )
+        if not content.strip():
             raise PersonaInvalidResponseError(
                 f"BasetenPersonaClient received an empty reply from model {self.model}."
             )
