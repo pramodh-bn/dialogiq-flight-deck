@@ -22,6 +22,17 @@ Codex is checking exact changed coach bytes with mocked tests and will review
 the generated outputs when available. Muse confirms availability but is holding
 implementation by user direction (CS-C505/509). Session watch remains active.
 
+Active-session update, about14:33UTC: CS80 is delivered (CS-C518). The
+9619b4a check used78Fireworks calls, scored53/78 but still failed B07 at4/6,
+including a first-hint invented post-stop action (CS-C519). No acceptance.
+PR36 nowa740eea broadens the stop rule to forbid recounting learner actions;
+Codex checked exact source on local87e8ec3, three focused selection/pinning
+tests plus Ruff/diff passed,0paid. Claude's new changed-candidate9afaa54
+check has a posted78-call cap; results and a12-B07-plus-sample independent
+regrade are awaited. Baseline/U1–U4 are not rerun. All broader quality misses
+and prior failures remain recorded. The session watch continues with no
+automatic15-minute cutoff.
+
 ## Latest restart checkpoint: 14:10 UTC
 
 - PR34 is merged at dev `8377b5e`; CS-C489/490 release the corrected stance
