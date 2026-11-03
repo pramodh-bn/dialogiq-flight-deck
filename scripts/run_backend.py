@@ -6,6 +6,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 from probe_persona_live import ENV_KEYS, parse_env_file
@@ -20,7 +21,7 @@ def record_coach_calls(log_path: str) -> None:
 
     original = coach.MetaCoachClient.respond
 
-    def respond(self, **kwargs):
+    def respond(self: coach.MetaCoachClient, **kwargs: Any) -> Any:
         start = time.monotonic()
         row = {
             "max_tokens": kwargs.get("max_tokens"),
