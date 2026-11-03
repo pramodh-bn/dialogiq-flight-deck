@@ -1,127 +1,356 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { getScenario } from "@/lib/scenarios";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { CoachHint } from "@/components/CoachHint";
+import {
+  api,
+  ApiError,
+  type ChatTurnRequest,
+  type ChatTurnResponse,
+  type Resistance,
+  type Whisper,
+} from "@/lib/api";
+import {
+  applyTurn,
+  branchChain,
+  failureAction,
+  failureMessage,
+  reconcileAction,
+  retainedActions,
+  type RetainedAction,
+  isStalled,
+  stanceChange,
+  type StanceChange,
+  refreshSession,
+  scenarioQuery,
+  sessionQuery,
+  storeSession,
+  treeQuery,
+  useCoach,
+} from "@/lib/practice";
+
+type ArenaSearch = { sessionId?: number | undefined; scenarioId?: number | undefined };
+
+function positiveId(value: unknown): number | undefined {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
 
 export const Route = createFileRoute("/arena")({
+  // Explicit undefined: the router keeps the raw value of any key left out here.
+  validateSearch: (search: Record<string, unknown>): ArenaSearch => ({
+    sessionId: positiveId(search["sessionId"]),
+    scenarioId: positiveId(search["scenarioId"]),
+  }),
+  // Only the Hub starts a run, so there is nothing to show without a session.
+  beforeLoad: ({ search }) => {
+    if (!search.sessionId) throw redirect({ to: "/" });
+  },
   head: () => ({
     meta: [
       { title: "Simulation Arena — DialogIQ" },
-      { name: "description", content: "Practice a hard conversation live with an AI persona and real-time coaching." },
+      {
+        name: "description",
+        content: "Practice a hard conversation live with an AI persona and real-time coaching.",
+      },
       { property: "og:title", content: "Simulation Arena — DialogIQ" },
-      { property: "og:description", content: "Practice a hard conversation live with an AI persona and real-time coaching." },
+      {
+        property: "og:description",
+        content: "Practice a hard conversation live with an AI persona and real-time coaching.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>): { scenario?: string | undefined; session?: string | undefined } => ({
-    scenario: typeof s["scenario"] === "string" ? s["scenario"] : undefined,
-    session: typeof s["session"] === "string" ? s["session"] : undefined,
-  }),
   component: Arena,
 });
 
-type Msg = { from: "bob" | "you"; text: string };
-type Whisper = { kind: "warn" | "good" | "tip"; text: string };
+type Msg = { from: "persona" | "you"; text: string };
 
-const CLOSED = /^(do|does|did|is|are|was|were|can|could|will|would|should|have|has|had|won't|don't|isn't|aren't)\b/i;
-const OPEN = /^(what|how|why|tell me|help me|walk me|describe|in what)\b/i;
-const EMPATHY = /(understand|sounds like|i hear|feel|frustrat|appreciate|makes sense|tough|hard)/i;
-
-const bobReplies = {
-  closed: [
-    "Yeah. I guess. Is that all?",
-    "No. I already told you it wasn't my fault.",
-    "Sure, fine. Whatever you think.",
-  ],
-  open: [
-    "Honestly? The design team kept changing specs and I was the one left holding the bag.",
-    "I don't know… I felt like nobody noticed how much I was juggling until it fell apart.",
-    "If I'm being real, I stopped asking for help because it never came.",
-  ],
-  empathy: [
-    "…Yeah. It's been rough. Thanks for actually saying that.",
-    "I appreciate that. I didn't think you'd see it that way.",
-  ],
+const RESISTANCE: Record<Resistance, { value: number; label: string }> = {
+  guarded: { value: 90, label: "Guarded" },
+  warming: { value: 55, label: "Warming" },
+  open: { value: 20, label: "Open" },
 };
 
-const hints = [
-  "Try: “What's been the hardest part of this quarter for you?”",
-  "Name the emotion: “It sounds like you've felt stretched thin.”",
-  "Invite ownership: “What would a good next step look like from your side?”",
-];
+const STANCE_CHANGE: Record<StanceChange, string> = {
+  less_guarded: "Less guarded than the turn before.",
+  more_guarded: "More guarded than the turn before.",
+  unchanged: "Unchanged from the turn before.",
+};
 
 function Arena() {
-  const { scenario: scenarioId } = Route.useSearch();
-  const sc = getScenario(scenarioId);
-  const [msgs, setMsgs] = useState<Msg[]>([{ from: "bob", text: sc.opener }]);
-  const [streaming, setStreaming] = useState("");
+  const { sessionId, scenarioId } = Route.useSearch();
+  if (!sessionId) return null;
+  // Keyed so that switching sessions cannot carry over a draft, reply or whisper.
+  return <ArenaSession key={sessionId} sessionId={sessionId} scenarioId={scenarioId} />;
+}
+
+function ArenaSession({
+  sessionId,
+  scenarioId,
+}: {
+  sessionId: number;
+  scenarioId: number | undefined;
+}) {
+  const client = useQueryClient();
+  const session = useQuery(sessionQuery(sessionId));
+  const tree = useQuery(treeQuery(sessionId));
+  const scenario = useQuery({
+    ...scenarioQuery(session.data?.scenario_id ?? 0),
+    enabled: session.data !== undefined,
+  });
+  const retained = useMemo(
+    () => retainedActions<ChatTurnRequest>(`turn:${sessionId}`),
+    [sessionId],
+  );
+  const checkedRetained = useRef(false);
+  const sending = useRef(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const [typing, setTyping] = useState<{ nodeId: number; text: string; shown: number } | null>(
+    null,
+  );
   const [input, setInput] = useState("");
   const [mic, setMic] = useState(false);
-  const [counts, setCounts] = useState({ open: 0, closed: 0, empathy: 0, turns: 0 });
-  const [whispers, setWhispers] = useState<Whisper[]>([
-    { kind: "tip", text: "Bob is avoidant. Lead with curiosity, not accusations." },
-  ]);
-  const [hintIdx, setHintIdx] = useState(0);
+  const [notes, setNotes] = useState<Whisper[]>([]);
   const feed = useRef<HTMLDivElement>(null);
+
+  const typingNodeId = typing?.nodeId;
+  useEffect(() => {
+    if (typingNodeId === undefined) return;
+    const id = setInterval(() => {
+      setTyping((t) => (!t || t.shown + 2 >= t.text.length ? null : { ...t, shown: t.shown + 2 }));
+    }, 25);
+    return () => clearInterval(id);
+  }, [typingNodeId]);
+
+  // The two reads can straddle a change made elsewhere; never render a mix of them.
+  const sessionRevision = session.data?.revision;
+  const treeRevision = tree.data?.revision;
+  const fetching = session.isFetching || tree.isFetching;
+  useEffect(() => {
+    if (sessionRevision === undefined || treeRevision === undefined) return;
+    if (sessionRevision !== treeRevision && !fetching && !sending.current) {
+      void refreshSession(client, sessionId);
+    }
+  }, [client, fetching, sessionId, sessionRevision, treeRevision]);
+
+  const chain = useMemo(() => {
+    if (!tree.data) return [];
+    const branch = tree.data.branches.find((b) => b.id === tree.data.active_branch_id);
+    return branchChain(tree.data.nodes, branch?.head_node_id ?? null);
+  }, [tree.data]);
+
+  const persona = session.data?.persona ?? scenario.data?.persona;
+  const msgs: Msg[] = useMemo(() => {
+    const opening: Msg[] = persona ? [{ from: "persona", text: persona.opening_message }] : [];
+    const turns = chain.flatMap((n): Msg[] => [
+      { from: "you", text: n.user_text },
+      {
+        from: "persona",
+        text:
+          n.id === typing?.nodeId
+            ? n.character_text.slice(0, typing.shown) + "▍"
+            : n.character_text,
+      },
+    ]);
+    return [...opening, ...turns];
+  }, [chain, persona, typing]);
 
   useEffect(() => {
     feed.current?.scrollTo({ top: feed.current.scrollHeight, behavior: "smooth" });
-  }, [msgs, streaming]);
+  }, [msgs, pending]);
 
-  const busy = streaming !== "";
+  const busy = pending !== null || typing !== null;
+  const ready = session.data !== undefined && tree.data !== undefined && persona !== undefined;
 
-  function streamBob(text: string) {
-    let i = 0;
-    const id = setInterval(() => {
-      i += 2;
-      setStreaming(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(id);
-        setStreaming("");
-        setMsgs((m) => [...m, { from: "bob", text }]);
-      }
-    }, 25);
+  // Coach requests bind to a position both reads agree on, never a mix of the two.
+  const headId = chain.at(-1)?.id ?? null;
+  const coachPosition = useMemo(() => {
+    if (!session.data || !tree.data) return null;
+    const { active_branch_id: branchId, active_head_node_id, revision } = session.data;
+    if (revision !== tree.data.revision || branchId !== tree.data.active_branch_id) return null;
+    if (active_head_node_id !== headId) return null;
+    return { branchId, headId, revision };
+  }, [headId, session.data, tree.data]);
+  const coach = useCoach({
+    sessionId,
+    position: coachPosition,
+    stalled: isStalled(chain),
+    hold: pending !== null,
+  });
+
+  function showTurn(res: ChatTurnResponse) {
+    storeSession(client, res.session);
+    client.setQueryData(["tree", sessionId], (prev: typeof tree.data) =>
+      prev ? applyTurn(prev, res) : prev,
+    );
+    void refreshSession(client, sessionId);
   }
 
-  function send() {
-    const t = input.trim();
-    if (!t || busy) return;
-    setInput("");
-    setMsgs((m) => [...m, { from: "you", text: t }]);
-    const isOpen = OPEN.test(t);
-    const isClosed = !isOpen && CLOSED.test(t);
-    const isEmp = EMPATHY.test(t);
-    setCounts((c) => ({
-      open: c.open + (isOpen ? 1 : 0),
-      closed: c.closed + (isClosed ? 1 : 0),
-      empathy: c.empathy + (isEmp ? 1 : 0),
-      turns: c.turns + 1,
+  // The outcome is unknown, so read the truth back. A turn that committed returns through
+  // its exact replay. Otherwise the draft comes back, and sending it reuses the same request.
+  async function reconcile(entry: RetainedAction<ChatTurnRequest>, message: string) {
+    const outcome = await reconcileAction(
+      entry,
+      () => api.getSession(sessionId).then((s) => s.revision),
+      () => api.sendTurn(entry.request, entry.key),
+    );
+    if (outcome.kind === "recovered") {
+      retained.settle(entry);
+      showTurn(outcome.result);
+      return;
+    }
+    if (outcome.kind === "state_changed") retained.settle(entry);
+    setInput(entry.action);
+    setNotes([
+      {
+        kind: "warn",
+        text: outcome.kind === "state_changed" ? failureMessage(outcome.error) : message,
+      },
+    ]);
+    void refreshSession(client, sessionId);
+  }
+
+  // A reload or a trip to the recorder can leave a turn unresolved.
+  useEffect(() => {
+    if (session.data === undefined || checkedRetained.current || sending.current) return;
+    checkedRetained.current = true;
+    const entry = retained.peek();
+    if (!entry) return;
+    sending.current = true;
+    setPending(entry.action);
+    void reconcile(
+      entry,
+      "Your last message may not have sent. It's still here to send again.",
+    ).finally(() => {
+      sending.current = false;
+      setPending(null);
+    });
+    // reconcile only reads stable values, and this runs once per visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retained, session.data]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || busy || sending.current || !session.data) return;
+    sending.current = true;
+    const current = session.data;
+    const entry = retained.begin(text, () => ({
+      session_id: sessionId,
+      branch_id: current.active_branch_id,
+      parent_node_id: current.active_head_node_id,
+      expected_revision: current.revision,
+      user_message: text,
     }));
-    const w: Whisper[] = [];
-    if (isClosed) w.push({ kind: "warn", text: "⚠️ Closed question detected. Try rephrasing as an open invitation." });
-    if (isOpen) w.push({ kind: "good", text: "✓ Open question — Bob's resistance is dropping." });
-    if (isEmp) w.push({ kind: "good", text: "✓ Empathy marker used. Trust +1." });
-    if (!w.length) w.push({ kind: "tip", text: "Statement detected. Follow up with a question to keep Bob talking." });
-    setWhispers((prev) => [...w, ...prev].slice(0, 6));
-    const pool = isEmp ? bobReplies.empathy : isOpen ? bobReplies.open : bobReplies.closed;
-    setTimeout(() => streamBob(pool[Math.floor(Math.random() * pool.length)] ?? pool[0]!), 500);
+    setInput("");
+    setPending(text);
+    setNotes([]);
+    try {
+      const res = await api.sendTurn(entry.request, entry.key);
+      retained.settle(entry);
+      showTurn(res);
+      setTyping({ nodeId: res.turn_id, text: res.character_response, shown: 0 });
+    } catch (error) {
+      if (failureAction(error) === "retry") {
+        await reconcile(entry, failureMessage(error));
+      } else {
+        retained.settle(entry);
+        setInput(text);
+        setNotes([{ kind: "warn", text: failureMessage(error) }]);
+        void refreshSession(client, sessionId);
+      }
+    } finally {
+      sending.current = false;
+      setPending(null);
+    }
   }
 
-  const asked = counts.open + counts.closed;
-  const openPct = asked ? Math.round((counts.open / asked) * 100) : 0;
-  const empathy = counts.turns ? Math.min(100, Math.round((counts.empathy / counts.turns) * 100 + counts.open * 5)) : 0;
-  const resistance = Math.max(10, 90 - counts.open * 15 - counts.empathy * 12 + counts.closed * 8);
+  if (session.error || tree.error) {
+    const missing = session.error instanceof ApiError && session.error.status === 404;
+    return (
+      <ArenaMessage
+        title={missing ? "Session not found" : "Couldn't reach the simulator"}
+        detail={
+          missing
+            ? "This session no longer exists. Start a new one from the dashboard."
+            : "Check that the simulator is running, then try again."
+        }
+      >
+        {!missing && (
+          <button
+            onClick={() => void refreshSession(client, sessionId)}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow"
+          >
+            Try again
+          </button>
+        )}
+      </ArenaMessage>
+    );
+  }
+
+  if (scenarioId && session.data && session.data.scenario_id !== scenarioId) {
+    return (
+      <ArenaMessage
+        title="This link points at a different scenario"
+        detail="The session belongs to another scenario, so it was not opened here."
+      >
+        <Link
+          to="/arena"
+          search={{ sessionId }}
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow"
+        >
+          Open the session
+        </Link>
+      </ArenaMessage>
+    );
+  }
+
+  if (scenario.error) {
+    return (
+      <ArenaMessage
+        title="Couldn't load this scenario"
+        detail="The persona details are unavailable, so the session was not opened."
+      />
+    );
+  }
+
+  const metrics = session.data?.metrics;
+  const asked = metrics ? metrics.open_questions + metrics.closed_questions : 0;
+  const openPct = metrics ? Math.round(metrics.open_question_ratio * 100) : 0;
+  const empathy = metrics?.turns ? Math.round((metrics.empathy_turns / metrics.turns) * 100) : 0;
+  const resistance = RESISTANCE[session.data?.resistance ?? "guarded"];
+  const progress = session.data?.conversation_progress;
+  const score = session.data?.score ?? 0;
+  const total = session.data?.total_needs ?? 7;
+
+  const change = stanceChange(chain);
+  const turnFeedback: Whisper[] = chain.at(-1)?.coaching.whispers ?? [];
+  const earlierHint = coach.pending ? coach.earlier : undefined;
+  const earlierTurn = chain.find((n) => n.id === earlierHint?.head_node_id)?.turn_number;
 
   return (
     <div className="flex h-screen flex-col bg-background bg-ambient">
       <header className="border-b border-border bg-background/70 backdrop-blur-xl">
         <div className="flex items-center gap-4 px-6 py-3">
-          <Link to="/" className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">← Dashboard</Link>
+          <Link
+            to="/"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            ← Dashboard
+          </Link>
           <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-accent">Simulation Arena · Live</p>
-            <h1 className="truncate font-semibold">{sc.title}</h1>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-accent">
+              Simulation Arena{progress ? "" : " · Live"}
+            </p>
+            <h1 className="truncate font-semibold">{scenario.data?.title ?? "Loading session…"}</h1>
           </div>
-          <Link to="/flight-recorder" className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5">
+          <Link
+            to="/flight-recorder"
+            search={{ sessionId }}
+            className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5"
+          >
             End Simulation &amp; View Flight Tree
           </Link>
         </div>
@@ -130,70 +359,223 @@ function Arena() {
       <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
         <section className="bento flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center gap-3 border-b border-border p-4">
-            <div className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-lg font-bold ring-2 ring-accent/40">{sc.persona.name[0]}</div>
+            <div className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-lg font-bold ring-2 ring-accent/40">
+              {persona?.initials ?? "…"}
+            </div>
             <div>
-              <p className="font-semibold">{sc.persona.name} <span className="font-normal text-muted-foreground">· {sc.persona.role}</span></p>
+              <p className="font-semibold">
+                {persona?.name ?? "Loading…"}{" "}
+                {persona && (
+                  <span className="font-normal text-muted-foreground">· {persona.role}</span>
+                )}
+              </p>
               <div className="mt-1 flex gap-1.5">
-                {sc.persona.traits.map((t) => (
-                  <span key={t} className="rounded-md border border-border bg-secondary/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{t}</span>
+                {(persona?.tags ?? []).map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-md border border-border bg-secondary/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                  >
+                    {t}
+                  </span>
                 ))}
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Wave active={busy || mic} />
-              <span className="font-mono text-[10px] text-muted-foreground">{busy ? "BOB SPEAKING" : mic ? "LISTENING" : "IDLE"}</span>
+              <span className="font-mono text-[10px] uppercase text-muted-foreground">
+                {busy ? `${persona?.name ?? "Persona"} speaking` : mic ? "Listening" : "Idle"}
+              </span>
             </div>
           </div>
 
+          {persona && (
+            <p className="border-b border-border bg-secondary/30 px-4 py-2 text-xs text-muted-foreground">
+              <span className="font-semibold text-secondary-foreground">Your situation: </span>
+              {persona.public_context}
+            </p>
+          )}
+
           <div ref={feed} className="flex-1 space-y-4 overflow-y-auto p-5">
-            {msgs.map((m, i) => <Bubble key={i} m={m} />)}
-            {busy && <Bubble m={{ from: "bob", text: streaming + "▍" }} />}
+            {!ready && <p className="text-sm text-muted-foreground">Loading session…</p>}
+            {msgs.map((m, i) => (
+              <Bubble key={i} m={m} />
+            ))}
+            {pending !== null && (
+              <>
+                <Bubble m={{ from: "you", text: pending }} />
+                <Bubble m={{ from: "persona", text: "▍" }} />
+              </>
+            )}
           </div>
 
           <div className="border-t border-border p-3">
-            <div className="flex items-end gap-2">
-              <button onClick={() => setMic((v) => !v)} aria-label="Toggle microphone"
-                className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border transition-colors ${mic ? "border-accent bg-accent/15 text-accent" : "border-border text-muted-foreground hover:text-foreground"}`}>
-                🎙
-              </button>
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={1}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                placeholder="Respond to Bob…"
-                className="max-h-32 min-h-10 flex-1 resize-none rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-primary/60" />
-              <button onClick={() => { setWhispers((p) => [{ kind: "tip" as const, text: "💡 " + hints[hintIdx % hints.length] }, ...p].slice(0, 6)); setHintIdx((h) => h + 1); }}
-                className="h-10 shrink-0 rounded-lg border border-border px-3 text-sm text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent">
-                Get Hint
-              </button>
-              <button onClick={send} disabled={!input.trim() || busy}
-                className="h-10 shrink-0 rounded-lg bg-brand px-4 text-sm font-semibold text-primary-foreground glow transition-opacity disabled:opacity-40">
-                Send Response
-              </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="flex min-w-0 flex-1 items-end gap-2">
+                <button
+                  onClick={() => setMic((v) => !v)}
+                  aria-label="Toggle microphone"
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border transition-colors ${mic ? "border-accent bg-accent/15 text-accent" : "border-border text-muted-foreground hover:text-foreground"}`}
+                >
+                  🎙
+                </button>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  rows={1}
+                  maxLength={4000}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                  placeholder={`Respond to ${persona?.name ?? "the persona"}…`}
+                  className="max-h-32 min-h-10 min-w-0 flex-1 resize-none rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-primary/60"
+                />
+              </div>
+              <div className="flex shrink-0 items-end justify-end gap-2">
+                <button
+                  disabled={!coachPosition || pending !== null || coach.pending || coach.exhausted}
+                  onClick={coach.requestHelp}
+                  className={`h-10 shrink-0 rounded-lg border border-border px-3 text-secondary-foreground transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40 ${coach.exhausted ? "max-w-36 text-[11px] leading-tight" : "text-sm"}`}
+                >
+                  {coach.exhausted
+                    ? "Two approaches saved for this turn"
+                    : coach.pending
+                      ? "Getting a hint…"
+                      : coach.canRetry
+                        ? "Try again"
+                        : coach.hints.length
+                          ? "Try another approach"
+                          : "Get a hint"}
+                </button>
+                <button
+                  onClick={() => void send()}
+                  disabled={!input.trim() || busy || !ready}
+                  className="h-10 shrink-0 rounded-lg bg-brand px-4 text-sm font-semibold text-primary-foreground glow transition-opacity disabled:opacity-40"
+                >
+                  Send Response
+                </button>
+              </div>
             </div>
           </div>
         </section>
 
-        <aside className="bento flex min-h-0 flex-col overflow-hidden">
+        <aside className="bento flex min-h-0 flex-col overflow-y-auto">
           <div className="border-b border-border p-4">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-accent">Live AI Coach</p>
-            <h2 className="font-semibold">Whispers</h2>
+            <h2 className="font-semibold">Conversation coach</h2>
+          </div>
+          <div className="space-y-3 border-b border-border p-4">
+            <CoachHint
+              hints={coach.hints}
+              earlier={earlierHint?.hint}
+              earlierLabel={earlierTurn ? `From turn ${earlierTurn}` : "From the opening"}
+              pending={coach.pending}
+              failure={coach.failure}
+            />
+            {turnFeedback.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">Turn feedback</p>
+                {turnFeedback.map((w, i) => (
+                  <WhisperNote key={i} whisper={w} />
+                ))}
+              </div>
+            )}
+            {notes.map((w, i) => (
+              <WhisperNote key={i} whisper={w} />
+            ))}
           </div>
           <div className="space-y-4 p-4">
-            <Meter label="Open vs. Closed Ratio" value={openPct} hint={`${counts.open} open · ${counts.closed} closed`} tone="accent" />
-            <Meter label="Empathy Index" value={empathy} hint={`${counts.empathy} empathy markers`} tone="primary" />
-            <Meter label="Bob's Resistance" value={resistance} hint="Lower is better" tone="warning" />
-          </div>
-          <div className="flex-1 space-y-2 overflow-y-auto border-t border-border p-4">
-            {whispers.map((w, i) => (
-              <div key={i} className={`rounded-lg px-3 py-2 text-sm ring-1 transition-all ${
-                w.kind === "warn" ? "bg-warning/10 text-warning ring-warning/30"
-                : w.kind === "good" ? "bg-success/10 text-success ring-success/30"
-                : "bg-secondary/50 text-secondary-foreground ring-border"}`}>
-                {w.text}
+            <Meter
+              label="Needs Uncovered"
+              value={Math.round((score / total) * 100)}
+              display={`${score}/${total}`}
+              hint="Scored by the judge on this branch"
+              tone="accent"
+            />
+            <Meter
+              label="Open vs. Closed Ratio"
+              value={openPct}
+              hint={
+                asked
+                  ? `${metrics?.open_questions} open · ${metrics?.closed_questions} closed`
+                  : "No questions yet"
+              }
+              tone="accent"
+            />
+            <Meter
+              label="Empathy Index"
+              value={empathy}
+              hint={`${metrics?.empathy_turns ?? 0} empathy markers`}
+              tone="primary"
+            />
+            {progress ? (
+              <div data-testid="stance">
+                <div className="flex items-baseline justify-between text-xs">
+                  <p className="font-semibold text-muted-foreground">
+                    {persona?.name ?? "Persona"}'s simulated stance
+                  </p>
+                  <p className="font-mono text-foreground">{RESISTANCE[progress.stance].label}</p>
+                </div>
+                {change && <p className="mt-1 text-xs text-foreground">{STANCE_CHANGE[change]}</p>}
+                <p className="mt-1 text-xs text-muted-foreground">{progress.explanation}</p>
               </div>
-            ))}
+            ) : (
+              <Meter
+                label={`${persona?.name ?? "Persona"}'s Resistance`}
+                value={resistance.value}
+                display={resistance.label}
+                hint="Lower is better"
+                tone="warning"
+              />
+            )}
           </div>
         </aside>
       </div>
+    </div>
+  );
+}
+
+function ArenaMessage({
+  title,
+  detail,
+  children,
+}: {
+  title: string;
+  detail: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="grid h-screen place-items-center bg-background bg-ambient p-6">
+      <div className="bento max-w-md space-y-3 p-6 text-center">
+        <h1 className="font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+        <div className="flex justify-center gap-2">
+          {children}
+          <Link
+            to="/"
+            className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            ← Dashboard
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WhisperNote({ whisper }: { whisper: Whisper }) {
+  return (
+    <div
+      className={`rounded-lg px-3 py-2 text-sm ring-1 ${
+        whisper.kind === "warn"
+          ? "bg-warning/10 text-warning ring-warning/30"
+          : whisper.kind === "good"
+            ? "bg-success/10 text-success ring-success/30"
+            : "bg-secondary/50 text-secondary-foreground ring-border"
+      }`}
+    >
+      {whisper.text}
     </div>
   );
 }
@@ -202,23 +584,40 @@ function Bubble({ m }: { m: Msg }) {
   const you = m.from === "you";
   return (
     <div className={`flex ${you ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${you ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-foreground"}`}>
+      <div
+        className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${you ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-foreground"}`}
+      >
         {m.text}
       </div>
     </div>
   );
 }
 
-function Meter({ label, value, hint, tone }: { label: string; value: number; hint: string; tone: "accent" | "primary" | "warning" }) {
+function Meter({
+  label,
+  value,
+  display,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: number;
+  display?: string;
+  hint: string;
+  tone: "accent" | "primary" | "warning";
+}) {
   const bar = tone === "accent" ? "bg-accent" : tone === "primary" ? "bg-primary" : "bg-warning";
   return (
     <div>
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono font-semibold">{value}%</span>
+        <span className="font-mono font-semibold">{display ?? `${value}%`}</span>
       </div>
       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
-        <div className={`h-full rounded-full ${bar} transition-all duration-700`} style={{ width: `${value}%` }} />
+        <div
+          className={`h-full rounded-full ${bar} transition-all duration-700`}
+          style={{ width: `${value}%` }}
+        />
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
     </div>
@@ -229,8 +628,14 @@ function Wave({ active }: { active: boolean }) {
   return (
     <div className="flex h-6 items-center gap-0.5">
       {Array.from({ length: 12 }).map((_, i) => (
-        <span key={i} className={`w-1 rounded-full bg-accent ${active ? "animate-pulse" : "opacity-30"}`}
-          style={{ height: active ? `${30 + ((i * 37) % 70)}%` : "20%", animationDelay: `${i * 80}ms` }} />
+        <span
+          key={i}
+          className={`w-1 rounded-full bg-accent ${active ? "animate-pulse" : "opacity-30"}`}
+          style={{
+            height: active ? `${30 + ((i * 37) % 70)}%` : "20%",
+            animationDelay: `${i * 80}ms`,
+          }}
+        />
       ))}
     </div>
   );

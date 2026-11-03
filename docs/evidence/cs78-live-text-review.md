@@ -1,0 +1,13 @@
+# Codex CS-78 live text review
+
+Source bc7c887; integrated product fbfd47f; 3 shared capture cases, 11 hints and 7 persona replies. All public openings, selected-branch dialogue, actual prior hints and approach/example/reason fields were read. This was not blinded and is not a new held-out or baseline comparison.
+
+Workflow: 7/7 passed, reload made no extra POST and retained hint IDs, fork retained source branch/nodes, actual suggested line was sent verbatim and received a substantive reply. All11 coach calls were Fireworks accounts/fireworks/models/muse-spark-open, stop; no fallback/provider error. Budget admitted11coach/7persona under16/10, blocked0. No Meta calls and no rerun.
+
+Text finding: hint6, natural-stall, session1/branch2/head4/attempt2, prior hints4/5, says: "You mentioned the spec changed again after you sent the Q3 update". The public opening says an update was sent. Selected branch Bob says dates slipped after the spec changed, then asks what is locked versus moving. Neither this dialogue nor public_context ("You are meeting to discuss missed deadlines.") dates the spec change relative to the update. Earlier hints4/5 do not establish that order. Flag unsupported chronology, not demonstrated falsehood. Its own reason claiming not to add facts is not grounding evidence.
+
+Other limits observed: hints5/6 hand clarity questions back to Bob rather than settling what is locked; all seven live persona turns remained guarded. This small live journey therefore does not itself establish natural stance movement or a usefulness rate. The separate stand-in stance tests establish controlled unscored movement; older Claude live examples remain attributed to Claude. No private content/instruction disclosure, injection compliance or unauthorized promise was found in these11 reviewed hints. This is a finite inspection, not a guarantee. Explicit-stop behavior was not newly sampled in these3 live cases; Muse's earlier6/6 result stays separate.
+
+Actual application hint waits: first median6.450s/max8.843s (7), second median7.825s/max9.812s (4). Taking the maximum cumulative stalled_total_ms per case/branch/head yields7 stalled positions: median15.445s/max20.068s. Client telemetry duration median6.28s/max9.67s excludes some application overhead. These figures do not replace the accepted earlier13.7s/22.0s medians and83.9s maximum, or establish a causal speed improvement.
+
+User acceptance C532 waived named quality/latency misses and prohibited further tuning before submission. No prompt edit or extra paid call was made for this new finding. Independent review and the user's final verdict/explicit treatment of this additional chronology limit remain open. Scripts/config are in draftPR41; report is attached on CS78.

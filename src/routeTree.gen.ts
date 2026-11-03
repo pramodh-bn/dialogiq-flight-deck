@@ -13,8 +13,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as FlightRecorderRouteImport } from './routes/flight-recorder'
-import { Route as ScenariosRouteImport } from './routes/scenarios'
-import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -36,32 +34,18 @@ const FlightRecorderRoute = FlightRecorderRouteImport.update({
   path: '/flight-recorder',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ScenariosRoute = ScenariosRouteImport.update({
-  id: '/scenarios',
-  path: '/scenarios',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSessionsRoute = ApiSessionsRouteImport.update({
-  id: '/api/sessions',
-  path: '/api/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
-  '/scenarios': typeof ScenariosRoute
-  '/api/sessions': typeof ApiSessionsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
-  '/scenarios': typeof ScenariosRoute
-  '/api/sessions': typeof ApiSessionsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,34 +53,13 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
-  '/scenarios': typeof ScenariosRoute
-  '/api/sessions': typeof ApiSessionsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/analytics'
-    | '/arena'
-    | '/flight-recorder'
-    | '/scenarios'
-    | '/api/sessions'
+  fullPaths: '/' | '/analytics' | '/arena' | '/flight-recorder'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/analytics'
-    | '/arena'
-    | '/flight-recorder'
-    | '/scenarios'
-    | '/api/sessions'
-  id:
-    | '__root__'
-    | '/'
-    | '/analytics'
-    | '/arena'
-    | '/flight-recorder'
-    | '/scenarios'
-    | '/api/sessions'
+  to: '/' | '/analytics' | '/arena' | '/flight-recorder'
+  id: '__root__' | '/' | '/analytics' | '/arena' | '/flight-recorder'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -104,8 +67,6 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ArenaRoute: typeof ArenaRoute
   FlightRecorderRoute: typeof FlightRecorderRoute
-  ScenariosRoute: typeof ScenariosRoute
-  ApiSessionsRoute: typeof ApiSessionsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -138,20 +99,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FlightRecorderRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/scenarios': {
-      id: '/scenarios'
-      path: '/scenarios'
-      fullPath: '/scenarios'
-      preLoaderRoute: typeof ScenariosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sessions': {
-      id: '/api/sessions'
-      path: '/api/sessions'
-      fullPath: '/api/sessions'
-      preLoaderRoute: typeof ApiSessionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -160,8 +107,6 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ArenaRoute: ArenaRoute,
   FlightRecorderRoute: FlightRecorderRoute,
-  ScenariosRoute: ScenariosRoute,
-  ApiSessionsRoute: ApiSessionsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,0 +1,24 @@
+{
+  "scenario": "Bob: Defensive Team Member",
+  "closed_score": 0,
+  "closed_threshold": "<=3/7",
+  "good_score": 7,
+  "good_threshold": ">=6/7",
+  "good_progression": [1, 2, 3, 4, 5, 6, 7],
+  "sessions": {
+    "closed": 1,
+    "good": 2
+  },
+  "original_branch": 2,
+  "alternate_branch": 3,
+  "alternate_score": 3,
+  "branches": 2,
+  "good_tree_nodes": 8,
+  "original_nodes_sha256": "f5c839a1493979037c88d548f2dcd2146be7a69b0d12273d42deff62453b5069",
+  "replay": "passed",
+  "reload": "passed",
+  "rewind_inclusive": "passed",
+  "original_transcript_and_score": "preserved",
+  "new_turn_requests": 15,
+  "mode": "external real HTTP (provider configured by server)"
+}
