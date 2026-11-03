@@ -182,74 +182,19 @@ actual review or user waiver, never silence. Contract checks require no model
 calls. Downstream coding begins after delivery; unrelated PR21–25 review does
 not depend on this contract. No live demo migration/restart or main promotion.
 
-## Intended outcome
+## File ownership and sequence
 
-Bob can respond to useful conversational moves beyond scored questions. The
-learner receives a truthful explanation of simulated conversational progress,
-separate from the fixed seven-need reveal count. The coach can suggest an answer,
-reflection, clarification, feasible action, question or respectful pause.
-
-Clarity about priorities, an explicit bounded commitment and a response to a
-request for support are candidate observable signals. Their exact definitions
-must come from independent cases, not matching the user's example wording.
-Agreement is not required, and continued disagreement must remain possible.
-No field should claim measured psychological trust or empathy.
-
-## Boundaries to preserve
-
-- New behavior applies only to explicitly versioned new Bob configurations.
-  Existing sessions, saved hints and historical states remain pinned. Other
-  personas retain their existing rules. Deploying code does not migrate data.
-- Seven needs remain fixed. The coach receives public dialogue and approved
-  public context, never need identifiers, scoring stems, private persona
-  instructions, private traits or classifier internals.
-- Supportive statements may affect simulated guardedness without revealing a
-  need. Blame must not be praised as support. The mechanism remains bounded,
-  inspectable and honestly limited rather than described as sentiment truth.
-- Direct requests should be addressed before further probing. A question is
-  optional. Suggested promises require authority and ability to honor them;
-  inferred motives must remain uncertain. Explicit and implicit disengagement
-  must be respected.
-- Branch state derives from its own ancestors. Rewind/fork restores that
-  branch's pinned state; sibling turns must not affect hints or transitions.
-
-## Interface inventory and decisions still required
-
-| Area | Existing boundary | Decision before adoption |
+| Owner | Scope | Sequence |
 | --- | --- | --- |
-| Progress | Reveal count and simulated resistance currently coupled | Public guardedness states, initial state, bounded signals, transition/recovery rules and honest explanations |
-| Judge feedback | Public question/empathy/leading feedback | Bob-only versioned supportive-versus-blaming rules from CS-74 contrasts; preserve old results |
-| Session snapshot | Scenario configuration pinned at creation | New Bob version opt-in and public pinned-persona projection for CS-56 |
-| Coach input | Latest six branch exchanges and up to two earlier hints | Whether approved public state/context is needed; no automatic context expansion |
-| Coach output | `approach`, `example`, `reason` JSON | Adaptive move wording within current lengths, or justified versioned length delta |
-| Persistence | Saved branch state, hints and request identities | Exact fields/migration need, atomicity and replay compatibility if fields change |
-| Timing/errors | Separate normal and demo modes | Preserve adopted settings unless baseline evidence justifies an explicit delta |
-| UI | Need count, simulated resistance and coach cards | Explain distinct outcomes without numeric trust claims or exposing private scoring cues |
+| Codex | judge.py and versioned judge fixtures | CS72 before CS76; serialize judge edits |
+| Codex | schemas.py, practice.py, snapshot/API tests, API docs | CS56 public pinned persona/capability fields then CS76 opt-in/state; coordinate shared DTO tests |
+| Muse | coach_context.py, coach_service.py, coach.py, provider tests | CS73; coordinate evaluator flag with Claude |
+| Muse | persona.py, persona_fixtures.json, provider tests | CS57 error correction first, CS79 variant after CS76 interface |
+| Claude | frontend types/mock adapter, Arena/Recorder/Hub, browser harness, evaluator | CS70/74 delivered; CS55/58/graph preparation independent; CS77 follows adopted API/coach/persona work |
+| Codex | integration and delivered-journey documentation | CS78 combined candidate and CS52 truthful instructions |
 
-## Ownership and edit sequence
-
-Codex owns judge, practice service, models, migrations, schemas and API contract.
-Muse owns persona generation, persona fixtures and coach files. Claude owns
-frontend and browser/evaluation harnesses.
-
-Sequence: CS-70 evidence capture; CS-74 independent cases and baseline; CS-75
-adopted contract; CS-72 narrow feedback correction before CS-76 judge changes.
-Coordinate CS-56 snapshot/API edits with that sequence. Muse's CS-57 persona
-error correction must remain separately owned and compatible with later persona
-work. No concurrent uncoordinated edits to shared files.
-
-## Evidence required before implementation approval
-
-1. Reference delivered CS-74 shared cases, held-out identifiers and baseline.
-   Implementation owners must not inspect private held-out contents.
-2. Specify exact versioned fields and transition examples, normal/demo error,
-   timeout/fallback and idempotency behavior, plus historical compatibility.
-3. Predeclare qualitative acceptance and baseline-derived latency targets, finite
-   paid-call plan, rerun checkpoints and stop policy. No calls authorized here.
-4. Obtain actual Claude/Muse review of affected interfaces or an explicit user
-   waiver. Posting a request or elapsed time is not approval.
-5. Check schema/examples, links and diff for the contract. Runtime tasks later
-   verify production-built frontend 5173 with backend 8080 on disposable data,
-   keeping unit/mock, HTTP, injected and live-provider evidence distinct.
-
-The running user demo must remain untouched during this preparation.
+Do not edit another owner's active files without a handoff. No live demo
+restart/migration, main promotion, voice or unrelated repository cleanup.
+Contract checks are document/schema/example/link checks only; runtime delivery
+requires a production-built real-client/backend check on disposable data, with
+mock/HTTP/injected/live-provider evidence attributed separately.
