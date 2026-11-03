@@ -16,6 +16,8 @@ export type Scenario = {
   title: string;
   description: string | null;
   persona: Persona;
+  // Versions a new session may opt into; empty until CS-76 registers one.
+  behavior_revisions: string[];
 };
 
 export type RevealedNeed = { id: string; title: string; description: string };
@@ -44,6 +46,8 @@ export type PracticeSession = State & {
   active_branch_id: number;
   active_head_node_id: number | null;
   revision: number;
+  // The public persona pinned at creation (CS-56); prefer it to the catalog's.
+  persona: Persona;
 };
 
 export type Whisper = { kind: "good" | "warn" | "tip"; text: string };

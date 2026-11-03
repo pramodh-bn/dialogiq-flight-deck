@@ -167,19 +167,22 @@ Arrays may be empty. Objects must not expose ORM rows wholesale.
 
 | DTO          | Fields and meanings                                                                                                                                                                                                  |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scenario     | `id`, `title` string, `description` string or null, `persona` Persona                                                                                                                                                |
+| Scenario     | `id`, `title` string, `description` string or null, `persona` Persona, `behavior_revisions` string array (CS-56; empty until CS-76 registers a variant)                                                                                                                                                |
 | Persona      | `name`, `role`, `initials`, `opening_message`, `public_context` (strings); `tags` string array of public display traits; `practice_hints` string array of generic communication advice                               |
 | RevealedNeed | `id` string (scenario-local `n1`…`n7`), `title` string, `description` string; only actually revealed entries                                                                                                         |
 | Metrics      | `turns`, `open_questions`, `closed_questions`, `empathy_turns` (nonnegative integers); `open_question_ratio` number 0–1, open/(open+closed), 0 when denominator is 0                                                 |
 | Coaching     | `source` literal `deterministic`; `question_type` `open`/`closed`/`statement`; `empathy` and `leading` booleans; `outcome` `breakthrough`/`deadend`/`neutral`; `alternatives` string array; `whispers` Whisper array |
 | Whisper      | `kind` `good`/`warn`/`tip`, `text` string                                                                                                                                                                            |
 | State        | `score` integer 0–7, `total_needs` literal 7, `revealed_needs` RevealedNeed array in n1…n7 order, `resistance` `guarded`/`warming`/`open`, `metrics` Metrics                                                         |
-| Session      | `id`, `scenario_id`, `active_branch_id`, `active_head_node_id` (node ID or null), `revision`, plus all State fields                                                                                                  |
+| Session      | `id`, `scenario_id`, `active_branch_id`, `active_head_node_id` (node ID or null), `revision`, `persona` Persona pinned at creation (CS-56), plus all State fields                                                                                                  |
 | Node         | `id`, `session_id`, `parent_id` (node ID or null), `turn_number` (chain depth, starts 1), `user_text`, `character_text` (strings), `coaching` Coaching, plus all State fields                                        |
 | Branch       | `id`, `session_id`, `fork_node_id` (node ID or null), `head_node_id` (node ID or null), plus all State fields                                                                                                        |
 | Tree         | `session_id`, `revision`, `active_branch_id`, `branches` Branch array, `nodes` Node array                                                                                                                            |
 
 Persona.tags is required display data, never private personality instructions.
+Session.persona is projected field by field from the persona pinned when the
+session was created, so the UI keeps showing who generated the conversation
+after catalog maintenance; new sessions take the current catalog persona.
 No timestamps, branch names, resistance percentages or empathy percentages
 are required in the DTOs. Use actual metrics and resistance enum
 instead of inventing numeric model outputs. Node and branch State snapshots
@@ -207,7 +210,8 @@ Example detail (illustrative ID; use returned IDs):
     "opening_message": "You wanted to see me? If this is about Q3, I already sent the update.",
     "public_context": "You are meeting to discuss missed deadlines.",
     "practice_hints": ["Invite their perspective before proposing a solution."]
-  }
+  },
+  "behavior_revisions": []
 }
 ```
 
@@ -259,6 +263,15 @@ Initial Session example:
   "active_branch_id": 31,
   "active_head_node_id": null,
   "revision": 0,
+  "persona": {
+    "name": "Bob",
+    "role": "Team member",
+    "initials": "B",
+    "tags": ["Guarded", "Performance review"],
+    "opening_message": "You wanted to see me? If this is about Q3, I already sent the update.",
+    "public_context": "You are meeting to discuss missed deadlines.",
+    "practice_hints": ["Invite their perspective before proposing a solution."]
+  },
   "score": 0,
   "total_needs": 7,
   "revealed_needs": [],
@@ -359,6 +372,15 @@ Complete success example:
     "active_branch_id": 31,
     "active_head_node_id": 81,
     "revision": 1,
+    "persona": {
+      "name": "Bob",
+      "role": "Team member",
+      "initials": "B",
+      "tags": ["Guarded", "Performance review"],
+      "opening_message": "You wanted to see me? If this is about Q3, I already sent the update.",
+      "public_context": "You are meeting to discuss missed deadlines.",
+      "practice_hints": ["Invite their perspective before proposing a solution."]
+    },
     "score": 1,
     "total_needs": 7,
     "revealed_needs": [

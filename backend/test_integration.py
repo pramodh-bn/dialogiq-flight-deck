@@ -15,6 +15,7 @@ from sqlalchemy import Engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
+import practice
 from database import create_sqlite_engine
 from judge import evaluate
 from main import create_app
@@ -118,7 +119,14 @@ def test_scenario_session_hub_cors_and_idempotent_seed(harness: Harness) -> None
     assert len(scenarios) == 4
     assert len({s["persona"]["name"] for s in scenarios}) == 4
     for scenario in scenarios:
-        assert set(scenario) == {"id", "title", "description", "persona"}
+        assert set(scenario) == {
+            "id",
+            "title",
+            "description",
+            "persona",
+            "behavior_revisions",
+        }
+        assert scenario["behavior_revisions"] == []
         assert client.get(f"/api/scenarios/{scenario['id']}").json() == scenario
     first = start(client)
     second = start(client)
@@ -585,3 +593,64 @@ def test_complete_catalog_and_existing_sessions_keep_legacy_dash_rules(
     second = send(client, new, "I hear you — what has this been like?")
     assert second["node"]["coaching"]["question_type"] == "statement"
     assert second["session"]["score"] == 0
+
+
+def test_session_keeps_its_pinned_public_persona_after_catalog_changes(
+    harness: Harness,
+) -> None:
+    """CS-56: the session shows the persona it was generated with, not the catalog's."""
+    client, engine, recorder = harness
+    old = start(client)
+    original = old["persona"]
+    assert (
+        original == client.get(f"/api/scenarios/{old['scenario_id']}").json()["persona"]
+    )
+    with DbSession(engine) as db:
+        scenario = db.get(Scenario, old["scenario_id"])
+        scenario.public_persona = {
+            **scenario.public_persona,
+            "name": "Updated catalog persona",
+            "opening_message": "Updated catalog opening",
+        }
+        db.commit()
+
+    turn = send(client, old)
+    rewound = client.post(
+        f"/api/sessions/{old['id']}/branches",
+        json={
+            "source_branch_id": turn["session"]["active_branch_id"],
+            "rewind_to_node_id": None,
+            "expected_revision": turn["session"]["revision"],
+        },
+        headers=headers(),
+    ).json()
+    listed = client.get(f"/api/sessions?scenario_id={old['scenario_id']}").json()
+    for session in (
+        client.get(f"/api/sessions/{old['id']}").json(),
+        turn["session"],
+        rewound["session"],
+        listed[0],
+    ):
+        assert session["persona"] == original
+    assert recorder.calls[-1]["brief"].character_name == original["name"]
+
+    new = start(client)
+    assert new["persona"]["name"] == "Updated catalog persona"
+    assert new["persona"]["opening_message"] == "Updated catalog opening"
+    assert set(new["persona"]) == set(original)
+
+
+def test_session_persona_exposes_only_allowlisted_fields(harness: Harness) -> None:
+    client, engine, _ = harness
+    session = start(client)
+    with DbSession(engine) as db:
+        pinned = db.get(Session, session["id"])
+        stored = {**pinned.scenario_config["persona"], "private_note": "never public"}
+        stand_in = Session(scenario_config={"persona": stored, "needs": ["x"]})
+        projected = practice.pinned_persona(stand_in).model_dump()
+    assert "private_note" not in projected
+    assert projected == session["persona"]
+    body = client.get(f"/api/sessions/{session['id']}").text
+    assert "private_note" not in body and "never public" not in body
+    for private in ("needs", "persona_traits", "system_prompt"):
+        assert private not in client.get(f"/api/sessions/{session['id']}").json()

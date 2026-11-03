@@ -55,6 +55,7 @@ export const mockScenarios: Scenario[] = [
       "You wanted to see me? If this is about the Q3 thing, I already sent the update.",
       "You are meeting to discuss missed deadlines.",
     ),
+    behavior_revisions: [],
   },
   {
     id: 2,
@@ -67,6 +68,7 @@ export const mockScenarios: Scenario[] = [
       "Is this about my phone again? I said I'd do it later.",
       "You are checking in about homework and phone use.",
     ),
+    behavior_revisions: [],
   },
   {
     id: 3,
@@ -79,6 +81,7 @@ export const mockScenarios: Scenario[] = [
       "Thanks for making time. I'm fine, it's just been a lot lately.",
       "You are holding a 1:1 about workload.",
     ),
+    behavior_revisions: [],
   },
   {
     id: 4,
@@ -91,6 +94,7 @@ export const mockScenarios: Scenario[] = [
       "Before we start, the new pricing is not really negotiable.",
       "You are negotiating a price increase.",
     ),
+    behavior_revisions: [],
   },
 ];
 
@@ -324,6 +328,7 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
         sessions.set(id, {
           id,
           scenario_id: req.scenario_id,
+          persona: structuredClone(mockScenarios.find((s) => s.id === req.scenario_id)!.persona),
           active_branch_id: branch.id,
           revision: 0,
         });
