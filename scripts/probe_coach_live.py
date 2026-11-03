@@ -62,7 +62,16 @@ from coach_context import (
     serialize_coach_context,
 )
 
-ENV_KEYS = ("META_MODEL_API_KEY", "META_MODEL_API_BASE", "META_MODEL_API_MODEL")
+# CS-80: coach env for either provider (see backend/coach.py COACH_ENV_KEYS).
+ENV_KEYS = (
+    "META_MODEL_API_KEY",
+    "META_MODEL_API_BASE",
+    "META_MODEL_API_MODEL",
+    "COACH_PROVIDER",
+    "FIREWORKS_API_KEY",
+    "FIREWORKS_API_BASE",
+    "FIREWORKS_MODEL",
+)
 MAYA_SCENARIO_TITLE = "Teenage Daughter: Homework Friction"
 CALLS_PER_CASE = 5
 PASS_MINIMUM = 9
@@ -275,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
 
     client = MetaCoachClient()
     if not client.configured:
-        print("Meta client not configured; no calls made.", file=sys.stderr)
+        print("Coach client not configured; no calls made.", file=sys.stderr)
         return 2
     calls: list[dict] = []
     for case, system_prompt, context_json in payloads:

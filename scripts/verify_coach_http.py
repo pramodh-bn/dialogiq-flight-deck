@@ -27,7 +27,16 @@ import urllib.request
 from pathlib import Path
 from uuid import uuid4
 
-META_ENV_KEYS = ("META_MODEL_API_KEY", "META_MODEL_API_BASE", "META_MODEL_API_MODEL")
+# CS-80: coach env for either provider (see backend/coach.py COACH_ENV_KEYS).
+META_ENV_KEYS = (
+    "META_MODEL_API_KEY",
+    "META_MODEL_API_BASE",
+    "META_MODEL_API_MODEL",
+    "COACH_PROVIDER",
+    "FIREWORKS_API_KEY",
+    "FIREWORKS_API_BASE",
+    "FIREWORKS_MODEL",
+)
 REQUEST_TIMEOUT = 30.0
 
 
