@@ -44,12 +44,31 @@ class Metrics(WireModel):
     open_question_ratio: float = Field(ge=0, le=1, default=0.0)
 
 
+class ConversationProgress(WireModel):
+    """Bob's simulated stance on s4-bob-r1 sessions; not a measure of trust."""
+
+    behavior_revision: Literal["s4-bob-r1"]
+    stance: Literal["guarded", "warming", "open"]
+    last_signal: Literal[
+        "initial",
+        "clarity",
+        "support",
+        "acknowledgment",
+        "repair",
+        "pressure",
+        "boundary",
+        "none",
+    ]
+    explanation: str = Field(max_length=240)
+
+
 class State(WireModel):
     score: int = Field(ge=0, le=7, default=0)
     total_needs: Literal[7] = 7
     revealed_needs: list[RevealedNeed] = Field(default_factory=list)
     resistance: Literal["guarded", "warming", "open"] = "guarded"
     metrics: Metrics = Field(default_factory=Metrics)
+    conversation_progress: ConversationProgress | None = None
 
 
 class Whisper(WireModel):
@@ -103,6 +122,7 @@ class TreeResponse(WireModel):
 
 class SessionCreateRequest(WireModel):
     scenario_id: Identifier
+    behavior_revision: Literal["s4-bob-r1"] | None = None
 
 
 class ChatTurnRequest(WireModel):

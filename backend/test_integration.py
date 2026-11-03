@@ -126,7 +126,8 @@ def test_scenario_session_hub_cors_and_idempotent_seed(harness: Harness) -> None
             "persona",
             "behavior_revisions",
         }
-        assert scenario["behavior_revisions"] == []
+        expected = ["s4-bob-r1"] if scenario["title"].startswith("Bob:") else []
+        assert scenario["behavior_revisions"] == expected
         assert client.get(f"/api/scenarios/{scenario['id']}").json() == scenario
     first = start(client)
     second = start(client)

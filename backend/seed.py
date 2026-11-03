@@ -10,7 +10,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from judge import RULESET_REVISION
+from judge import BOB_FEEDBACK_REVISION, RULESET_REVISION
 from models import Scenario, User
 from need_catalog import NEEDS_BY_TITLE
 from schemas import Persona
@@ -57,19 +57,28 @@ def seed_scenarios(db: Session) -> int:
     return added
 
 
-def pin_scenario(scenario: Scenario) -> dict:
-    """Private immutable session configuration, never a public response DTO."""
+def pin_scenario(scenario: Scenario, behavior_revision: str | None = None) -> dict:
+    """Private immutable session configuration, never a public response DTO.
+
+    An s4-bob-r1 opt-in pins the Bob judge revision and records the behavior
+    revision; the catalog row itself is never modified.
+    """
     if len(scenario.needs) != 7 or not scenario.public_persona:
         raise ValueError("Scenario has no supported seven-need configuration.")
-    return copy.deepcopy(
-        {
-            "revision": scenario.config_revision,
-            "persona": scenario.public_persona,
-            "needs": scenario.needs,
-            "persona_traits": scenario.persona_traits or "",
-            "system_prompt": scenario.system_prompt or "",
-        }
-    )
+    revision = scenario.config_revision
+    if behavior_revision is not None:
+        catalog = revision.split(":", 1)[1] if ":" in revision else revision
+        revision = f"{BOB_FEEDBACK_REVISION}:{catalog}"
+    config = {
+        "revision": revision,
+        "persona": scenario.public_persona,
+        "needs": scenario.needs,
+        "persona_traits": scenario.persona_traits or "",
+        "system_prompt": scenario.system_prompt or "",
+    }
+    if behavior_revision is not None:
+        config["behavior_revision"] = behavior_revision
+    return copy.deepcopy(config)
 
 
 def get_or_create_demo_user(db: Session) -> User:
