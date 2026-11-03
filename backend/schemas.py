@@ -27,6 +27,7 @@ class ScenarioResponse(WireModel):
     title: str
     description: str | None
     persona: Persona
+    behavior_revisions: list[str]
 
 
 class RevealedNeed(WireModel):
@@ -72,6 +73,7 @@ class SessionResponse(State):
     active_branch_id: Identifier
     active_head_node_id: Identifier | None
     revision: Revision
+    persona: Persona
 
 
 class NodeResponse(State):

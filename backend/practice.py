@@ -23,6 +23,7 @@ from schemas import (
     ChatTurnRequest,
     ChatTurnResponse,
     NodeResponse,
+    Persona,
     ScenarioResponse,
     SessionResponse,
     State,
@@ -71,13 +72,31 @@ def state_at(db: DbSession, session_id: int, node_id: int | None) -> dict:
     return copy.deepcopy(node.state) if node else State().model_dump()
 
 
+def behavior_revisions(scenario: Scenario) -> list[str]:
+    """Versions a new session may opt into (contract s4-bob-r1).
+
+    Empty until CS-76 registers the complete Bob variant, so no client opts in early.
+    """
+    return []
+
+
 def scenario_dto(scenario: Scenario) -> dict:
     return ScenarioResponse(
         id=scenario.id,
         title=scenario.title,
         description=scenario.description,
         persona=scenario.public_persona,
+        behavior_revisions=behavior_revisions(scenario),
     ).model_dump()
+
+
+def pinned_persona(session: Session) -> Persona:
+    """The public persona pinned at creation, copied field by field from the allowlist.
+
+    The pinned config also holds private needs and prompts; only Persona fields leave.
+    """
+    pinned = session.scenario_config["persona"]
+    return Persona(**{field: pinned[field] for field in Persona.model_fields})
 
 
 def session_dto(db: DbSession, session: Session) -> dict:
@@ -88,6 +107,7 @@ def session_dto(db: DbSession, session: Session) -> dict:
         active_branch_id=branch.id,
         active_head_node_id=branch.head_node_id,
         revision=session.revision,
+        persona=pinned_persona(session),
         **state_at(db, session.id, branch.head_node_id),
     ).model_dump()
 
