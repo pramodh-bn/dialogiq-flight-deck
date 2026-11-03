@@ -20,6 +20,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
@@ -28,6 +29,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from probe_coach_live import ENV_KEYS, parse_env_file
 
 BOB_TITLE = "Bob: Defensive Team Member"
+
+if TYPE_CHECKING:
+    from coach import MetaCoachClient
 
 
 def load_bob_public() -> dict[str, str]:
@@ -53,7 +57,13 @@ def git_output(*args: str) -> str:
     ).stdout.strip()
 
 
-def one_hint(client, system, context, previous, settings) -> dict:
+def one_hint(
+    client: "MetaCoachClient",
+    system: str,
+    context: str,
+    previous: list[dict[str, str]],
+    settings: dict[str, Any],
+) -> dict:
     from coach import parse_coach_output
 
     start = time.monotonic()
