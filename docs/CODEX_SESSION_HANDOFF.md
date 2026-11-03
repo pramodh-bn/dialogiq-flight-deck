@@ -1,7 +1,59 @@
 # Codex session restart and Megillah handoff
 
-Updated by Codex, November 3, 2026, about 14:10 UTC. This is a restart
+Updated by Codex, November 3, 2026, about 18:50 UTC. This is a restart
 checkpoint, not a live status feed. Refresh Megillah and GitHub before acting.
+
+## Current checkpoint: final owner review pending
+
+- User clarified the session watch has no automatic15-minute cutoff (C511).
+  Keep checking in the active turn with45-second waits; Windows scheduling
+  stays disabled. Do not imply monitoring during the14:43–17:43 tool gap.
+  Muse covered review/integration by explicit C522/C535 handoffs, then Codex
+  resumed final verification. No new subagents were spawned.
+- Integrated product dev: `fbfd47f5f8fa0850b85103321614abae5af440b3`.
+  Muse merged PR39/36/35; Codex merged PR38/40/42. CS73/77/79/80/52 delivered.
+  UserC532 accepted named coach misses with no further prompt tuning; this
+  was an owner waiver, not passing every target or carrying old unseen data.
+- CS78 is active. Codex checked backend277, frontend110, TypeScript/Arena
+  ESLint, evidence helpers17, and call-budget tests9. Fresh Python3.12.10
+  setup/jiter/pip check and npm ci succeeded. Production browser: final
+  Bob/legacy38, lost-response32; unchanged Recorder15 and graph75 earlier.
+  Actual backend8080/frontend5173, disposable databases; stand-in and live
+  evidence remain separate. Physical pinch/device zoom remains untested.
+- Visual QA exposed a390px composer defect missed by earlier stance-only
+  checks. Failing controlA94:26px textarea, Send right418.9px. Claude PR42
+  fixed it; independentA95 passes38/38, textarea284px, Send right361px.
+- Automated final live run:11Fireworks +7Baseten,0Meta/0fallback/0blocked,
+  workflow7/7. Sourcebc7c887 product bytes equal integratedfbfd47f. A96 has
+  full public selected-branch transcripts/prior hints; A97 has the text review.
+  First hint median6.450s, second7.825s, max9.812s. These do not erase the
+  earlier accepted13.7s/22.0s medians,83.9s max or69/60cap breach.
+- New text flag: hint6 asserts spec change occurred after the update was sent;
+  public dialogue establishes no such order. Claude independently agrees
+  (C561). No prompt edit/new paid rerun. All live stances stayed guarded;
+  controlled unscored movement is separate stand-in evidence. Do not claim
+  all quality gates passed or final learner acceptance.
+- Verification artifacts/scripts are published on Codex draftPR41, head
+  `3032fd3b96809e28bd670ad3555c4c87224295e9`. User is asked asynchronously
+  for the final demo verdict/treatment of the chronology limit and explicit
+  authorization to merge this Codex-authored PR. Do not infer approval from
+  the preselected choice or elapsed time. PR37 remains a separate draft.
+- A fresh production review preview is running at127.0.0.1:8080/5173.
+  Backend exec session85115, frontend53571; product sourcefbfd47f, compiled
+  with paired demo-wait flags, separate review DB under the Codex worktree's
+  `cs78-evidence.local/review/`. Verify process health rather than assuming it.
+  Only original budget remainder is allocated:5coach/3persona at startup,
+  zero at18:48. Read the budget log before quoting current remaining counts.
+  Original automated11/7 plus manual remainder cannot exceed16/10.
+  Do not reset the budget file or restart with a fresh allowance.
+- Do not publish manual-review conversation text automatically. Only scripted
+  synthetic public cases were committed. Root demo DB/env/main are untouched.
+  Next owner: Pramodh for verdict; Codex then records the exact decision,
+  merges PR41 only if explicitly authorized, and closes CS78 only when its
+  remaining acceptance gate is resolved. Continue the session watch meanwhile.
+
+The sections below retain earlier historical checkpoints; current state above
+supersedes their old open-PR, ownership and failed-candidate status.
 
 User clarification, November 3 at about14:14UTC: "schedule" means recurring
 checks within the active Codex session. Resume that watch without the former
