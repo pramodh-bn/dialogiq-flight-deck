@@ -103,6 +103,24 @@ def test_already_revealed_need_is_not_new_discovery() -> None:
         feedback.checked(decision(), prior)
 
 
+@pytest.mark.parametrize("identifier", ["L1", "P99", "the hidden rubric"])
+def test_model_cannot_forge_persona_source_ids(identifier: str) -> None:
+    model = feedback.ModelDecision(
+        question_type="statement",
+        question_evidence="",
+        acknowledgment=False,
+        acknowledgment_evidence="",
+        pressure=False,
+        pressure_evidence="",
+        stance_signal="none",
+        stance_change=0,
+        stance_evidence="",
+        revealed_need=feedback.ModelNeed(need_id="n1", persona_evidence=identifier),
+    )
+    with pytest.raises(ValueError):
+        feedback.resolve_evidence(model, context())
+
+
 def test_unavailable_does_not_count_as_zero_observation() -> None:
     prior, _ = feedback.evaluate(
         initial_state(), LEARNER, PERSONA, [], NEEDS, lambda _: decision()
@@ -177,10 +195,22 @@ def test_one_attempt_strict_provider_request(monkeypatch: pytest.MonkeyPatch) ->
 
         def respond(self, **kwargs: object) -> CoachCompletion:
             calls.append(kwargs)
-            return CoachCompletion(decision().model_dump_json(), "stop", 100, 20)
+            model = feedback.ModelDecision(
+                question_type="statement",
+                question_evidence="",
+                acknowledgment=False,
+                acknowledgment_evidence="",
+                pressure=False,
+                pressure_evidence="",
+                stance_signal="support",
+                stance_change=1,
+                stance_evidence="L1",
+                revealed_need=feedback.ModelNeed(need_id="n1", persona_evidence="P1"),
+            )
+            return CoachCompletion(model.model_dump_json(), "stop", 100, 20)
 
     monkeypatch.setattr(feedback, "MetaCoachClient", Client)
-    assert feedback.real_provider(context()) == decision()
+    assert feedback.real_provider(context()) == decision(stance_quote=LEARNER)
     assert len(calls) == 1
     assert calls[0]["timeout"] == feedback.TIMEOUT_SECONDS
     assert calls[0]["reasoning_effort"] == "low"

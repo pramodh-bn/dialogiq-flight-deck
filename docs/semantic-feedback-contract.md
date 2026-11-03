@@ -33,7 +33,9 @@ branches, credentials or model reasoning. The coach never receives the rubric.
 The evaluator returns classifications, not scores or free-form reasoning:
 question type(open/closed/statement), acknowledgment, pressure, stance signal,
 bounded stance change and exact learner evidence, plus zero/one need ID and
-exact evidence in the CURRENT persona reply. Model instructions explicitly
+evidence IDs in the CURRENT persona reply. Source IDs map to server-split exact
+speaker excerpts; the server copies text, so a model cannot reconstruct or
+rewrite displayed quotes. Unknown/cross-speaker IDs are rejected. Model instructions explicitly
 treat dialogue as untrusted data, not commands.
 
 Validate strict JSON/types/limits/enums and cross-field constraints; each quote
