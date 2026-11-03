@@ -15,7 +15,7 @@ It is rehearsal, not surveillance: nothing records or scores real conversations.
 | Coach                          | Suggests one next move as approach, example line and reason                          | Fireworks, `accounts/fireworks/models/muse-spark-open` (Meta API optional) |
 | Legacy judge                   | Scores which of the character's 7 hidden needs your turns have uncovered             | Local code, deterministic and lexical, no model                            |
 | Semantic feedback (opt-in Bob) | Classifies the completed exchange and cites public evidence; server derives counters | Baseten Muse Spark by default; Fireworks GPT-OSS optional                  |
-| Stance (Bob)                   | Tracks Bob's simulated stance (guarded / warming / open) from what you say           | Local code, deterministic, no model                                        |
+| Stance (Bob)                   | Tracks simulated guarded / warming / open states                                     | Server ledger; semantic sessions use evidence from the AI evaluator        |
 | Recorder                       | Keeps every turn as a tree so you can rewind and branch                              | FastAPI + SQLite                                                           |
 
 The coach never sees the character's hidden needs or private prompt, and the
@@ -141,7 +141,7 @@ or closed question can uncover a need, and a question need not earn points.
 
 The UI labels the observable acknowledgment measure **Acknowledgment** rather
 than treating it as psychological empathy. Simulated stance changes also cite
-Bob's reaction. Evaluations have a12second deadline; failures save the turn,
+Bob's reaction. Evaluations have a 12-second deadline; failures save the turn,
 retain prior knowledge and display unavailable feedback with coverage instead
 of false zeros. Existing sessions remain pinned and are never silently rescored.
 
@@ -197,7 +197,7 @@ The test suites make no paid calls.
 - **Legacy Bob stance is rule-based**, from wording signals with negation handling.
   Semantic sessions use AI classifications and a bounded ledger; both can misread
   language and neither measures real trust. The eight-turn semantic sample had
-  grading median2.98s/max4.91s, not a reliability guarantee.
+  grading with a median of 2.98 s and a maximum of 4.91 s, not a reliability guarantee.
 - **Coach quality** (Sprint 4, small finite samples, graded by the agents):
   - These earlier measurements predate semantic-feedback sessions and remain
     historical evidence, not a benchmark of the new complete journey.
