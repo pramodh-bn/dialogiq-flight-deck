@@ -133,6 +133,10 @@ backend/dialogiq.db, exercises the actual TS HTTP client, and stops its server.
 It assumes the four demo scenarios; use a fresh checkout database for this check.
 It makes no model requests. If Node is not on PATH, pass its absolute path to --node.
 
+> **Superseded launch recipe (historical).** The ports below are from Sprint 1
+> and conflict with the current setup (backend 8080, frontend 5173). Use the
+> [README](../README.md) for current run steps.
+
 For the interactive demo, run these in separate terminals:
 
 ```powershell
