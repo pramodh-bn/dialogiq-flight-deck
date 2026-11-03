@@ -57,6 +57,7 @@ def record_coach_calls(log_path: str) -> None:
             row.update(
                 ok=False,
                 error=type(error).__name__,
+                upstream_status=getattr(error.__cause__, "status_code", None),
                 finish=getattr(error, "finish_reason", None),
                 completion_tokens=getattr(error, "completion_tokens", None),
                 reasoning_tokens=getattr(error, "reasoning_tokens", None),

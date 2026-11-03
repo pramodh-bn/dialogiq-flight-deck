@@ -183,8 +183,8 @@ def test_one_attempt_strict_provider_request(monkeypatch: pytest.MonkeyPatch) ->
     assert feedback.real_provider(context()) == decision()
     assert len(calls) == 1
     assert calls[0]["timeout"] == feedback.TIMEOUT_SECONDS
-    assert "reasoning_effort" not in calls[0]
-    assert calls[0]["max_tokens"] == 2048
+    assert calls[0]["reasoning_effort"] == "low"
+    assert calls[0]["max_tokens"] == 4096
     assert "coach" not in context()
 
 

@@ -22,7 +22,7 @@ from coach import (
 )
 
 REVISION = "semantic-r1"
-DEFAULT_MODEL = "accounts/fireworks/models/llama-v3p3-70b-instruct"
+DEFAULT_MODEL = "accounts/fireworks/models/gpt-oss-120b"
 TIMEOUT_SECONDS = 12.0
 SLOTS = threading.BoundedSemaphore(2)
 logger = logging.getLogger("dialogiq.feedback")
@@ -98,8 +98,9 @@ def real_provider(context: dict) -> Decision:
             system_prompt=SYSTEM_PROMPT,
             context_json=json.dumps(context, ensure_ascii=False),
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,
             timeout=TIMEOUT_SECONDS,
+            reasoning_effort="low",
             response_format={"type": "json_object"},
         )
         logger.info(

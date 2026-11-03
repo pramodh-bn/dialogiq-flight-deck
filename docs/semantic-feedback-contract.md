@@ -48,7 +48,7 @@ pauses need not increase score. Repeated offers/thanks do not require movement.
 One evaluation attempt after a successful persona call, before immutable node
 commit; no DB transaction held across either call. Fireworks via existing
 server-only provider configuration, separate prompt/client request. SDK retries0,
-16384token cap, low reasoning, HTTP12s and total12s deadline, two daemon worker
+4096token cap, low reasoning, JSONobject mode, HTTP12s and total12s deadline, two daemon worker
 slots. Timeout/invalid/unconfigured/upstream/saturation persist unavailable with
 prior known values and increment skipped coverage; the actual persona turn
 still commits. Late results cannot change saved nodes. No automatic evaluation
@@ -73,3 +73,9 @@ then branch/reload/replay, unavailable/timeout/late-result behavior and coverage
 Keep a separate reviewer-authored sample for the eventual frozen candidate.
 Real8080/5173/disposableDB/browser and bounded provider measurements are separate
 gates from unit/mock checks. No live-readiness/delivery claim before those gates.
+Default evaluator is Fireworks `accounts/fireworks/models/gpt-oss-120b`, verified
+present in the account's live models list. `FEEDBACK_MODEL` is an explicit
+server-only override, independent from the Muse coach and Baseten persona.
+The first Muse evaluator trial timed out2/2. A catalog-listed Llama model was
+not present in the account list and rejected2requests; neither trial is a
+successful grading result. Keep those failures with later evidence.

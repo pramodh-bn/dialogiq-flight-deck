@@ -25,6 +25,7 @@ def main() -> None:
     parser.add_argument("--prior-report", type=Path, required=True)
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--max-calls", type=int, choices=(1, 2, 3, 4), default=4)
     args = parser.parse_args()
     if args.out.exists():
         raise ValueError("Refusing to replace prior evidence.")
@@ -34,7 +35,9 @@ def main() -> None:
             os.environ[key] = values[key]
     os.environ["FEEDBACK_MODEL"] = feedback.DEFAULT_MODEL
     args.out.mkdir(parents=True)
-    budget = CallBudget({"feedback": 4, "coach": 0}, args.out / "budget.jsonl")
+    budget = CallBudget(
+        {"feedback": args.max_calls, "coach": 0}, args.out / "budget.jsonl"
+    )
     coach.MetaCoachClient.respond = bounded_feedback_client(
         coach.MetaCoachClient.respond, budget
     )
@@ -90,7 +93,7 @@ def main() -> None:
         "cases": [],
     }
     failures = 0
-    for index, context in enumerate(contexts[:4]):
+    for index, context in enumerate(contexts[: args.max_calls]):
         started = time.monotonic()
         row = {
             "case": index + 1,
