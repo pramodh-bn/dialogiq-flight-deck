@@ -301,7 +301,12 @@ describe("contract examples", () => {
     (m) => JSON.parse(m[1]!) as Record<string, unknown>,
   );
   const example = (field: string) => examples.find((e) => field in e)!;
-  const keys = (value: object) => Object.keys(value).sort();
+  // s4-bob-r1 additions, which docs/api_contract.md gains with CS-56 and CS-76.
+  const additive = new Set(["behavior_revisions", "conversation_progress"]);
+  const keys = (value: object) =>
+    Object.keys(value)
+      .filter((key) => !additive.has(key))
+      .sort();
 
   it("matches the turn response example field for field", async () => {
     const { res } = await startTurn(createMockApi());

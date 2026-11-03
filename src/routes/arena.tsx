@@ -20,6 +20,8 @@ import {
   retainedActions,
   type RetainedAction,
   isStalled,
+  stanceChange,
+  type StanceChange,
   refreshSession,
   scenarioQuery,
   sessionQuery,
@@ -70,6 +72,12 @@ const RESISTANCE: Record<Resistance, { value: number; label: string }> = {
   guarded: { value: 90, label: "Guarded" },
   warming: { value: 55, label: "Warming" },
   open: { value: 20, label: "Open" },
+};
+
+const STANCE_CHANGE: Record<StanceChange, string> = {
+  less_guarded: "Less guarded than the turn before.",
+  more_guarded: "More guarded than the turn before.",
+  unchanged: "Unchanged from the turn before.",
 };
 
 function Arena() {
@@ -134,7 +142,7 @@ function ArenaSession({
     return branchChain(tree.data.nodes, branch?.head_node_id ?? null);
   }, [tree.data]);
 
-  const persona = scenario.data?.persona;
+  const persona = session.data?.persona ?? scenario.data?.persona;
   const msgs: Msg[] = useMemo(() => {
     const opening: Msg[] = persona ? [{ from: "persona", text: persona.opening_message }] : [];
     const turns = chain.flatMap((n): Msg[] => [
@@ -311,9 +319,11 @@ function ArenaSession({
   const openPct = metrics ? Math.round(metrics.open_question_ratio * 100) : 0;
   const empathy = metrics?.turns ? Math.round((metrics.empathy_turns / metrics.turns) * 100) : 0;
   const resistance = RESISTANCE[session.data?.resistance ?? "guarded"];
+  const progress = session.data?.conversation_progress;
   const score = session.data?.score ?? 0;
   const total = session.data?.total_needs ?? 7;
 
+  const change = stanceChange(chain);
   const turnFeedback: Whisper[] = chain.at(-1)?.coaching.whispers ?? [];
   const earlierHint = coach.pending ? coach.earlier : undefined;
   const earlierTurn = chain.find((n) => n.id === earlierHint?.head_node_id)?.turn_number;
@@ -330,7 +340,7 @@ function ArenaSession({
           </Link>
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-widest text-accent">
-              Simulation Arena · Live
+              Simulation Arena{progress ? "" : " · Live"}
             </p>
             <h1 className="truncate font-semibold">{scenario.data?.title ?? "Loading session…"}</h1>
           </div>
@@ -493,13 +503,26 @@ function ArenaSession({
               hint={`${metrics?.empathy_turns ?? 0} empathy markers`}
               tone="primary"
             />
-            <Meter
-              label={`${persona?.name ?? "Persona"}'s Resistance`}
-              value={resistance.value}
-              display={resistance.label}
-              hint="Lower is better"
-              tone="warning"
-            />
+            {progress ? (
+              <div data-testid="stance">
+                <div className="flex items-baseline justify-between text-xs">
+                  <p className="font-semibold text-muted-foreground">
+                    {persona?.name ?? "Persona"}'s simulated stance
+                  </p>
+                  <p className="font-mono text-foreground">{RESISTANCE[progress.stance].label}</p>
+                </div>
+                {change && <p className="mt-1 text-xs text-foreground">{STANCE_CHANGE[change]}</p>}
+                <p className="mt-1 text-xs text-muted-foreground">{progress.explanation}</p>
+              </div>
+            ) : (
+              <Meter
+                label={`${persona?.name ?? "Persona"}'s Resistance`}
+                value={resistance.value}
+                display={resistance.label}
+                hint="Lower is better"
+                tone="warning"
+              />
+            )}
           </div>
         </aside>
       </div>

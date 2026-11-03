@@ -5,10 +5,13 @@ import type {
   Branch,
   Coaching,
   CoachHintResponse,
+  ConversationProgress,
   DialogApi,
   Hint,
   HintAttempt,
   PracticeSession,
+  ProgressSignal,
+  Resistance,
   RevealedNeed,
   Scenario,
   State,
@@ -20,6 +23,8 @@ import type {
 // It is bundled whenever VITE_API_BASE_URL is unset, so it holds invented placeholder
 // needs and no cue table: any eligible open turn earns the next placeholder. Nothing
 // here is the real judge, and sessions last only until the page reloads.
+
+const BEHAVIOR_REVISION = "s4-bob-r1";
 
 const hints = [
   "Invite their perspective before proposing a solution.",
@@ -55,6 +60,7 @@ export const mockScenarios: Scenario[] = [
       "You wanted to see me? If this is about the Q3 thing, I already sent the update.",
       "You are meeting to discuss missed deadlines.",
     ),
+    behavior_revisions: [BEHAVIOR_REVISION],
   },
   {
     id: 2,
@@ -129,6 +135,52 @@ const INITIAL_STATE: State = {
 
 function resistanceFor(score: number): State["resistance"] {
   return score >= 6 ? "open" : score >= 3 ? "warming" : "guarded";
+}
+
+// The contract's public wording. The rules below are a crude stand-in for the real stance
+// ledger, enough to exercise the UI: empathy counts as acknowledgment, a plain statement
+// as clarity and a leading turn as pressure. Nothing here is the real judge.
+const EXPLANATIONS: Record<ProgressSignal, string> = {
+  initial: "This is Bob's simulated starting stance, not a measure of trust.",
+  clarity: "Your wording offered a concrete clarification.",
+  support: "Your wording offered practical support.",
+  acknowledgment: "Your wording acknowledged a specific concern.",
+  repair: "Your wording took responsibility or withdrew a comparison.",
+  pressure: "Your wording included pressure or blame.",
+  boundary: "Your wording respected a request for space.",
+  none: "No clear stance signal was recognized in this wording.",
+};
+
+type Ledger = { balance: number; lastPositive: ProgressSignal | null };
+
+const INITIAL_LEDGER: Ledger = { balance: 0, lastPositive: null };
+
+function stanceFor(balance: number): Resistance {
+  return balance >= 2 ? "open" : balance === 1 ? "warming" : "guarded";
+}
+
+function progressFor(balance: number, signal: ProgressSignal): ConversationProgress {
+  return {
+    behavior_revision: BEHAVIOR_REVISION,
+    stance: stanceFor(balance),
+    last_signal: signal,
+    explanation: EXPLANATIONS[signal],
+  };
+}
+
+function signalFor(text: string): ProgressSignal {
+  const { questionType, empathy, leading } = classifyTurn(text);
+  if (leading) return "pressure";
+  if (empathy) return "acknowledgment";
+  return questionType === "statement" ? "clarity" : "none";
+}
+
+function advance(prev: Ledger, signal: ProgressSignal): Ledger {
+  if (signal === "pressure") {
+    return { balance: Math.max(prev.balance - 1, -2), lastPositive: null };
+  }
+  if (signal === "none" || signal === prev.lastPositive) return prev;
+  return { balance: Math.min(prev.balance + 1, 2), lastPositive: signal };
 }
 
 function coachingFor(text: string, revealed: boolean): Coaching {
@@ -223,8 +275,8 @@ function fail(status: number, path: string, code: string, retryable = false): Ap
 }
 
 function pickState(s: State): State {
-  const { score, total_needs, revealed_needs, resistance, metrics } = s;
-  return { score, total_needs, revealed_needs, resistance, metrics };
+  const { score, total_needs, revealed_needs, resistance, metrics, conversation_progress } = s;
+  return { score, total_needs, revealed_needs, resistance, metrics, conversation_progress };
 }
 
 export function createMockApi(random: () => number = Math.random): DialogApi {
@@ -234,6 +286,14 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
   const nodes = new Map<number, TurnNode>();
   const completed = new Map<string, { request: string; result: unknown }>();
   const savedHints = new Map<string, Hint>();
+  const optedIn = new Set<number>();
+  const ledgers = new Map<number, Ledger>();
+
+  // A new-Bob session or empty branch starts from the initial object; legacy stays null.
+  const startState = (sessionId: number): State => ({
+    ...INITIAL_STATE,
+    conversation_progress: optedIn.has(sessionId) ? progressFor(0, "initial") : null,
+  });
 
   const hintSlot = (branchId: number, headId: number | null, attempt: number) =>
     `${branchId}:${headId ?? "root"}:${attempt}`;
@@ -319,8 +379,12 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
       return once(path, key, req, () => {
         if (!mockScenarios.some((s) => s.id === req.scenario_id))
           throw fail(404, path, "scenario_not_found");
+        const listed = mockScenarios.find((s) => s.id === req.scenario_id)?.behavior_revisions;
+        if (req.behavior_revision && !listed?.includes(req.behavior_revision))
+          throw fail(422, path, "validation_error");
         const id = nextId++;
-        const branch = addBranch(id, null, INITIAL_STATE);
+        if (req.behavior_revision) optedIn.add(id);
+        const branch = addBranch(id, null, startState(id));
         sessions.set(id, {
           id,
           scenario_id: req.scenario_id,
@@ -359,6 +423,16 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
         const coaching = coachingFor(req.user_message, reveals);
         const pool = c.empathy ? replies.empathy : eligible ? replies.open : replies.closed;
         const reply = pool[Math.floor(random() * pool.length)] ?? pool[0]!;
+        const parentLedger =
+          (req.parent_node_id !== null && ledgers.get(req.parent_node_id)) || INITIAL_LEDGER;
+        const signal = signalFor(req.user_message);
+        const ledger = advance(parentLedger, signal);
+        const pinned = optedIn.has(req.session_id)
+          ? {
+              resistance: stanceFor(ledger.balance),
+              conversation_progress: progressFor(ledger.balance, signal),
+            }
+          : { conversation_progress: null };
         const node: TurnNode = {
           id: nextId++,
           session_id: req.session_id,
@@ -368,8 +442,10 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
           character_text: reply,
           coaching,
           ...nextState(branch, coaching),
+          ...pinned,
         };
         nodes.set(node.id, node);
+        ledgers.set(node.id, ledger);
         branches.set(branch.id, { ...branch, head_node_id: node.id, ...pickState(node) });
         session.revision += 1;
         return {
@@ -390,7 +466,7 @@ export function createMockApi(random: () => number = Math.random): DialogApi {
         const target = req.rewind_to_node_id;
         if (target !== null && !onChain(source.head_node_id, target))
           throw fail(409, path, "rewind_target_not_on_branch");
-        const branch = addBranch(id, target, target === null ? INITIAL_STATE : nodes.get(target)!);
+        const branch = addBranch(id, target, target === null ? startState(id) : nodes.get(target)!);
         session.active_branch_id = branch.id;
         session.revision += 1;
         return { branch, session: snapshot(id) };

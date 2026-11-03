@@ -16,6 +16,8 @@ export type Scenario = {
   title: string;
   description: string | null;
   persona: Persona;
+  // Versions a new session may opt into. Absent from servers older than s4-bob-r1.
+  behavior_revisions?: string[];
 };
 
 export type RevealedNeed = { id: string; title: string; description: string };
@@ -30,12 +32,32 @@ export type Metrics = {
 
 export type Resistance = "guarded" | "warming" | "open";
 
+export type ProgressSignal =
+  | "initial"
+  | "clarity"
+  | "support"
+  | "acknowledgment"
+  | "repair"
+  | "pressure"
+  | "boundary"
+  | "none";
+
+// Bob's simulated stance on sessions pinned to a behavior revision, which is separate
+// from the needs score. Null or absent on legacy sessions.
+export type ConversationProgress = {
+  behavior_revision: string;
+  stance: Resistance;
+  last_signal: ProgressSignal;
+  explanation: string;
+};
+
 export type State = {
   score: number;
   total_needs: number;
   revealed_needs: RevealedNeed[];
   resistance: Resistance;
   metrics: Metrics;
+  conversation_progress?: ConversationProgress | null | undefined;
 };
 
 export type PracticeSession = State & {
@@ -44,6 +66,8 @@ export type PracticeSession = State & {
   active_branch_id: number;
   active_head_node_id: number | null;
   revision: number;
+  // The public persona pinned at creation. Absent from servers before CS-56.
+  persona?: Persona;
 };
 
 export type Whisper = { kind: "good" | "warn" | "tip"; text: string };
@@ -86,7 +110,7 @@ export type Tree = {
   nodes: TurnNode[];
 };
 
-export type CreateSessionRequest = { scenario_id: number };
+export type CreateSessionRequest = { scenario_id: number; behavior_revision?: string };
 
 export type ChatTurnRequest = {
   session_id: number;
