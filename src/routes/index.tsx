@@ -9,6 +9,7 @@ import {
   failureMessage,
   scenariosQuery,
   sessionsQuery,
+  createSessionBody,
   storeSession,
   useActionKeys,
 } from "@/lib/practice";
@@ -50,6 +51,7 @@ function toCard(s: Scenario, latest: PracticeSession | undefined) {
     score,
     total,
     progress: Math.round((score / total) * 100),
+    scoreLabel: s.behavior_revisions?.length ? "needs uncovered" : "Breakthrough",
     last: !latest ? "Not started" : turns === 1 ? "1 turn" : `${turns} turns`,
     sessionId: latest?.id,
   };
@@ -120,12 +122,13 @@ function Dashboard() {
   const scenarios = (data ?? []).map((s, i) => toCard(s, sessionLists[i]?.data?.[0]));
 
   async function startSession(scenarioId: number) {
-    if (starting !== null) return;
+    const scenario = data?.find((s) => s.id === scenarioId);
+    if (starting !== null || !scenario) return;
     const action = `new:${scenarioId}`;
     setStarting(scenarioId);
     setStartError(null);
     try {
-      const session = await api.createSession({ scenario_id: scenarioId }, keys.keyFor(action));
+      const session = await api.createSession(createSessionBody(scenario), keys.keyFor(action));
       keys.release(action);
       storeSession(client, session);
       void client.invalidateQueries({ queryKey: ["sessions", scenarioId] });
@@ -222,7 +225,7 @@ function Dashboard() {
                       <p className="truncate text-xs text-muted-foreground">{s.ctx}</p>
                     </div>
                     <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 font-mono text-[11px] text-success ring-1 ring-success/30">
-                      {s.score}/{s.total} Breakthrough
+                      {s.score}/{s.total} {s.scoreLabel}
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">

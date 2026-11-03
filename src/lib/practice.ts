@@ -10,8 +10,11 @@ import {
   type ChatTurnResponse,
   type CoachHintList,
   type CoachHintRequest,
+  type CreateSessionRequest,
   type Hint,
   type PracticeSession,
+  type Resistance,
+  type Scenario,
   type Tree,
   type TurnNode,
 } from "@/lib/api";
@@ -309,6 +312,29 @@ export function isStalled(chain: TurnNode[]): boolean {
   if (!head) return false;
   const parentScore = chain.at(-2)?.score ?? 0;
   return head.score === parentScore && head.score < MAX_SCORE;
+}
+
+const BEHAVIOR_REVISION = "s4-bob-r1";
+
+// The opt-in comes from the scenario's capability list, never from its name or id.
+export function createSessionBody(scenario: Scenario): CreateSessionRequest {
+  return scenario.behavior_revisions?.includes(BEHAVIOR_REVISION)
+    ? { scenario_id: scenario.id, behavior_revision: BEHAVIOR_REVISION }
+    : { scenario_id: scenario.id };
+}
+
+const STANCE_RANK: Record<Resistance, number> = { guarded: 0, warming: 1, open: 2 };
+
+export type StanceChange = "less_guarded" | "more_guarded" | "unchanged";
+
+// Compared with the parent node only, so a repeat signal is never shown as an increase.
+export function stanceChange(chain: TurnNode[]): StanceChange | null {
+  const head = chain.at(-1)?.conversation_progress;
+  if (!head) return null;
+  const parent = chain.length > 1 ? chain.at(-2)?.conversation_progress?.stance : "guarded";
+  if (!parent) return null;
+  const change = STANCE_RANK[head.stance] - STANCE_RANK[parent];
+  return change > 0 ? "less_guarded" : change < 0 ? "more_guarded" : "unchanged";
 }
 
 type ListedHint = CoachHintList["hints"][number];
