@@ -194,6 +194,8 @@ def main() -> None:
         "source_revision": git_output("rev-parse", "HEAD"),
         "uncommitted_changes": bool(git_output("status", "--porcelain")),
         "scope": "coach only, fixed reviewer-authored dialogue, no persona or browser",
+        "provider": getattr(client, "provider", "meta"),
+        "model": client.model,
         "settings": {**settings, "timeout": None, "temperature": "client default"},
         "cases_file": Path(args.cases).name,
         "behavior_revision": args.behavior_revision,
