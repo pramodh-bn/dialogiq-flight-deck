@@ -3,19 +3,28 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CoachHint } from "@/components/CoachHint";
-import { api, ApiError, type Resistance, type Whisper } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  type ChatTurnRequest,
+  type ChatTurnResponse,
+  type Resistance,
+  type Whisper,
+} from "@/lib/api";
 import {
   applyTurn,
   branchChain,
   failureAction,
   failureMessage,
+  reconcileAction,
+  retainedActions,
+  type RetainedAction,
   isStalled,
   refreshSession,
   scenarioQuery,
   sessionQuery,
   storeSession,
   treeQuery,
-  useActionKeys,
   useCoach,
 } from "@/lib/practice";
 
@@ -84,7 +93,11 @@ function ArenaSession({
     ...scenarioQuery(session.data?.scenario_id ?? 0),
     enabled: session.data !== undefined,
   });
-  const keys = useActionKeys();
+  const retained = useMemo(
+    () => retainedActions<ChatTurnRequest>(`turn:${sessionId}`),
+    [sessionId],
+  );
+  const checkedRetained = useRef(false);
   const sending = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
   const [typing, setTyping] = useState<{ nodeId: number; text: string; shown: number } | null>(
@@ -160,39 +173,84 @@ function ArenaSession({
     hold: pending !== null,
   });
 
+  function showTurn(res: ChatTurnResponse) {
+    storeSession(client, res.session);
+    client.setQueryData(["tree", sessionId], (prev: typeof tree.data) =>
+      prev ? applyTurn(prev, res) : prev,
+    );
+    void refreshSession(client, sessionId);
+  }
+
+  // The outcome is unknown, so read the truth back. A turn that committed returns through
+  // its exact replay. Otherwise the draft comes back, and sending it reuses the same request.
+  async function reconcile(entry: RetainedAction<ChatTurnRequest>, message: string) {
+    const outcome = await reconcileAction(
+      entry,
+      () => api.getSession(sessionId).then((s) => s.revision),
+      () => api.sendTurn(entry.request, entry.key),
+    );
+    if (outcome.kind === "recovered") {
+      retained.settle(entry);
+      showTurn(outcome.result);
+      return;
+    }
+    if (outcome.kind === "state_changed") retained.settle(entry);
+    setInput(entry.action);
+    setNotes([
+      {
+        kind: "warn",
+        text: outcome.kind === "state_changed" ? failureMessage(outcome.error) : message,
+      },
+    ]);
+    void refreshSession(client, sessionId);
+  }
+
+  // A reload or a trip to the recorder can leave a turn unresolved.
+  useEffect(() => {
+    if (session.data === undefined || checkedRetained.current || sending.current) return;
+    checkedRetained.current = true;
+    const entry = retained.peek();
+    if (!entry) return;
+    sending.current = true;
+    setPending(entry.action);
+    void reconcile(entry, "Your last message may not have sent. It's still here to send again.")
+      .finally(() => {
+        sending.current = false;
+        setPending(null);
+      });
+    // reconcile only reads stable values, and this runs once per visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retained, session.data]);
+
   async function send() {
     const text = input.trim();
     if (!text || busy || sending.current || !session.data) return;
     sending.current = true;
-    const action = `turn:${text}`;
+    const current = session.data;
+    const entry = retained.begin(text, () => ({
+      session_id: sessionId,
+      branch_id: current.active_branch_id,
+      parent_node_id: current.active_head_node_id,
+      expected_revision: current.revision,
+      user_message: text,
+    }));
     setInput("");
     setPending(text);
     setNotes([]);
     try {
-      const res = await api.sendTurn(
-        {
-          session_id: sessionId,
-          branch_id: session.data.active_branch_id,
-          parent_node_id: session.data.active_head_node_id,
-          expected_revision: session.data.revision,
-          user_message: text,
-        },
-        keys.keyFor(action),
-      );
-      keys.release(action);
-      storeSession(client, res.session);
-      client.setQueryData(["tree", sessionId], (prev: typeof tree.data) =>
-        prev ? applyTurn(prev, res) : prev,
-      );
+      const res = await api.sendTurn(entry.request, entry.key);
+      retained.settle(entry);
+      showTurn(res);
       setTyping({ nodeId: res.turn_id, text: res.character_response, shown: 0 });
-      void refreshSession(client, sessionId);
     } catch (error) {
-      // The outcome may be unknown, so restore the draft and read the truth back. A
-      // resend of the same text keeps its key, which replays a turn that did commit.
-      if (failureAction(error) !== "retry") keys.release(action);
-      setInput(text);
-      setNotes([{ kind: "warn", text: failureMessage(error) }]);
-      void refreshSession(client, sessionId);
+      if (failureAction(error) === "retry") {
+        await reconcile(entry, failureMessage(error));
+      } else {
+        retained.settle(entry);
+        setInput(text);
+        setNotes([{ kind: "warn", text: failureMessage(error) }]);
+        void refreshSession(client, sessionId);
+      }
     } finally {
       sending.current = false;
       setPending(null);

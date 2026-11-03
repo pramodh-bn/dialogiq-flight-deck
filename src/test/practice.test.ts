@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, type Coaching, type PracticeSession, type Tree, type TurnNode } from "@/lib/api";
 import { createMockApi } from "@/lib/api/mock";
@@ -10,6 +10,8 @@ import {
   containingBranch,
   failureAction,
   layoutTree,
+  reconcileAction,
+  retainedActions,
   storeSession,
 } from "@/lib/practice";
 
@@ -160,5 +162,132 @@ describe("replayed responses", () => {
     expect(after.revision).toBe(2);
     expect(after.nodes.map((n) => n.id)).toEqual([first.node.id, second.node.id]);
     expect(after.branches[0]).toMatchObject({ head_node_id: second.node.id, score: 2 });
+  });
+});
+
+describe("retained actions", () => {
+  const request = (expected_revision: number) => ({ expected_revision, user_message: "Hello" });
+
+  function memoryStorage() {
+    const values = new Map<string, string>();
+    return {
+      getItem: (k: string) => values.get(k) ?? null,
+      setItem: (k: string, v: string) => void values.set(k, v),
+      removeItem: (k: string) => void values.delete(k),
+    } as unknown as Storage;
+  }
+
+  let storage: Storage;
+  beforeEach(() => {
+    storage = memoryStorage();
+  });
+
+  it("keeps the key and the exact body when the action is sent again", () => {
+    const actions = retainedActions("a", storage);
+    const first = actions.begin("Hello", () => request(3));
+
+    const second = actions.begin("Hello", () => request(9));
+
+    expect(second).toEqual(first);
+    expect(second.request.expected_revision).toBe(3);
+  });
+
+  it("survives a reload through storage", () => {
+    const first = retainedActions("b", storage).begin("Hello", () => request(3));
+
+    expect(retainedActions("b", storage).peek()).toEqual(first);
+  });
+
+  it("gives identical text a new key once the action has resolved", () => {
+    const actions = retainedActions("c", storage);
+    const first = actions.begin("Hello", () => request(3));
+
+    actions.settle(first);
+    const next = actions.begin("Hello", () => request(4));
+
+    expect(next.key).not.toBe(first.key);
+    expect(next.request.expected_revision).toBe(4);
+  });
+
+  it("replaces an unresolved action when the learner sends something else", () => {
+    const actions = retainedActions("d", storage);
+    const first = actions.begin("Hello", () => request(3));
+
+    const other = actions.begin("Different", () => request(3));
+
+    expect(actions.peek()).toEqual(other);
+    actions.settle(first);
+    expect(actions.peek()).toEqual(other);
+  });
+
+  it("still works when storage refuses", () => {
+    const refusing = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {
+        throw new Error("blocked");
+      },
+    } as unknown as Storage;
+    const actions = retainedActions("e", refusing);
+
+    const first = actions.begin("Hello", () => request(3));
+
+    expect(actions.begin("Hello", () => request(9))).toEqual(first);
+    actions.settle(first);
+    expect(actions.peek()).toBeNull();
+  });
+
+  it("survives corrupt storage", () => {
+    storage.setItem("dialogiq:retained:f", "{not json");
+
+    expect(retainedActions("f", storage).peek()).toBeNull();
+  });
+});
+
+describe("reconcileAction", () => {
+  const entry = { action: "Hello", key: "k", request: { expected_revision: 3 } };
+
+  it("replays when the revision moved, and returns the original result", async () => {
+    const replay = vi.fn().mockResolvedValue("original");
+
+    const outcome = await reconcileAction(entry, async () => 4, replay);
+
+    expect(outcome).toEqual({ kind: "recovered", result: "original" });
+    expect(replay).toHaveBeenCalledOnce();
+  });
+
+  it("does not replay when nothing moved", async () => {
+    const replay = vi.fn();
+
+    expect(await reconcileAction(entry, async () => 3, replay)).toEqual({ kind: "not_committed" });
+    expect(replay).not.toHaveBeenCalled();
+  });
+
+  it("reports a stale refusal as a changed session", async () => {
+    const error = apiError(409, "stale_revision");
+    const replay = vi.fn().mockRejectedValue(error);
+
+    expect(await reconcileAction(entry, async () => 4, replay)).toEqual({
+      kind: "state_changed",
+      error,
+    });
+  });
+
+  it("stays unknown when the replay is lost too", async () => {
+    const replay = vi.fn().mockRejectedValue(new Error("offline"));
+
+    expect(await reconcileAction(entry, async () => 4, replay)).toEqual({ kind: "unknown" });
+  });
+
+  it("stays unknown when the session cannot be read, and sends nothing", async () => {
+    const replay = vi.fn();
+    const read = () => Promise.reject(new Error("offline"));
+
+    expect(await reconcileAction(entry, read, replay)).toEqual({ kind: "unknown" });
+    expect(replay).not.toHaveBeenCalled();
   });
 });

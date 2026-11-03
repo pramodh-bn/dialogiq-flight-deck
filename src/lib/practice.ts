@@ -181,6 +181,105 @@ export function useActionKeys() {
   );
 }
 
+// A mutation whose outcome may be unknown. Its key and exact body stay together until it
+// resolves, because the backend replays only an identical request. Rebuilding the body
+// around a newer head would be refused as a conflict and could lead to a duplicate action.
+export type RetainedAction<T> = { action: string; key: string; request: T };
+
+const RETAINED_PREFIX = "dialogiq:retained:";
+const unstored = new Map<string, string>();
+
+function browserStorage(): Storage | null {
+  try {
+    return globalThis.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Stored before sending, so a reload or navigation cannot lose an action in flight. Storage
+// can refuse, so the same value also stays in memory for this page.
+export function retainedActions<T extends { expected_revision: number }>(
+  slot: string,
+  storage: Storage | null = browserStorage(),
+) {
+  const name = RETAINED_PREFIX + slot;
+
+  function read(): RetainedAction<T> | null {
+    let raw = unstored.get(name) ?? null;
+    try {
+      raw = storage?.getItem(name) ?? raw;
+    } catch {
+      // The copy in memory stands in.
+    }
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as RetainedAction<T>;
+    } catch {
+      return null;
+    }
+  }
+
+  function clear() {
+    unstored.delete(name);
+    try {
+      storage?.removeItem(name);
+    } catch {
+      // Nothing was stored there.
+    }
+  }
+
+  return {
+    peek: read,
+    // The same action reuses its retained request. A different one replaces it.
+    begin(action: string, build: () => T): RetainedAction<T> {
+      const existing = read();
+      if (existing?.action === action) return existing;
+      const entry = { action, key: crypto.randomUUID(), request: build() };
+      const raw = JSON.stringify(entry);
+      unstored.set(name, raw);
+      try {
+        storage?.setItem(name, raw);
+      } catch {
+        // The copy in memory stands in.
+      }
+      return entry;
+    },
+    settle(entry: RetainedAction<T>) {
+      if (read()?.key === entry.key) clear();
+    },
+  };
+}
+
+export type Reconciled<R> =
+  | { kind: "recovered"; result: R }
+  // Nothing moved, so the action can be sent again as it stands.
+  | { kind: "not_committed" }
+  // Something else moved the session and this action never committed.
+  | { kind: "state_changed"; error: unknown }
+  | { kind: "unknown" };
+
+// A newer revision may be this action's own commit. Only an exact replay can tell: it returns
+// the original result if it committed, and is refused as stale if it did not.
+export async function reconcileAction<T extends { expected_revision: number }, R>(
+  entry: RetainedAction<T>,
+  readRevision: () => Promise<number>,
+  replay: () => Promise<R>,
+): Promise<Reconciled<R>> {
+  let revision: number;
+  try {
+    revision = await readRevision();
+  } catch {
+    return { kind: "unknown" };
+  }
+  if (revision <= entry.request.expected_revision) return { kind: "not_committed" };
+  try {
+    return { kind: "recovered", result: await replay() };
+  } catch (error) {
+    return failureAction(error) === "retry" ? { kind: "unknown" } : { kind: "state_changed", error };
+  }
+}
+
 // Contextual coaching: see docs/cs45-coaching-contract.md.
 
 const MAX_SCORE = 7;

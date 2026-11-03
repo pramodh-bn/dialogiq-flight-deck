@@ -13,6 +13,9 @@
 //   --out <dir>        Report and screenshots. Default: a new temp directory.
 //   --python <path>    Default: backend/.venv's interpreter.
 //   --edge <path>      Default: the standard Windows Edge install.
+//   --journey lost-response
+//                      Drop responses after the server commits, with a stand-in persona that
+//                      counts its calls. Needs no provider, spends nothing and ignores --coach.
 //   --journey bob      Run the --cases step lists against Bob instead of the full journey.
 //                      Needs --coach real. Saves each hint beside the public dialogue it
 //                      answered. Case text is never printed, so a held-out file stays out
@@ -69,8 +72,12 @@ if (!["injected", "real", "stub"].includes(args.coach)) {
   throw new Error("--coach: injected, real or stub");
 }
 if (args.coach === "stub" && !args["demo-wait"]) throw new Error("--coach stub needs --demo-wait");
-if (!args["env-file"]) throw new Error("--env-file is required: persona turns need Baseten");
-if (!["full", "bob"].includes(args.journey)) throw new Error("--journey: full or bob");
+if (!args["env-file"] && args.journey !== "lost-response") {
+  throw new Error("--env-file is required: persona turns need Baseten");
+}
+const JOURNEYS = ["full", "bob", "lost-response"];
+if (!JOURNEYS.includes(args.journey)) throw new Error(`--journey: ${JOURNEYS.join(", ")}`);
+const LOST = args.journey === "lost-response";
 if (!["dev", "production"].includes(args.frontend)) {
   throw new Error("--frontend: dev or production");
 }
@@ -94,6 +101,7 @@ const PYTHON = args.python ?? join(ROOT, "backend", ".venv", "Scripts", "python.
 const EDGE = args.edge ?? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const SCRATCH = mkdtempSync(join(tmpdir(), "coach-browser-db-"));
 const STUB_CALLS = join(SCRATCH, "stub-calls.txt");
+const PERSONA_CALLS = join(SCRATCH, "persona-calls.txt");
 const TELEMETRY = join(OUT, "coach-telemetry.jsonl");
 mkdirSync(OUT, { recursive: true });
 
@@ -281,9 +289,10 @@ function respondHint(requestId, req, url, over) {
   });
 }
 
-async function onPaused({ requestId, request }) {
+async function onPaused({ requestId, request, responseStatusCode }) {
   const { method, url, postData, headers } = request;
   if (method === "OPTIONS") return send("Fetch.continueRequest", { requestId });
+  if (LOST) return onMutation({ requestId, request, responseStatusCode });
 
   if (method === "GET") {
     coachGets.push(url);
@@ -630,6 +639,239 @@ async function runLongWait() {
   await screenshot("long-wait-end");
 }
 
+// ---- Lost responses --------------------------------------------------------------------
+//
+// Faults happen at the browser with the real backend behind it. `after-commit` lets the
+// server finish and drops its response, which is the case a learner cannot tell apart from
+// a failed send. `before-send` drops the request, so nothing commits.
+
+const mutations = [];
+let fault = null;
+
+const armFault = (stage, then = "fail") => {
+  fault = { stage, then };
+};
+
+async function onMutation({ requestId, request, responseStatusCode }) {
+  const responded = responseStatusCode !== undefined;
+  const key = Object.entries(request.headers).find(
+    ([k]) => k.toLowerCase() === "idempotency-key",
+  )?.[1];
+  if (request.method !== "GET" && !responded) {
+    mutations.push({ url: request.url, key, body: request.postData, status: null });
+  }
+  if (responded && request.method !== "GET") {
+    const record = mutations.findLast((m) => m.key === key && m.status === null);
+    if (record) record.status = responseStatusCode;
+  }
+  if (fault?.stage === "before-send" && !responded) {
+    fault = null;
+    return send("Fetch.failRequest", { requestId, errorReason: "ConnectionFailed" });
+  }
+  if (fault?.stage === "after-commit" && responded) {
+    const { then } = fault;
+    fault = null;
+    if (then === "reload") return void send("Page.reload");
+    return send("Fetch.failRequest", { requestId, errorReason: "ConnectionFailed" });
+  }
+  return send("Fetch.continueRequest", { requestId });
+}
+
+const personaCalls = () => {
+  try {
+    return readFileSync(PERSONA_CALLS, "utf8").split("\n").filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+};
+
+const draft = () => evaluate(`document.querySelector("textarea")?.value ?? ""`);
+
+async function typeAndSend(text) {
+  await evaluate(`document.querySelector("textarea").focus()`);
+  await send("Input.insertText", { text });
+  await click("Send Response");
+}
+
+const nodeCount = async (id) => (await tree(id)).nodes.length;
+
+async function waitForNodes(id, count) {
+  await waitFor(`${count} turns saved`, async () => (await nodeCount(id)) >= count, 15_000);
+}
+
+// The replay runs after the tree settles, so wait on the draft and on what was sent.
+async function settled(id, nodes) {
+  await waitForNodes(id, nodes);
+  await waitFor("the composer to settle", async () => (await buttonState("Send Response")) !== "absent", 15_000);
+  await sleep(1_500);
+}
+
+function sameRequest(posts) {
+  return (
+    posts.length >= 2 &&
+    new Set(posts.map((p) => p.key)).size === 1 &&
+    new Set(posts.map((p) => p.body)).size === 1
+  );
+}
+
+async function openRecorderAt(id, nodeId) {
+  await clickLink("End Simulation");
+  await waitFor(
+    "the Flight Recorder",
+    () => evaluate(`location.pathname === "/flight-recorder"`),
+    15_000,
+  );
+  await clickTreeNode(nodeId);
+}
+
+async function runLostResponse() {
+  const evidence = "real-http";
+  const id = await openBobSession();
+  await waitFor("the composer", () => evaluate(`Boolean(document.querySelector("textarea"))`));
+
+  // A committed turn whose response is lost comes back through its exact replay.
+  let start = mutations.length;
+  armFault("after-commit");
+  await typeAndSend("First line.");
+  await settled(id, 1);
+  let posts = mutations.slice(start);
+  check("lost turn: one turn saved", (await nodeCount(id)) === 1, evidence, `${await nodeCount(id)}`);
+  check("lost turn: one persona call", personaCalls() === 1, evidence, `${personaCalls()}`);
+  check("lost turn: replay used the same key and body", sameRequest(posts), evidence, `${posts.length} POSTs`);
+  check("lost turn: the replay succeeded", posts.at(-1)?.status === 200, evidence, `${posts.at(-1)?.status}`);
+  check("lost turn: no draft left behind", (await draft()) === "", evidence);
+  check("lost turn: the reply is on screen", await has("Stand-in reply 1."), evidence);
+
+  // The same words again are a new action.
+  start = mutations.length;
+  await typeAndSend("First line.");
+  await settled(id, 2);
+  posts = mutations.slice(start);
+  check("identical line: a second turn saved", (await nodeCount(id)) === 2, evidence);
+  check("identical line: a second persona call", personaCalls() === 2, evidence, `${personaCalls()}`);
+  check(
+    "identical line: a new key",
+    posts.length === 1 && !mutations.slice(0, start).some((m) => m.key === posts[0].key),
+    evidence,
+  );
+
+  // A reload while the outcome is unknown: storage carries the action across it.
+  start = mutations.length;
+  armFault("after-commit", "reload");
+  await typeAndSend("Third line.");
+  await waitForNodes(id, 3);
+  await waitFor("the Arena after reload", () => has("Your situation"), 20_000);
+  await waitFor(
+    "the replay after reload",
+    () => mutations.slice(start).some((m) => m.status === 200),
+    15_000,
+  );
+  await sleep(1_500);
+  posts = mutations.slice(start);
+  check("reload: one turn saved", (await nodeCount(id)) === 3, evidence, `${await nodeCount(id)}`);
+  check("reload: one persona call", personaCalls() === 3, evidence, `${personaCalls()}`);
+  check("reload: replay used the same key and body", sameRequest(posts), evidence, `${posts.length} POSTs`);
+  check("reload: no draft left behind", (await draft()) === "", evidence);
+
+  // A request that never arrived stays a draft, and sending it again commits once.
+  start = mutations.length;
+  armFault("before-send");
+  await typeAndSend("Fourth line.");
+  await waitFor("the restored draft", async () => (await draft()) === "Fourth line.", 15_000);
+  check("not sent: nothing saved", (await nodeCount(id)) === 3, evidence);
+  check("not sent: no persona call", personaCalls() === 3, evidence, `${personaCalls()}`);
+  await click("Send Response");
+  await settled(id, 4);
+  posts = mutations.slice(start);
+  check("not sent: the resend committed once", (await nodeCount(id)) === 4, evidence);
+  check("not sent: one persona call", personaCalls() === 4, evidence, `${personaCalls()}`);
+  check("not sent: the resend kept its key and body", sameRequest(posts), evidence, `${posts.length} POSTs`);
+
+  // Another tab moved on while the draft waited: the old request is refused, not duplicated.
+  armFault("before-send");
+  await typeAndSend("Fifth line.");
+  await waitFor("the restored draft", async () => (await draft()) === "Fifth line.", 15_000);
+  const data = await tree(id);
+  const other = await fetch(`${API}/api/chat/turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({
+      session_id: id,
+      branch_id: data.active_branch_id,
+      parent_node_id: headOf(data),
+      expected_revision: data.revision,
+      user_message: "From another tab.",
+    }),
+  });
+  check("stale: the other tab's turn saved", other.status === 200, evidence, `${other.status}`);
+  start = mutations.length;
+  await sleep(500);
+  await click("Send Response");
+  await waitFor("the stale refusal", () => mutations.slice(start).some((m) => m.status === 409), 15_000);
+  await sleep(1_500);
+  check("stale: nothing duplicated", (await nodeCount(id)) === 5, evidence, `${await nodeCount(id)}`);
+  check("stale: the draft is kept", (await draft()) === "Fifth line.", evidence);
+  start = mutations.length;
+  const staleKey = mutations.at(-1).key;
+  await waitFor("the composer", async () => (await buttonState("Send Response")) === "enabled", 15_000);
+  await click("Send Response");
+  await settled(id, 6);
+  check("stale: sending again commits once", (await nodeCount(id)) === 6, evidence);
+  check(
+    "stale: the new send has a new key",
+    mutations.slice(start).length === 1 &&
+      mutations.slice(start)[0].status === 200 &&
+      mutations.slice(start)[0].key !== staleKey,
+    evidence,
+  );
+
+  // Rewind whose response is lost: one branch, and the learner still lands on it.
+  const before = await tree(id);
+  const callsBefore = personaCalls();
+  const nodeId = selectedPath(before.nodes, headOf(before))[1].id;
+  await openRecorderAt(id, nodeId);
+  start = mutations.length;
+  armFault("after-commit");
+  await click("Branch from here");
+  await waitFor("the Arena on the new branch", () => evaluate(`location.pathname === "/arena"`), 15_000);
+  await sleep(1_000);
+  let after = await tree(id);
+  posts = mutations.slice(start);
+  check("lost rewind: one branch", after.branches.length === before.branches.length + 1, evidence, `${after.branches.length}`);
+  check("lost rewind: replay used the same key and body", sameRequest(posts), evidence, `${posts.length} POSTs`);
+  check("lost rewind: no turn or persona call added", after.nodes.length === before.nodes.length && personaCalls() === callsBefore, evidence, `${callsBefore} to ${personaCalls()}`);
+
+  // Rewind with a reload while unknown.
+  const mid = after;
+  await openRecorderAt(id, selectedPath(mid.nodes, headOf(mid))[0].id);
+  start = mutations.length;
+  armFault("after-commit", "reload");
+  await click("Branch from here");
+  await waitFor("the Arena after reload", () => evaluate(`location.pathname === "/arena"`), 25_000);
+  await sleep(1_000);
+  after = await tree(id);
+  posts = mutations.slice(start);
+  check("reloaded rewind: one branch", after.branches.length === mid.branches.length + 1, evidence, `${after.branches.length}`);
+  check("reloaded rewind: replay used the same key and body", sameRequest(posts), evidence, `${posts.length} POSTs`);
+
+  // Resuming a branch whose response is lost.
+  const source = before.active_branch_id;
+  const resumed = selectedPath(after.nodes, before.branches.find((b) => b.id === source).head_node_id).at(-1);
+  await openRecorderAt(id, resumed.id);
+  start = mutations.length;
+  armFault("after-commit");
+  await click("Resume this branch");
+  await waitFor("the Arena on the resumed branch", () => evaluate(`location.pathname === "/arena"`), 15_000);
+  await sleep(1_000);
+  const finalTree = await tree(id);
+  posts = mutations.slice(start);
+  check("lost resume: the branch is active", finalTree.active_branch_id === source, evidence);
+  check("lost resume: replay used the same key and body", sameRequest(posts), evidence, `${posts.length} POSTs`);
+  check("lost resume: no branch added", finalTree.branches.length === after.branches.length, evidence);
+
+  check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
+}
+
 // ---- Bob evidence ------------------------------------------------------------------------
 //
 // Each case is a list of steps, so an independent runner can supply unseen cases:
@@ -963,6 +1205,7 @@ function liveHintStats() {
 }
 
 async function run() {
+  if (LOST) return runLostResponse();
   if (args.journey === "bob") return runBob();
   if (STUB) {
     await runLongWait();
@@ -1333,7 +1576,9 @@ async function main() {
   startLogged(
     "backend",
     PYTHON,
-    STUB
+    LOST
+      ? ["scripts/run_backend_stub_persona.py", "--calls-file", PERSONA_CALLS, "--host", BIND]
+      : STUB
       ? [
           "scripts/run_backend_stub_coach.py",
           "--env-file",
@@ -1441,7 +1686,14 @@ async function main() {
   };
   await send("Runtime.enable");
   await send("Page.enable");
-  await send("Fetch.enable", { patterns: [{ urlPattern: "*coach-hints*" }] });
+  await send("Fetch.enable", {
+    patterns: LOST
+      ? ["*/api/chat/turn", "*/branches", "*/active-branch"].flatMap((urlPattern) => [
+          { urlPattern, requestStage: "Request" },
+          { urlPattern, requestStage: "Response" },
+        ])
+      : [{ urlPattern: "*coach-hints*" }],
+  });
 
   let crashed = null;
   try {
@@ -1487,7 +1739,7 @@ async function main() {
     source_revision: revision.stdout.trim(),
     uncommitted_changes: dirty.stdout.trim().length > 0,
     database: "disposable, removed after this run",
-    persona: "live Baseten",
+    persona: LOST ? "stand-in" : "live Baseten",
     coach_posts: coachPosts.length,
     injected_posts: coachPosts.filter((p) => p.injected).length,
     timings,
@@ -1496,6 +1748,17 @@ async function main() {
     live_hint_stats: REAL ? liveHintStats() : undefined,
     saved_hints: savedHints,
     bob: bobEvidence,
+    lost_response: LOST
+      ? {
+          persona: "stand-in, counted, no provider call",
+          persona_calls: personaCalls(),
+          mutations: mutations.map(({ url, key, status }) => ({
+            route: new URL(url).pathname,
+            key,
+            status,
+          })),
+        }
+      : undefined,
     summary: {
       passed: results.filter((r) => r.status === "pass").length,
       failed,
