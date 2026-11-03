@@ -20,6 +20,22 @@ creation. New Bob judge revision `s2-r2.3-bob` inherits2.2 reveals and parsing,
 adding CS72 feedback and independent stance only. All old revisions and other
 personas retain behavior; seven needs and their authorization remain fixed.
 
+ScenarioResponse gains `behavior_revisions: list[str]`: `["s4-bob-r1"]` for
+Bob when this server has the complete registered variant available, `[]` for
+other scenarios/unavailable variants. Frontend uses this capability list, never
+a hard-coded Bob id or name. Explicit opt-in works for a new session against
+an existing complete Bob catalog too: build the new snapshot from that catalog
+plus the registered versioned behavior overlay, without modifying the catalog
+or its old sessions. Missing/invalid required configuration yields no capability
+and a typed422 on attempted opt-in. Absence of opt-in always retains the
+catalog's pinned revision. Include existing-complete and fresh-catalog tests.
+
+Known limit retained deliberately: where/when/who/which question prefixes are
+not added to the lexical scorer in this contract. A useful question may receive
+no open-question/reveal credit. Do not constrain the adaptive coach to secret
+scoring vocabulary; disclose this limitation in CS52/77. Any wider question
+classification correction is a separately reviewed delta with contrast cases.
+
 **Public schemas.** State-derived session/node/branch DTOs gain nullable
 `conversation_progress` (default null for legacy). New Bob has exactly:
 
@@ -40,6 +56,11 @@ private scenario data. SessionResponse also gains `persona` using existing
 public Persona schema from its pinned snapshot, for all versions (CS56).
 No new routes/ports. Internal ledger lives in stored JSON state; no relational
 migration required. Explicit API fixtures cover null legacy and new fields.
+New-Bob root sessions and branches with no turns return the non-null initial
+progress object (guarded/initial), including after rewind to root; null is only
+for legacy. Catalog title/description remain separately queried and unpinned.
+Automatic hint triggering remains score-only in isStalled for compatibility;
+the UI must not call a supportive unscored turn a conversational failure.
 
 **Small deterministic mechanism (CS76).** Internal balance starts0, bounded
 -2..2; <=0 guarded,1 warming,2 open. Max one increment/decrement per turn.
