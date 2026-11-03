@@ -12,6 +12,7 @@
 //                      injected, adds delayed browser checks past 15s and 30s.
 //   --out <dir>        Report and screenshots. Default: a new temp directory.
 //   --python <path>    Default: backend/.venv's interpreter.
+//   --backend-runner <path>  Optional live-backend entry point (e.g. a capped verifier).
 //   --edge <path>      Default: the standard Windows Edge install.
 //   --journey lost-response
 //                      Drop responses after the server commits, with a stand-in persona that
@@ -66,6 +67,7 @@ const { values: args } = parseArgs({
     "demo-wait": { type: "boolean", default: false },
     out: { type: "string" },
     python: { type: "string" },
+    "backend-runner": { type: "string", default: "scripts/run_backend.py" },
     edge: { type: "string" },
     journey: { type: "string", default: "full" },
     cases: { type: "string" },
@@ -119,7 +121,7 @@ const TELEMETRY = join(OUT, "coach-telemetry.jsonl");
 mkdirSync(OUT, { recursive: true });
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-const hintEvidence = STUB ? "stub-provider" : REAL ? "live-meta" : "injected";
+const hintEvidence = STUB ? "stub-provider" : REAL ? "live-provider" : "injected";
 const uiEvidence = REAL ? "real-http" : "injected";
 
 // ---- Results ---------------------------------------------------------------------------
@@ -1538,7 +1540,7 @@ async function runBob() {
     }
     if (ctx.sessionId) await harvestCase(ctx);
     bob.cases.at(-1).failure = failure;
-    check(`case ${item.id} completed`, !failure, "live-meta", failure ?? "");
+    check(`case ${item.id} completed`, !failure, "live-provider", failure ?? "");
     await screenshot(`case-${item.id}`).catch(() => {});
   }
   check(
@@ -2081,7 +2083,7 @@ async function main() {
           "--calls-file",
           STUB_CALLS,
         ]
-      : ["scripts/run_backend.py", "--env-file", resolve(args["env-file"]), "--host", BIND],
+      : [args["backend-runner"], "--env-file", resolve(args["env-file"]), "--host", BIND],
     {
       env: {
         ...process.env,
