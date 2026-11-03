@@ -7,8 +7,9 @@ decides the stance. Nothing here measures trust or proves a promise was kept.
 """
 
 import re
+from collections.abc import Callable
 
-from judge import BOB_FEEDBACK_REVISION, classify, normalize
+from judge import BOB_ACKNOWLEDGMENT, BOB_BLAME, LEADING_PHRASES, normalize
 
 BEHAVIOR_REVISION = "s4-bob-r1"
 LEDGER_KEY = "stance_ledger"
@@ -26,8 +27,9 @@ EXPLANATIONS = {
 }
 
 # Finite expression lists, published per the contract. Each phrase is matched on
-# normalized text at word boundaries; affirmative forms only, so "I can't help" or
-# "I'm not going to arrange" match nothing.
+# normalized text at word boundaries, and an occurrence negated earlier in its clause
+# does not count (see _has), so "I can't help" or "I will not say I can help you"
+# match nothing.
 COMPARISON_OR_BLAME = (
     "everyone else",
     "everybody else",
@@ -168,23 +170,73 @@ ACKNOWLEDGMENT = (
     "that's a lot to carry",
     "a lot to carry",
 )
-NEGATED = re.compile(r"\b(?:not|never|no)\b|n't\b")
+NEGATED = re.compile(r"\b(?:not|never|no|cannot)\b|n't\b")
+# A negator only reaches forward within its own clause: "I cannot promise those yet,
+# but I will check" still offers clarity.
+CLAUSE = re.compile(r"[.,;:!?]|\b(?:but|and|so|though|although|however)\b")
+# Blame is cancelled only by a direct denial just before it ("this is not your
+# fault", "I never said you were slow"). Other negation around blame is often blame
+# itself ("you can't keep up with everyone else", "she didn't make all this fuss").
+DENIAL = re.compile(
+    r"(?:\b(?:not|never)|\b(?:is|was|are|were)n't|\b(?:did|do|does)n't"
+    r"(?= (?:say|said|mean|meant|think)\b))"
+    r"(?: (?:say|said|saying|mean|meant|think|calling|call))?"
+    r"(?: (?:that|it))? $"
+)
 
 
-def _has(value: str, phrases: tuple[str, ...]) -> bool:
-    return any(
-        re.search(rf"(?<![a-z']){re.escape(p)}(?![a-z'])", value) for p in phrases
+def _negated(value: str, start: int) -> bool:
+    """True when a negator precedes ``start`` inside the same clause."""
+    clause = CLAUSE.split(value[:start])[-1]
+    return NEGATED.search(clause) is not None
+
+
+def _denied(value: str, start: int) -> bool:
+    """True when a direct denial ends right where the match at ``start`` begins."""
+    return DENIAL.search(value[:start]) is not None
+
+
+Cancel = Callable[[str, int], bool]
+
+
+def _has(value: str, phrases: tuple[str, ...], cancel: Cancel = _negated) -> bool:
+    """Word-bounded phrase match, ignoring occurrences that ``cancel`` rules out.
+
+    Negators inside a phrase itself ("you never", "isn't easy") are part of the
+    expression; only text before the match can cancel it.
+    """
+    for phrase in phrases:
+        pattern = rf"(?<![a-z']){re.escape(phrase)}(?![a-z'])"
+        for match in re.finditer(pattern, value):
+            if not cancel(value, match.start()):
+                return True
+    return False
+
+
+def _matches(pattern: re.Pattern[str], value: str, cancel: Cancel = _negated) -> bool:
+    return any(not cancel(value, m.start()) for m in pattern.finditer(value))
+
+
+def _judge_flags(value: str) -> tuple[bool, bool]:
+    """The CS-72 judge's Bob wording flags, with negation applied for the stance.
+
+    Returns (acknowledgment, leading). The judge itself is unchanged; only the
+    stance ignores "This is not your fault" or "I don't think it sounds hard".
+    """
+    leading = _has(value, LEADING_PHRASES, _denied) or _matches(
+        BOB_BLAME, value, _denied
     )
+    return _matches(BOB_ACKNOWLEDGMENT, value) and not leading, leading
 
 
 def signal_for(text: str) -> str:
     """Return the first applicable signal in the contract's precedence order."""
     value = normalize(text)
-    _, empathy, leading = classify(text, BOB_FEEDBACK_REVISION)
+    empathy, leading = _judge_flags(value)
     repaired = _has(value, REPAIR)
     fresh = WITHDRAWN.sub(" ", value)
-    blamed = _has(fresh, COMPARISON_OR_BLAME) or (leading and not repaired)
-    if _has(value, PRESSURE) or blamed:
+    blamed = _has(fresh, COMPARISON_OR_BLAME, _denied) or (leading and not repaired)
+    if _has(value, PRESSURE, _denied) or blamed:
         return "pressure"
     if repaired:
         return "repair"
@@ -194,7 +246,7 @@ def signal_for(text: str) -> str:
         return "clarity"
     if _has(value, SUPPORT):
         return "support"
-    if empathy or _has(value, ACKNOWLEDGMENT) or FEELING.search(value):
+    if empathy or _has(value, ACKNOWLEDGMENT) or _matches(FEELING, value):
         return "acknowledgment"
     return "none"
 
