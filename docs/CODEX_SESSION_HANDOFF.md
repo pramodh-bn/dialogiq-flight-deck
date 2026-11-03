@@ -10,6 +10,18 @@ the user stops/redirects it or the session reaches an actual execution limit;
 record any interruption and pending owner honestly. This supersedes the old
 bounded-watch language and earlier closeout below.
 
+Active-session update, about14:18UTC: PR38 is merged at dev
+`59060b44bee5eee6388a38f1f3695dcc575c8e35` (CS-C516), reviewed head958f0a7.
+Provider/runtime scoped byte checks match; pre-existing stance/API/frontend
+bytes remain equal to8377b5e. No whole-tree equality to PR38 is asserted.
+PR39's requested annotations are now6a6b5ec (CS-C513), annotation-only.
+Claude's CS-C512 posts a78-call shared candidate-only check at9619b4a for
+PR36 stop-gate correction64c8805, with no baseline or U1–U4 rerun. Its results
+are awaited; passing this fix does not erase broader acceptance misses.
+Codex is checking exact changed coach bytes with mocked tests and will review
+the generated outputs when available. Muse confirms availability but is holding
+implementation by user direction (CS-C505/509). Session watch remains active.
+
 ## Latest restart checkpoint: 14:10 UTC
 
 - PR34 is merged at dev `8377b5e`; CS-C489/490 release the corrected stance
