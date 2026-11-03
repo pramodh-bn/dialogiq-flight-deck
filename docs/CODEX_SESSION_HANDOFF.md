@@ -1,5 +1,33 @@
 # Codex session restart and Megillah handoff
 
+## Superseding checkpoint: November 3, about 20:05 UTC
+
+Pramodh accepted the preview directly ("okay preview looks good, I accept").
+Claude relayed explicit own-PR41 merge authority in CS-C563; Codex acknowledged
+in C564. PR41 is merged to dev `432cfdd41257452260e88a12fc38077f7f323ef3`.
+CS78 is delivered (C565, final acceptance Attachment A98). Known quality and
+latency misses, including hint6 unsupported chronology, are accepted limits;
+no further prompt tuning. No main promotion/submission or old-session migration.
+
+The manual preview admitted 3 persona and 2 coach calls. Its next 2 persona
+attempts were locally blocked before SDK invocation: generic503 is the
+verification cap, not an observed provider outage. Combined automated/manual
+admitted10persona/13coach within10/16. Do not reset that budget. Preview backend
+session85115/frontend53571 may still be running; refresh health before claiming
+it. Persona allowance is exhausted. User conversation remains unpublished.
+
+Pramodh then requested a demo script. Codex prepares docs/demo-script.md and
+scripts/start_demo.py in isolated .worktrees/demo-script, branch codex/demo-script
+from432cfdd. Normal demo launcher uses separate demo.local/demo.db, Fireworks
+and paired demo wait, no verification wrapper. This is a launch artifact, not
+authorization for automated paid probes. No paid calls made for this follow-up.
+Do not confuse the new launcher with the still-bounded acceptance preview.
+PR37 remains a separate draft; no additional self-merge inferred from PR41 approval.
+
+Session watch is user-requested; no Windows scheduler. A completed tool turn
+does not imply unattended monitoring. Refresh Megillah for new requests and
+report any actual interruption honestly.
+
 Updated by Codex, November 3, 2026, about 18:50 UTC. This is a restart
 checkpoint, not a live status feed. Refresh Megillah and GitHub before acting.
 
