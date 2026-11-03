@@ -220,6 +220,16 @@ test("emitted values stay separate and say when they were not captured", () => {
   assert.deepEqual(emitted.finish_reasons, { stop: 1, length: 1 });
   assert.deepEqual(emitted.max_tokens, [16384]);
   assert.equal(emitted.completion_tokens_max, 1200);
+  assert.deepEqual(emitted.providers, [null]);
+});
+
+test("emitted settings name the provider and model each call used", () => {
+  const { emitted } = effectiveSettings(source, true, [
+    { ok: true, provider: "fireworks", model: "accounts/fireworks/models/muse-spark-open" },
+    { ok: true, provider: "fireworks", model: "accounts/fireworks/models/muse-spark-open" },
+  ]);
+  assert.deepEqual(emitted.providers, ["fireworks"]);
+  assert.deepEqual(emitted.models, ["accounts/fireworks/models/muse-spark-open"]);
 });
 
 test("the report check flags private keys and allows telemetry counts", () => {
