@@ -608,3 +608,61 @@ def test_fixture_public_strings_have_no_need_titles():
         joined = "\n".join(_public_strings(scenario)).lower()
         for title in CONTRACT_NEED_TITLES:
             assert title.lower() not in joined, (scenario["scenario_title"], title)
+
+
+# CS-79: s4-bob-r1 persona variant. Prompt-only checks, zero network.
+def test_bob_variant_absent_keeps_original_bytes() -> None:
+    for level in (RESISTANCE_GUARDED, RESISTANCE_WARMING, RESISTANCE_OPEN):
+        original = build_persona_system_prompt(_brief(), resistance=level)
+        assert (
+            build_persona_system_prompt(
+                _brief(),
+                resistance=level,
+                behavior_revision=None,
+                stance_signal="support",
+            )
+            == original
+        )
+        assert (
+            build_persona_system_prompt(
+                _brief(), resistance=level, behavior_revision="unknown-r9"
+            )
+            == original
+        )
+
+
+def test_bob_variant_replaces_open_question_rule_and_etiquette() -> None:
+    prompt = build_persona_system_prompt(
+        _brief(),
+        resistance=RESISTANCE_GUARDED,
+        behavior_revision="s4-bob-r1",
+        stance_signal="clarity",
+    )
+    assert resistance_instruction(RESISTANCE_GUARDED) not in prompt
+    assert "Only a genuinely open" not in prompt
+    assert "even if it is not a question" in prompt
+    assert "concrete clarification" in prompt
+    assert "A friendlier tone is not agreement" in prompt
+    assert "Never reveal anything that is not already out" in prompt
+    # Private brief and reveal authorization lines are unchanged.
+    assert "never state this outright" in prompt
+    assert "Nothing new is permitted this reply." in prompt
+
+
+def test_bob_variant_levels_and_signals() -> None:
+    from persona import bob_stance_instruction
+
+    levels = {
+        bob_stance_instruction(level)
+        for level in (RESISTANCE_GUARDED, RESISTANCE_WARMING, RESISTANCE_OPEN)
+    }
+    assert len(levels) == 3
+    assert "Being open is not agreeing" in bob_stance_instruction(RESISTANCE_OPEN)
+    assert "pressed or blamed" in bob_stance_instruction(RESISTANCE_GUARDED, "pressure")
+    # Signals with no reaction add nothing.
+    for quiet in (None, "none", "initial"):
+        assert bob_stance_instruction(RESISTANCE_WARMING, quiet) == (
+            bob_stance_instruction(RESISTANCE_WARMING)
+        )
+    with pytest.raises(ValueError, match="unknown resistance level"):
+        bob_stance_instruction("spicy")
