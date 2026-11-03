@@ -108,9 +108,9 @@ setting.
 4. Ask for a hint at any turn. A second hint at the same turn tries a different
    approach; each turn keeps at most two. If the coach provider times out or
    fails, the server saves a fixed fallback hint as that attempt's hint; it is
-   kept like any other hint and still counts toward the two. **Try again**
-   appears only when the request itself fails, such as a network or server
-   error, and repeats that same attempt.
+   kept like any other hint and still counts toward the two. If a request is
+   unresolved (the response was lost or the wait ran out with no known
+   result), **Try again** repeats that same attempt.
 5. Open the **Flight Recorder** to see the turn tree, select an earlier turn and
    branch from it. Saved hints and stance stay with their turns after reload.
 
