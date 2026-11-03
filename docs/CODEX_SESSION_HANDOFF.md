@@ -1,7 +1,45 @@
 # Codex session restart and Megillah handoff
 
-Recorded by Codex, November 3, 2026, about 12:50 UTC. This is a restart
+Updated by Codex, November 3, 2026, about 14:10 UTC. This is a restart
 checkpoint, not a live status feed. Refresh Megillah and GitHub before acting.
+
+## Latest restart checkpoint: 14:10 UTC
+
+- PR34 is merged at dev `8377b5e`; CS-C489/490 release the corrected stance
+  dependency. Original shared checkout remains untouched at local dev7d8fecd.
+- PR35 `b0b362d` and PR36 `b93347a` were retargeted to dev without rewriting
+  history. They remain draft/unmerged. The corrected coach still fails acceptance.
+- Fireworks evaluation on Claude's `b022828`: 204 calls, all parse-valid,
+  no retries. After Codex's 41-label regrade and CS-C504/506 reconciliation:
+  candidate **51/78 shared**, **4/6 explicit refusal**, **16/24 unseen**;
+  baseline 23/78 shared. Two invented post-refusal events remain hard failures.
+  The sample omitted reasons/prior hints, and two gate labels were identified
+  before the regrade; do not claim complete blinding or full-output review.
+  U1–U4 are now evaluated/reviewed, not untouched held-out cases for future runs.
+- PR38 is at `958f0a7`: telemetry/docs correction reviewed at `1345eaa`,
+  evidence helpers **17/17**, syntax/Ruff/diff checks passed. Latest change only
+  adds the paired frontend demo flags/ports to README; reviewed by diff.
+  Earlier provider checks **61/61** still apply to unchanged provider bytes.
+- PR39 is at `46f0aae`: Codex persona/stance/integration checks **158/158**,
+  Ruff/diff passed on local combined review `82e1902`. No blocking source finding;
+  three new test function return annotations requested in CS-C507.
+- Claude's six live shared journeys completed, each 7/7 harness checks,
+  candidate source8630098/baseline1345eaa. Codex read their public transcripts;
+  runtime evidence is Claude-run. Reported **69 Fireworks calls against cap60**
+  and about42 Baseten turns; retain the breach, not retrospective authorization.
+  These samples do not override the failed CS73 gates or prove learner benefit.
+- Muse's abilities appear restored per the user. CS-C503 preserves Claude's
+  current ownership until an explicit artifact/file-scoped hand-back is recorded.
+- Waiting owner: Claude for a scoped next prompt/call plan, routine persona
+  annotations and final CS79/80/77/52 delivery handoffs. Codex does not silently
+  adopt a new tuning budget or merge the incomplete journey. Source reviews are
+  complete; persona/Fireworks PRs remain unmerged pending final scoped handoff.
+- The bounded watch was announced for13:20–13:35UTC. Later handoffs were
+  processed before closeout; no new unattended watch starts when this turn ends.
+  Scheduler remains disabled. Codex made zero paid calls. No main promotion,
+  demo restart, historical rescore or session migration occurred.
+
+Details below preserve the earlier checkpoints and their attributed evidence.
 
 ## Startup instruction
 
@@ -34,7 +72,7 @@ only if the user explicitly asks for one.
    changes. Work in an isolated Codex worktree; do not edit Claude's worktrees.
 3. Discover the Megillah tools available in the session. Read project `CS`,
    track `CS-T7`, and the full records/recent comments for `CS-73`, `CS-76`,
-   `CS-77`, `CS-79`, `CS-52` and `CS-78`. Refresh the project list if its identity
+   `CS-77`, `CS-79`, `CS-52`, `CS-78` and `CS-80`. Refresh the project list if its identity
    is unclear. Tool availability and records can change.
 4. Read current GitHub PR heads/bases and remote dev. Fetch before comparing
    source; do not treat the original workspace's local dev as current.
@@ -96,21 +134,24 @@ Codex in CS-C474. Read subsequent task claims before changing scope.
 ## Exact checkpoint and next actions
 
 Remote dev at this checkpoint:
-`34da60b6388b6b9bf5d3460ff7b172ed49f59bcb`.
+`8377b5e8b3f8b7fb8c249d63e8654e49ae8de1e9`.
 The original workspace's local dev was still `7d8fecd`; do not reset or switch
 that shared directory just to synchronize it.
 
-| Artifact                                                                   | Checkpoint                                                                                        | Next action                                                                 |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [PR 33](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/33), CS-56 | Merged; reviewed head `cfc488df13df983da7378ba31506bee47529f8a7`; closeout CS-C476                | Preserve pinned public-persona allowlist; no repeat integration             |
-| [PR 34](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/34), CS-76 | Open at `41513b49fc4783e0f160300175d4c41405ea8063`; blocker CS-C475                               | Await/review Claude's narrow negation correction, then integrate            |
-| [PR 35](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/35), CS-77 | Open at `a532b5cb1d770615a80a2de9a996ac8e61227458`, based on PR 34 branch                         | Follow corrected PR 34; inspect/retarget base before merging                |
-| [PR 32](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/32), CS-73 | Open at `3868da508f1c862041652f7b056faeedd46cd90b`; original candidate fails acceptance           | Do not activate as accepted behavior; coordinate supersession with PR 36    |
-| [PR 36](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/36), CS-73 | Open at `0dce93345d0a4b2c060657c0bebf9b51b332f32e`, based on PR 34 branch; Claude handoff CS-C477 | Review pinned selection and second-hint correction; no live measurement yet |
-| CS-79                                                                      | Persona work assigned to Claude                                                                   | Refresh for actual claim/artifact; independently verify after delivery      |
-| CS-52 / CS-78                                                              | Final docs / complete Bob journey remain open                                                     | Use exact integrated source and explicit remaining limits                   |
+| Artifact                                                                   | Checkpoint                                                                                         | Next action                                                              |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [PR 33](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/33), CS-56 | Merged; reviewed head `cfc488df13df983da7378ba31506bee47529f8a7`; closeout CS-C476                 | Preserve pinned public-persona allowlist; no repeat integration          |
+| [PR 34](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/34), CS-76 | Merged at dev `8377b5e`; reviewed head `2aa7fa7423a90d39f1ef08095715d25ac32faed9`, full tree equal | No repeat integration; dependency released on CS79 in CS-C490            |
+| [PR 35](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/35), CS-77 | Open at `b0b362d5c8710fb7f9697854328f8a22462862bb`, retargeted to dev                              | Hold final delivery for CS73/79                                          |
+| [PR 32](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/32), CS-73 | Open at `3868da508f1c862041652f7b056faeedd46cd90b`; original candidate fails acceptance            | Do not activate as accepted behavior; coordinate supersession with PR 36 |
+| [PR 36](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/36), CS-73 | Open at `b93347af6c336b13b3954cab057a028735196b8c`, retargeted to dev; source review completed     | Hold: Fireworks candidate still fails acceptance                         |
+| [PR 38](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/38), CS-80 | Open at `958f0a7485249c6f995a5e29e8f4f2eae31c89c8`; source/telemetry/docs review complete          | Await final scoped delivery handoff                                      |
+| [PR 39](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/39), CS-79 | Open at `46f0aae18cf7fc0dc3d6602c0ee58176d8e9dd25`; persona source review complete                 | Await routine annotations and final scoped delivery handoff              |
+| CS-79                                                                      | Persona work assigned to Claude                                                                    | Refresh for actual claim/artifact; independently verify after delivery   |
+| CS-52 / CS-78                                                              | Final docs / complete Bob journey remain open                                                      | Use exact integrated source and explicit remaining limits                |
 
-CS-C475 reproductions on the old PR 34 source:
+CS-C475 reproductions on the old PR 34 source (fixed by Claude in CS-C480,
+independently verified by Codex in CS-C487):
 
 | Learner wording                            | Actual incorrect signal |
 | ------------------------------------------ | ----------------------- |
@@ -119,15 +160,50 @@ CS-C475 reproductions on the old PR 34 source:
 | I am not saying that was unfair.           | repair                  |
 | I will not say that I can help you.        | support                 |
 
-Require scoped negation contrasts without losing legitimate conditional checks
-or withdrawal of quoted blame. Also requested: return annotation on the helper
-`create` in `backend/test_bob_stance.py`. Claude owns these corrections.
+All four now return `none`. Conditional checks, explicit withdrawn blame and
+blaming negation contrasts pass. The helper `create` now has a return type.
+Indirect denial and generic acknowledgment remain lexical limitations.
 
 ## Completed evidence; do not inflate its scope
 
+Latest combined review `979070b7f9e9af94ca082514d09500881fa2a03f`:
+Codex independently ran backend **267/267**, Ruff, eleven direct wording
+contrasts, real HTTP **11/11** at 127.0.0.1:8080, and production-built browser
+**26/26** at 8080/5173. Disposable databases and stand-in persona only; zero
+paid calls. Browser report CS-A90, review CS-C487, integration CS-C489.
+Two known TestClient warnings remain. Browser covers opt-in, needs/stance,
+reload, narrow/emulated magnified layout, keyboard and Recorder; no graph
+navigation rerun or generated-output acceptance. Backend stance bytes equal
+PR34; coach equals PR36/b93347a; frontend equals PR35/b0b362d. Full PR34 tree
+equals merged dev8377b5e. Runtime evidence is not whole-tree identity between
+the combined review and dev, which does not yet contain PR35/36.
+
+Codex then combined PR38 locally for source review at
+`578f7ff2741daf9705c163bfb8c07c0260dd9028`. Provider/client/probe files match
+PR38; focused mocked tests passed **61/61**, with two known warnings, and
+Ruff passed (CS-C494). CS-C492 requests
+safe provider/model telemetry and accurate browser labels plus scoped docs
+before Fireworks acceptance. Claude retains implementation ownership.
+
+Resume review on November 3, about 13:00 UTC: remote dev and PR34/35/36
+heads remain unchanged. Codex combined PR36 into the existing isolated review
+branch, producing local merge `e6b02f1d96827da84b8cbf656b3f0ef58a1b916d`.
+All three coach files are byte-identical to PR36. Codex ran the focused coach
+service/client suite: **50 passed**, two existing TestClient deprecation
+warnings; Ruff and diff checks passed. These are mocked-provider/TestClient
+checks with disposable pytest SQLite, not real-server/browser/live evidence.
+Zero paid calls. Independent comparisons confirmed legacy Bob/Maya prompt
+bytes match current remote dev. Bob/Team member candidate prompt SHA256 is
+`7a05e6e5fb49ff9bad8e60ef7d0bec2768a650407e550fc5136e1241060d451a`.
+No new source blocker was found in PR36's narrow correction; the earlier
+generated-output failures remain unverified. Claude still owns corrections,
+persona, UI and final docs. PR34 negation correction remains the next artifact.
+The local review merge is not delivery, integration into dev or acceptance.
+Scheduler was rechecked **Disabled**; no listeners on 8080/5173 at preflight.
+
 Codex's isolated review worktree:
 `D:/Workspace/meta-hackathon/dialogiq-flight-deck/.worktrees/s4-final-review`,
-branch `codex/s4-final-review`, source `a532b5c` at checkpoint.
+branch `codex/s4-final-review`, prior source `a532b5c` at the earlier checkpoint.
 
 Codex independently ran: backend 247/247 (two deprecation warnings), frontend
 110/110, Ruff, TypeScript, production build and diff checks. Real HTTP probe
@@ -151,6 +227,21 @@ normal approval escalation. Use the prescribed escalation flow; do not bypass
 it. Never print credential values. Recheck toolchain before new tests.
 
 ## Coach evaluation and spending boundary
+
+**Current Fireworks decision supersedes the old Meta proposal below.**
+Claude records the user's choice of Fireworks `muse-spark-open` in CS-C484
+and demo-wait/open Fireworks budget in CS-C488. Claude's finite measurement
+plan on source `b022828` caps this run at **204 Fireworks calls**, zero Meta
+and zero Baseten: shared baseline/candidate 78+78, unseen 24+24, no failure
+retries or disappointing-result reruns. Journeys need their own plan.
+Codex acknowledges receipt in CS-C491 and makes no paid calls in this review.
+Do not infer that the run finished or passed from the plan's existence.
+Meta results do not transfer to Fireworks. Claude's separate three-call smoke
+had two normal-mode timeouts and one demo success at 5.14s; this is a small
+compatibility sample, not reliability or learner acceptance. User-selected
+demo-wait avoids an unadopted normal-mode reasoning parameter change.
+
+The following preserves the earlier **Meta** result and spending history:
 
 CS-C471 is Codex's 32-hint blind regrade of CS-A89. CS-C473 is Claude's
 reconciliation: 30/32 agreement; both disputed unsupported-event findings were
