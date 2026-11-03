@@ -10,6 +10,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import ClassVar
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -59,6 +60,8 @@ class _FakeCompletionsEndpoint:
         self.calls.append(kwargs)
         if FakeOpenAI.error is not None:
             raise FakeOpenAI.error
+        if FakeOpenAI.completion is not None:
+            return FakeOpenAI.completion
         return _FakeCompletion(self._reply)
 
 
@@ -73,6 +76,7 @@ class FakeOpenAI:
     instances: ClassVar[list] = []
     reply = "Mocked persona reply."
     error = None
+    completion = None
 
     def __init__(self, base_url=None, api_key=None, max_retries=None):
         self.base_url = base_url
@@ -95,6 +99,7 @@ def _isolated(monkeypatch):
     FakeOpenAI.instances.clear()
     FakeOpenAI.reply = "Mocked persona reply."
     FakeOpenAI.error = None
+    FakeOpenAI.completion = None
     monkeypatch.setattr(persona, "OpenAI", FakeOpenAI)
 
 
@@ -443,6 +448,40 @@ def test_empty_reply_raises_typed_invalid():
     client = BasetenPersonaClient(api_key="test-key")
     with pytest.raises(PersonaInvalidResponseError, match="empty reply"):
         client.respond(system_prompt="s", messages=[])
+
+
+def _raw_completion(*, choices):
+    return SimpleNamespace(choices=choices)
+
+
+def _raw_message(content):
+    return SimpleNamespace(message=SimpleNamespace(content=content))
+
+
+@pytest.mark.parametrize(
+    "completion,match",
+    [
+        (_raw_completion(choices=[]), "malformed reply"),
+        (_raw_completion(choices=None), "malformed reply"),
+        (_raw_completion(choices=[SimpleNamespace(message=None)]), "malformed reply"),
+        (_raw_completion(choices=[_raw_message(None)]), "empty reply"),
+        (_raw_completion(choices=[_raw_message(42)]), "malformed reply"),
+        (_raw_completion(choices=[_raw_message("   ")]), "empty reply"),
+    ],
+)
+def test_malformed_completion_shapes_raise_typed_invalid(completion, match):
+    FakeOpenAI.completion = completion
+    client = BasetenPersonaClient(api_key="test-key")
+    with pytest.raises(PersonaInvalidResponseError, match=match):
+        client.respond(system_prompt="s", messages=[])
+
+
+def test_valid_completion_still_returns_stripped_reply():
+    FakeOpenAI.completion = _raw_completion(
+        choices=[_raw_message("  A complete persona reply.  ")]
+    )
+    client = BasetenPersonaClient(api_key="test-key")
+    assert client.respond(system_prompt="s", messages=[]) == "A complete persona reply."
 
 
 def test_sdk_timeout_maps_to_persona_timeout():
