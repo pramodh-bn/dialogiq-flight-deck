@@ -19,6 +19,9 @@
 //   --journey recorder-failure
 //                      Fail the Recorder's scenario request, then let it recover, with the same
 //                      stand-in persona. Needs no provider, spends nothing and ignores --coach.
+//   --journey graph-navigation
+//                      Walk a long branched tree across canvas zoom and browser magnification
+//                      with the stand-in persona. Needs no provider and spends nothing.
 //   --journey bob      Run the --cases step lists against Bob instead of the full journey.
 //                      Needs --coach real. Saves each hint beside the public dialogue it
 //                      answered. Case text is never printed, so a held-out file stays out
@@ -75,14 +78,15 @@ if (!["injected", "real", "stub"].includes(args.coach)) {
   throw new Error("--coach: injected, real or stub");
 }
 if (args.coach === "stub" && !args["demo-wait"]) throw new Error("--coach stub needs --demo-wait");
-if (!args["env-file"] && !["lost-response", "recorder-failure"].includes(args.journey)) {
+if (!args["env-file"] && !["lost-response", "recorder-failure", "graph-navigation"].includes(args.journey)) {
   throw new Error("--env-file is required: persona turns need Baseten");
 }
-const JOURNEYS = ["full", "bob", "lost-response", "recorder-failure"];
+const JOURNEYS = ["full", "bob", "lost-response", "recorder-failure", "graph-navigation"];
 if (!JOURNEYS.includes(args.journey)) throw new Error(`--journey: ${JOURNEYS.join(", ")}`);
 const LOST = args.journey === "lost-response";
 const RECORDER_FAILURE = args.journey === "recorder-failure";
-const STAND_IN = LOST || RECORDER_FAILURE;
+const GRAPH = args.journey === "graph-navigation";
+const STAND_IN = LOST || RECORDER_FAILURE || GRAPH;
 if (!["dev", "production"].includes(args.frontend)) {
   throw new Error("--frontend: dev or production");
 }
@@ -968,6 +972,283 @@ async function runRecorderFailure() {
   check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
 }
 
+// ---- Graph navigation --------------------------------------------------------------------
+//
+// Browser magnification is emulated: at 200 percent a 1400x900 window lays out as 700x450
+// CSS pixels, drawn at twice the density. Canvas zoom uses the graph's own buttons.
+
+const VIEWPORTS = [
+  { name: "browser-100", width: 1400, height: 900, scale: 1 },
+  { name: "browser-125", width: 1120, height: 720, scale: 1.25 },
+  { name: "browser-150", width: 933, height: 600, scale: 1.5 },
+  { name: "browser-200", width: 700, height: 450, scale: 2 },
+  { name: "short-window", width: 1280, height: 420, scale: 1 },
+  { name: "narrow-phone", width: 390, height: 844, scale: 1 },
+];
+const graphRows = [];
+
+const readScale = () =>
+  evaluate(`(() => {
+    const m = /scale\\(([0-9.]+)\\)/.exec(document.querySelector(".react-flow__viewport")?.style.transform ?? "");
+    return m ? Number(m[1]) : null;
+  })()`);
+
+const readTransform = () =>
+  evaluate(`document.querySelector(".react-flow__viewport")?.style.transform ?? ""`);
+
+const graphLayout = () =>
+  evaluate(`(() => {
+    const size = (s) => {
+      const b = document.querySelector(s)?.getBoundingClientRect();
+      return b ? { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) } : null;
+    };
+    const page = document.scrollingElement;
+    return {
+      header: size("header"),
+      canvas: size(".react-flow"),
+      controls: size(".react-flow__controls"),
+      page_scroll: page.scrollHeight - innerHeight,
+      inner: { w: innerWidth, h: innerHeight },
+    };
+  })()`);
+
+// Visible means the point at the node's centre lands on that node: inside the canvas and
+// not under the header, legend, controls or drawer.
+const nodeSeen = (id) =>
+  evaluate(`(() => {
+    const node = document.querySelector('.react-flow__node[data-id="${id}"]');
+    const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
+    const box = node?.getBoundingClientRect();
+    if (!box || !canvas || !canvas.height) return { seen: false, x: 0, y: 0, cx: 0, cy: 0, w: 0, h: 0 };
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const hit = x >= 0 && y >= 0 && x < innerWidth && y < innerHeight ? document.elementFromPoint(x, y) : null;
+    // The legend ignores the pointer, so hit testing alone would see through it.
+    const legend = [...document.querySelectorAll("div.pointer-events-none")].find((d) => d.innerText.includes("Dead-end"))?.getBoundingClientRect();
+    const underLegend = Boolean(legend && x >= legend.left && x <= legend.right && y >= legend.top && y <= legend.bottom);
+    return {
+      seen: Boolean(hit && node.contains(hit)) && !underLegend,
+      blocked_by: underLegend ? "LEGEND" : hit && !node.contains(hit) ? (hit.closest("aside,header,.react-flow__controls") ?? hit).tagName : null,
+      x, y,
+      cx: canvas.x + canvas.width / 2,
+      cy: canvas.y + canvas.height / 2,
+      w: canvas.width,
+      h: canvas.height,
+    };
+  })()`);
+
+const freePanePoint = (dx, dy) =>
+  evaluate(`(() => {
+    const c = document.querySelector(".react-flow").getBoundingClientRect();
+    for (let i = 1; i < 12; i++) for (let j = 1; j < 12; j++) {
+      const x = c.x + (c.width * i) / 12;
+      const y = c.y + (c.height * j) / 12;
+      const a = document.elementFromPoint(x, y);
+      if (!a?.classList.contains("react-flow__pane")) continue;
+      const tx = x + ${dx}, ty = y + ${dy};
+      if (tx > c.x + 2 && ty > c.y + 2 && tx < c.right - 2 && ty < c.bottom - 2) return { x, y };
+    }
+    return null;
+  })()`);
+
+async function dragBy(dx, dy) {
+  const start = await freePanePoint(dx, dy);
+  if (!start) return false;
+  const press = { x: start.x, y: start.y, button: "left", clickCount: 1 };
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: start.x, y: start.y });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", ...press });
+  for (let step = 1; step <= 5; step++) {
+    await send("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: start.x + (dx * step) / 5,
+      y: start.y + (dy * step) / 5,
+      button: "left",
+      buttons: 1,
+    });
+  }
+  await send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: start.x + dx,
+    y: start.y + dy,
+    button: "left",
+    clickCount: 1,
+  });
+  await sleep(80);
+  return true;
+}
+
+async function reachByDrag(id) {
+  for (let drags = 0; drags <= 30; drags++) {
+    const state = await nodeSeen(id);
+    if (state.seen) return { reached: true, drags };
+    if (!state.h) return { reached: false, drags, why: "no canvas height" };
+    const limit = (size, value) => Math.max(-size * 0.4, Math.min(size * 0.4, value));
+    const moved = await dragBy(limit(state.w, state.cx - state.x), limit(state.h, state.cy - state.y));
+    if (!moved) return { reached: false, drags, why: "no free pane to drag", blocked_by: state.blocked_by };
+  }
+  return { reached: false, drags: 30, why: "still hidden after 30 drags", blocked_by: (await nodeSeen(id)).blocked_by };
+}
+
+const controlButton = (name) =>
+  evaluate(`(() => {
+    const b = document.querySelector(".react-flow__controls-${name}");
+    if (!b || b.disabled) return false;
+    b.click();
+    return true;
+  })()`);
+
+async function setCanvasZoom(target) {
+  await controlButton("fitview");
+  await sleep(350);
+  if (target === "fit") return;
+  for (let i = 0; i < 16 && (await controlButton(target === "max" ? "zoomin" : "zoomout")); i++) {
+    await sleep(260);
+    const scale = await readScale();
+    if (target === "min" && scale <= 0.305) break;
+    if (target === "max" && scale >= 1.99) break;
+  }
+  if (target === "default") {
+    for (let i = 0; i < 16 && (await controlButton("zoomout")); i++) await sleep(260);
+    for (let i = 0; i < 16 && (await readScale()) < 0.95; i++) {
+      await controlButton("zoomin");
+      await sleep(260);
+    }
+  }
+}
+
+async function runGraphNavigation() {
+  const evidence = "injected-viewport";
+  const id = await openBobSession();
+  await waitFor("the composer", () => evaluate(`Boolean(document.querySelector("textarea"))`));
+
+  // 12 turns, then branches from turns 4 and 8.
+  const add = async (count, label) => {
+    for (let i = 1; i <= count; i++) {
+      const data = await tree(id);
+      const response = await fetch(`${API}/api/chat/turn`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({
+          session_id: id,
+          branch_id: data.active_branch_id,
+          parent_node_id: headOf(data),
+          expected_revision: data.revision,
+          user_message: `${label} line ${i}.`,
+        }),
+      });
+      if (!response.ok) throw new Error(`turn failed: ${response.status}`);
+    }
+  };
+  const branchFrom = async (index) => {
+    const data = await tree(id);
+    const node = selectedPath(data.nodes, headOf(data))[index];
+    const response = await fetch(`${API}/api/sessions/${id}/branches`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({
+        source_branch_id: data.active_branch_id,
+        rewind_to_node_id: node.id,
+        expected_revision: data.revision,
+      }),
+    });
+    if (!response.ok) throw new Error(`branch failed: ${response.status}`);
+  };
+  await add(12, "Main");
+  await branchFrom(3);
+  await add(4, "Second");
+  const data = await tree(id);
+  await branchFrom(1);
+  await add(2, "Third");
+  const before = await tree(id);
+  const ordered = [...before.nodes].sort((a, b) => a.id - b.id);
+  const deepest = ordered.reduce((a, b) => (b.turn_number > a.turn_number ? b : a));
+  const targets = { first: ordered[0].id, last: deepest.id };
+  check("tree: long and branched", before.nodes.length >= 18 && before.branches.length >= 3, "real-http", `${before.nodes.length} turns, ${before.branches.length} branches, ${data.nodes.length} before last`);
+
+  const url = new URL(`/flight-recorder?sessionId=${id}`, WEB).href;
+  for (const view of VIEWPORTS) {
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: view.width,
+      height: view.height,
+      deviceScaleFactor: view.scale,
+      mobile: false,
+    });
+    await send("Page.navigate", { url });
+    await waitFor("the graph", () => evaluate(`document.querySelectorAll(".react-flow__node").length > 5`), 20_000);
+    await sleep(800);
+    const layout = await graphLayout();
+    await screenshot(`graph-${view.name}-fit`);
+
+    // What the wheel does over the canvas.
+    const scaleBefore = await readScale();
+    const transformBefore = await readTransform();
+    await send("Input.dispatchMouseEvent", {
+      type: "mouseWheel",
+      x: view.width / 2,
+      y: Math.min(view.height - 20, (layout.canvas?.y ?? 0) + (layout.canvas?.h ?? 0) / 2),
+      deltaX: 0,
+      deltaY: 200,
+    });
+    await sleep(450);
+    const wheel =
+      (await readScale()) !== scaleBefore
+        ? "zooms"
+        : (await readTransform()) !== transformBefore
+          ? "pans"
+          : "nothing";
+
+    check(`${view.name}: the wheel moves the canvas`, wheel === "pans", evidence, wheel);
+    const row = { viewport: view, layout, wheel, zooms: {} };
+    for (const zoom of ["fit", "min", "default", "max"]) {
+      await setCanvasZoom(zoom);
+      const entry = { scale: await readScale() };
+      for (const [name, nodeId] of Object.entries(targets)) {
+        await setCanvasZoom(zoom);
+        entry[name] = await reachByDrag(nodeId);
+        check(`${view.name} ${zoom}: ${name} node reachable`, entry[name].reached, evidence, `${entry[name].drags} drags ${entry[name].why ?? ""}`);
+      }
+      graphStep: if (zoom === "max" && entry.last.reached) {
+        await screenshot(`graph-${view.name}-max-last`);
+        const point = await nodeSeen(targets.last);
+        await clickTreeNode(targets.last);
+        await sleep(450);
+        const opened = await nodeSeen(targets.last);
+        entry.drawer = { node_visible: opened.seen, blocked_by: opened.blocked_by ?? null };
+        await screenshot(`graph-${view.name}-max-drawer`);
+        const fills = view.width - 384 < 120;
+        if (!fills) {
+          check(`${view.name} max: selected node stays visible beside the drawer`, opened.seen, evidence, opened.blocked_by ?? "");
+        }
+        const closed = await evaluate(`(() => { const b = document.querySelector('[aria-label="Close"]'); if (!b) return false; b.click(); return true; })()`);
+        await sleep(450);
+        entry.drawer.closed = closed;
+        const shown = await nodeSeen(targets.last);
+        check(`${view.name} max: node visible after closing the drawer`, closed && shown.seen, evidence, shown.blocked_by ?? "");
+        if (!point) break graphStep;
+      }
+      row.zooms[zoom] = entry;
+    }
+    await sleep(350);
+    await setCanvasZoom("fit");
+    const hidden = [];
+    for (const node of before.nodes) {
+      if (!(await nodeSeen(node.id)).seen) hidden.push(node.id);
+    }
+    row.fit_hidden = hidden.length;
+    row.fit_recovers = hidden.length === 0;
+    check(`${view.name}: Fit view shows every node`, hidden.length === 0, evidence, `${hidden.length} of ${before.nodes.length} hidden`);
+    graphRows.push(row);
+    console.log(
+      `${view.name}: canvas ${layout.canvas?.w}x${layout.canvas?.h} of ${view.width}x${view.height}, header ${layout.header?.h}, page scroll ${layout.page_scroll}, wheel ${wheel}`,
+    );
+  }
+
+  const after = await tree(id);
+  check("state: revision unchanged by navigation", after.revision === before.revision, "real-http", `${after.revision}`);
+  check("state: active branch unchanged", after.active_branch_id === before.active_branch_id, "real-http");
+  check("no console errors or exceptions", problems.length === 0, evidence, problems.slice(0, 3).join(" | "));
+}
+
 // ---- Bob evidence ------------------------------------------------------------------------
 //
 // Each case is a list of steps, so an independent runner can supply unseen cases:
@@ -1303,6 +1584,7 @@ function liveHintStats() {
 async function run() {
   if (LOST) return runLostResponse();
   if (RECORDER_FAILURE) return runRecorderFailure();
+  if (GRAPH) return runGraphNavigation();
   if (args.journey === "bob") return runBob();
   if (STUB) {
     await runLongWait();
@@ -1847,6 +2129,7 @@ async function main() {
     live_hint_stats: REAL ? liveHintStats() : undefined,
     saved_hints: savedHints,
     bob: bobEvidence,
+    graph_navigation: GRAPH ? graphRows : undefined,
     recorder_failure: RECORDER_FAILURE
       ? { scenario_requests: scenarioRequests, persona_calls: personaCalls() }
       : undefined,
