@@ -36,6 +36,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.2:8080")
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument(
+        "--short-diagnostic",
+        action="store_true",
+        help="Two integrated turns and no hints; requires2/2/0caps.",
+    )
     args = parser.parse_args()
     if args.out.exists():
         raise ValueError("Refusing to replace prior live evidence.")
@@ -48,7 +53,9 @@ def main() -> None:
         ).strip(),
         "transport": "real HTTP",
         "cases": records,
-        "plan": {"persona": 8, "feedback": 8, "coach": 4},
+        "plan": {"persona": 2, "feedback": 2, "coach": 0}
+        if args.short_diagnostic
+        else {"persona": 8, "feedback": 8, "coach": 4},
         "scope": "Codex authored synthetic shared sample, not independent or unseen",
     }
 
@@ -72,7 +79,12 @@ def main() -> None:
         scenarios, _ = request("/api/scenarios")
         bob = next(s for s in scenarios if s["persona"]["name"] == "Bob")
         assert "semantic-r1" in bob["feedback_revisions"]
-        for case_id, messages in CASES:
+        cases = (
+            [("span-evidence-integrated", CASES[0][1][:2])]
+            if args.short_diagnostic
+            else CASES
+        )
+        for case_id, messages in cases:
             session, _ = request(
                 "/api/sessions",
                 {
@@ -127,7 +139,7 @@ def main() -> None:
                     ),
                     flush=True,
                 )
-                if index == 1:
+                if index == 1 and not args.short_diagnostic:
                     for attempt in (1, 2):
                         hint, hint_elapsed = request(
                             f"/api/sessions/{session['id']}/coach-hints",
