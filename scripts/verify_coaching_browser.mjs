@@ -13,6 +13,13 @@
 //   --out <dir>        Report and screenshots. Default: a new temp directory.
 //   --python <path>    Default: backend/.venv's interpreter.
 //   --edge <path>      Default: the standard Windows Edge install.
+//   --journey bob      Run the --cases step lists against Bob instead of the full journey.
+//                      Needs --coach real. Saves each hint beside the public dialogue it
+//                      answered. Case text is never printed, so a held-out file stays out
+//                      of the console; its report does contain the text.
+//   --cases <path>     Default: scripts/cases/bob_capture_cases.json.
+//   --frontend <mode>  dev (default) or production: a built client served by a local Worker.
+//   --bind <address>   Default 127.0.0.1. Use 127.0.0.2 to run beside a held demo.
 //
 // Needs ports 8080 and 5173 free, and stops if they are not. It starts both servers on a
 // new disposable SQLite database and removes that database afterwards. Persona turns use
@@ -31,8 +38,17 @@ import {
 } from "node:fs";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+
+import {
+  denominators,
+  effectiveSettings,
+  followRecord,
+  forbiddenKeys,
+  hintRecord,
+  selectedPath,
+} from "./coach_evidence.mjs";
 
 const { values: args } = parseArgs({
   options: {
@@ -42,6 +58,10 @@ const { values: args } = parseArgs({
     out: { type: "string" },
     python: { type: "string" },
     edge: { type: "string" },
+    journey: { type: "string", default: "full" },
+    cases: { type: "string" },
+    frontend: { type: "string", default: "dev" },
+    bind: { type: "string", default: "127.0.0.1" },
   },
 });
 
@@ -50,13 +70,21 @@ if (!["injected", "real", "stub"].includes(args.coach)) {
 }
 if (args.coach === "stub" && !args["demo-wait"]) throw new Error("--coach stub needs --demo-wait");
 if (!args["env-file"]) throw new Error("--env-file is required: persona turns need Baseten");
+if (!["full", "bob"].includes(args.journey)) throw new Error("--journey: full or bob");
+if (!["dev", "production"].includes(args.frontend)) {
+  throw new Error("--frontend: dev or production");
+}
+if (args.journey === "bob" && args.coach !== "real") throw new Error("--journey bob: --coach real");
 
 const ROOT = resolve(import.meta.dirname, "..");
-const WEB = "http://127.0.0.1:5173";
-const API = "http://127.0.0.1:8080";
+const BIND = args.bind;
+const WEB = `http://${BIND}:5173`;
+const API = `http://${BIND}:8080`;
 const DEBUG_PORT = 9334;
 const STUB = args.coach === "stub";
 const STUB_DELAY_S = 35;
+// Older Wrangler bundles a Workerd that refuses the build's compatibility date (CS-C360).
+const WRANGLER_VERSION = "4.156.2";
 const REAL = args.coach !== "injected";
 const DEMO = args["demo-wait"];
 // With no cutoff in demo waiting, a live hint can take far longer than the usual bound.
@@ -66,6 +94,7 @@ const PYTHON = args.python ?? join(ROOT, "backend", ".venv", "Scripts", "python.
 const EDGE = args.edge ?? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const SCRATCH = mkdtempSync(join(tmpdir(), "coach-browser-db-"));
 const STUB_CALLS = join(SCRATCH, "stub-calls.txt");
+const TELEMETRY = join(OUT, "coach-telemetry.jsonl");
 mkdirSync(OUT, { recursive: true });
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -94,7 +123,7 @@ function notExercised(name, evidence, why) {
 
 const portFree = (port) =>
   new Promise((done) => {
-    const socket = createConnection({ port, host: "127.0.0.1" });
+    const socket = createConnection({ port, host: BIND });
     socket.once("connect", () => (socket.destroy(), done(false)));
     socket.once("error", () => done(true));
   });
@@ -601,6 +630,323 @@ async function runLongWait() {
   await screenshot("long-wait-end");
 }
 
+// ---- Bob evidence ------------------------------------------------------------------------
+//
+// Each case is a list of steps, so an independent runner can supply unseen cases:
+//   { "say": "text" }         the learner sends a line
+//   { "hints": true }         first and second hints on the current turn
+//   { "follow": 1 }           send that attempt's example line, verbatim
+//   { "reload": true }        reload, then compare saved hints
+//   { "fork_to_turn": 2 }     rewind to that turn on a new branch
+//
+// A hint that fails to arrive is recorded and the case goes on. Only a failure the learner
+// could not get past ends a case, and that failure stays in the report.
+
+const bob = {
+  cases: [],
+  hints: [],
+  missing: [],
+  follow_through: [],
+  transcripts: [],
+  reloads: [],
+  forks: [],
+  persona_turns_attempted: 0,
+};
+
+async function openBobSession() {
+  await send("Page.navigate", { url: WEB });
+  await waitFor("the hub", () => has("New Session"), 30_000);
+  const clicked = await evaluate(`(() => {
+    const starts = [...document.querySelectorAll("button")].filter((b) => b.innerText.trim() === "New Session");
+    for (const start of starts) {
+      for (let box = start.parentElement; box; box = box.parentElement) {
+        const inside = starts.filter((b) => box.contains(b)).length;
+        if (inside > 1) break;
+        if (box.innerText.includes("Bob")) return start.click(), true;
+      }
+    }
+    return false;
+  })()`);
+  if (!clicked) throw new Error("no Bob card on the hub");
+  await waitFor("the Arena", () => evaluate(`location.pathname === "/arena"`), 20_000);
+  await waitFor("the Bob session", () => has("Your situation"), 20_000);
+  return Number(new URL(await evaluate("location.href")).searchParams.get("sessionId"));
+}
+
+const hintsOnBranch = async (ctx, branch) =>
+  (await getJson(`/api/sessions/${ctx.sessionId}/branches/${branch}/coach-hints`)).hints;
+
+const hintsHere = async (ctx) =>
+  (await hintsOnBranch(ctx, ctx.branch))
+    .filter((h) => h.head_node_id === ctx.head)
+    .map((h) => h.hint);
+
+const slotOf = (ctx, attempt) => `${ctx.branch}:${ctx.head}:${attempt}`;
+
+// Times are what the learner waited, measured here. latency_ms on the wire saturates at 10s.
+async function awaitHint(ctx, attempt, startedAt, turnMs, trigger) {
+  try {
+    await waitFor(
+      `attempt ${attempt}`,
+      async () => (await hintsHere(ctx)).some((h) => h.attempt === attempt),
+      HINT_WAIT_MS,
+    );
+  } catch (error) {
+    bob.missing.push({ case_id: ctx.caseId, slot: slotOf(ctx, attempt), attempt, why: error.message });
+    return false;
+  }
+  const waited = Date.now() - startedAt;
+  const earlier = attempt === 1 ? (turnMs ?? 0) : (ctx.timing.get(slotOf(ctx, 1))?.stalled_total_ms ?? 0);
+  ctx.timing.set(slotOf(ctx, attempt), {
+    trigger,
+    turn_ms: turnMs,
+    hint_wait_ms: waited,
+    stalled_total_ms: earlier + waited,
+  });
+  return true;
+}
+
+// Whether a turn drew automatic help is the app's decision, so watch for its POST. Waiting
+// also keeps a pending hint from being abandoned, which would spend a call for nothing.
+async function settleAutomaticHint(ctx, turnMs) {
+  const startedAt = Date.now();
+  const posted = await waitFor(
+    "an automatic hint",
+    () =>
+      coachPosts.some(
+        (p) => p.body.branch_id === ctx.branch && p.body.head_node_id === ctx.head,
+      ),
+    6_000,
+  ).catch(() => false);
+  if (posted) await awaitHint(ctx, 1, startedAt, turnMs, "automatic");
+}
+
+async function bobSay(ctx, text) {
+  const data = await tree(ctx.sessionId);
+  const before = data.nodes.find((n) => n.id === ctx.head);
+  const startedAt = Date.now();
+  bob.persona_turns_attempted += 1;
+  const turn = await sendTurn(ctx.sessionId, text);
+  ctx.turnMs = Date.now() - startedAt;
+  ctx.branch = turn.data.active_branch_id;
+  ctx.head = turn.head.id;
+  await settleAutomaticHint(ctx, ctx.turnMs);
+  return { turn, before };
+}
+
+async function bobHints(ctx) {
+  if ((await hintsHere(ctx)).length === 0) {
+    const startedAt = Date.now();
+    await click("Get a hint");
+    if (!(await awaitHint(ctx, 1, startedAt, ctx.turnMs, "requested"))) {
+      bob.missing.push({ case_id: ctx.caseId, slot: slotOf(ctx, 2), attempt: 2, why: "no first hint" });
+      return;
+    }
+  }
+  const startedAt = Date.now();
+  await click("Try another approach");
+  await awaitHint(ctx, 2, startedAt, null, "requested");
+}
+
+async function bobFollow(ctx, attempt) {
+  const hint = (await hintsHere(ctx)).find((h) => h.attempt === attempt);
+  if (!hint) {
+    bob.follow_through.push({ case_id: ctx.caseId, attempt, skipped: "no saved hint to send" });
+    return;
+  }
+  const identity = { case_id: ctx.caseId, session_id: ctx.sessionId, branch_id: ctx.branch };
+  const { turn, before } = await bobSay(ctx, hint.example);
+  bob.follow_through.push(followRecord({ identity, hint, node: turn.head, before }));
+}
+
+async function bobReload(ctx) {
+  const ids = async () => (await hintsHere(ctx)).map((h) => h.id).sort((a, b) => a - b);
+  const before = await ids();
+  const posts = coachPosts.length;
+  await send("Page.reload");
+  await waitFor("the Arena after reload", () => has("Your situation"), 20_000);
+  await sleep(1_500);
+  const after = await ids();
+  const latest = (await hintsHere(ctx)).sort((a, b) => b.attempt - a.attempt)[0];
+  const record = {
+    case_id: ctx.caseId,
+    session_id: ctx.sessionId,
+    branch_id: ctx.branch,
+    head_node_id: ctx.head,
+    hint_ids_before: before,
+    hint_ids_after: after,
+    posts_added: coachPosts.length - posts,
+    latest_hint_visible: latest ? await has(latest.approach) : null,
+  };
+  bob.reloads.push(record);
+  if (before.length === 0) {
+    notExercised(`${ctx.caseId}: reload`, "real-http", "no saved hint on this turn to restore");
+    return;
+  }
+  check(
+    `${ctx.caseId}: reload keeps saved hints and makes no POST`,
+    JSON.stringify(before) === JSON.stringify(after) && record.posts_added === 0,
+    "real-http",
+  );
+}
+
+async function bobFork(ctx, turnNumber) {
+  const data = await tree(ctx.sessionId);
+  const target = selectedPath(data.nodes, ctx.head).find((n) => n.turn_number === turnNumber);
+  if (!target) throw new Error(`no turn ${turnNumber} on the selected branch`);
+  const source = data.active_branch_id;
+  await clickLink("End Simulation");
+  await waitFor(
+    "the Flight Recorder",
+    () => evaluate(`location.pathname === "/flight-recorder"`),
+    15_000,
+  );
+  await clickTreeNode(target.id);
+  await click("Branch from here");
+  await waitFor(
+    "the Arena on the new branch",
+    () => evaluate(`location.pathname === "/arena"`),
+    15_000,
+  );
+  await waitFor(
+    "the new branch's state",
+    async () => (await tree(ctx.sessionId)).active_branch_id !== source,
+    15_000,
+  );
+  const forked = await tree(ctx.sessionId);
+  ctx.branch = forked.active_branch_id;
+  ctx.head = target.id;
+  ctx.turnMs = null;
+  await settleAutomaticHint(ctx, null);
+  bob.forks.push({
+    case_id: ctx.caseId,
+    session_id: ctx.sessionId,
+    source_branch_id: source,
+    fork_branch_id: forked.active_branch_id,
+    fork_node_id: target.id,
+    source_branch_kept: forked.branches.some((b) => b.id === source),
+    nodes_before: data.nodes.length,
+    nodes_after: forked.nodes.length,
+  });
+  check(
+    `${ctx.caseId}: fork keeps the source branch and its turns`,
+    forked.branches.some((b) => b.id === source) && forked.nodes.length === data.nodes.length,
+    "real-http",
+  );
+}
+
+// Everything saved, on every branch, so a hint the steps never asked for is still on record.
+async function harvestCase(ctx) {
+  const data = await tree(ctx.sessionId);
+  const session = await getJson(`/api/sessions/${ctx.sessionId}`);
+  const scenario = await getJson(`/api/scenarios/${session.scenario_id}`);
+  const opening = scenario.persona.opening_message;
+  for (const branch of data.branches) {
+    const listed = await hintsOnBranch(ctx, branch.id);
+    bob.transcripts.push({
+      case_id: ctx.caseId,
+      session_id: ctx.sessionId,
+      branch_id: branch.id,
+      head_node_id: branch.head_node_id,
+      fork_node_id: branch.fork_node_id,
+      opening,
+      turns:
+        branch.head_node_id == null
+          ? []
+          : selectedPath(data.nodes, branch.head_node_id).map((n) => ({
+              node_id: n.id,
+              turn_number: n.turn_number,
+              learner: n.user_text,
+              persona: n.character_text,
+              score: n.score,
+              resistance: n.resistance,
+              question_type: n.coaching?.question_type ?? null,
+            })),
+    });
+    for (const { head_node_id: head, hint } of listed) {
+      bob.hints.push(
+        hintRecord({
+          identity: { case_id: ctx.caseId, session_id: ctx.sessionId, branch_id: branch.id },
+          opening,
+          nodes: data.nodes,
+          headNodeId: head,
+          entries: listed,
+          hint,
+          timing: ctx.timing.get(`${branch.id}:${head}:${hint.attempt}`),
+        }),
+      );
+    }
+  }
+}
+
+function loadCases() {
+  const path = resolve(args.cases ?? join(ROOT, "scripts", "cases", "bob_capture_cases.json"));
+  const cases = JSON.parse(readFileSync(path, "utf8")).cases;
+  if (!Array.isArray(cases) || cases.length === 0) throw new Error("--cases: no cases");
+  const steps = new Set(["say", "hints", "follow", "reload", "fork_to_turn"]);
+  for (const item of cases) {
+    const unknown = item.steps.flatMap(Object.keys).filter((key) => !steps.has(key));
+    if (!item.id || unknown.length) throw new Error(`--cases: bad case ${item.id ?? "?"}`);
+  }
+  return cases;
+}
+
+async function runBob() {
+  for (const item of loadCases()) {
+    const ctx = { caseId: item.id, timing: new Map(), head: null, turnMs: null };
+    bob.cases.push({ id: item.id, kind: item.kind ?? null, steps: item.steps.length });
+    let failure = null;
+    try {
+      ctx.sessionId = await openBobSession();
+      ctx.branch = (await tree(ctx.sessionId)).active_branch_id;
+      for (const step of item.steps) {
+        if ("say" in step) await bobSay(ctx, step.say);
+        else if ("hints" in step) await bobHints(ctx);
+        else if ("follow" in step) await bobFollow(ctx, step.follow);
+        else if ("reload" in step) await bobReload(ctx);
+        else await bobFork(ctx, step.fork_to_turn);
+      }
+    } catch (error) {
+      failure = error.message;
+      await screenshot(`case-${item.id}-failed`).catch(() => {});
+    }
+    if (ctx.sessionId) await harvestCase(ctx);
+    bob.cases.at(-1).failure = failure;
+    check(`case ${item.id} completed`, !failure, "live-meta", failure ?? "");
+    await screenshot(`case-${item.id}`).catch(() => {});
+  }
+  check(
+    "no console errors or exceptions",
+    problems.length === 0,
+    "real-http",
+    problems.slice(0, 3).join(" | "),
+  );
+}
+
+// Declared settings, read from the source under test rather than copied into this script.
+function sourceSettings() {
+  const code = [
+    "import json, sys",
+    "sys.path.insert(0, 'backend')",
+    "import coach as c",
+    "print(json.dumps({'model_default': c.DEFAULT_MODEL, 'temperature': c.COACH_TEMPERATURE,",
+    "  'max_tokens': c.COACH_MAX_TOKENS, 'demo_max_tokens': c.COACH_DEMO_MAX_TOKENS,",
+    "  'demo_reasoning_effort': c.COACH_DEMO_REASONING_EFFORT,",
+    "  'timeout_seconds': c.COACH_TIMEOUT_SECONDS}))",
+  ].join("\n");
+  const result = spawnSync(PYTHON, ["-c", code], { cwd: ROOT, encoding: "utf8" });
+  if (result.status !== 0) throw new Error("could not read coach settings from source");
+  return JSON.parse(result.stdout);
+}
+
+function readTelemetry() {
+  try {
+    return readFileSync(TELEMETRY, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  } catch {
+    return undefined;
+  }
+}
+
 function liveHintStats() {
   const provider = savedHints.filter((h) => h.source === "meta");
   const reasons = {};
@@ -617,6 +963,7 @@ function liveHintStats() {
 }
 
 async function run() {
+  if (args.journey === "bob") return runBob();
   if (STUB) {
     await runLongWait();
     check(
@@ -976,7 +1323,7 @@ async function main() {
   for (const port of [8080, 5173]) {
     if (!(await portFree(port))) throw new Error(`port ${port} is in use; refusing to start`);
   }
-  const revision = spawnSync("git", ["rev-parse", "--short", "HEAD"], {
+  const revision = spawnSync("git", ["rev-parse", "HEAD"], {
     cwd: ROOT,
     encoding: "utf8",
   });
@@ -996,35 +1343,58 @@ async function main() {
           "--calls-file",
           STUB_CALLS,
         ]
-      : ["scripts/run_backend.py", "--env-file", resolve(args["env-file"])],
+      : ["scripts/run_backend.py", "--env-file", resolve(args["env-file"]), "--host", BIND],
     {
       env: {
         ...process.env,
         DIALOGIQ_DB_PATH: database,
+        ...(REAL && !STUB ? { COACH_TELEMETRY_FILE: TELEMETRY } : {}),
+        // Only a run on another address needs this; the default origins stay as they are.
+        ...(BIND === "127.0.0.1" ? {} : { DIALOGIQ_CORS_ORIGINS: WEB }),
         ...(DEMO ? { COACH_DEMO_WAIT: "1" } : {}),
       },
     },
   );
   await waitForUrl(`${API}/api/scenarios`, "backend");
+  const clientEnv = {
+    ...process.env,
+    VITE_API_BASE_URL: API,
+    ...(DEMO ? { VITE_COACH_DEMO_WAIT: "1" } : {}),
+  };
+  if (args.frontend === "production") {
+    const built = spawnSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
+      cwd: ROOT,
+      env: clientEnv,
+      encoding: "utf8",
+    });
+    writeFileSync(join(OUT, "build.log"), `${built.stdout}\n${built.stderr}`);
+    if (built.status !== 0) throw new Error(`production build failed; see ${OUT}`);
+  }
   startLogged(
     "frontend",
     process.execPath,
-    [
-      "node_modules/vite/bin/vite.js",
-      "dev",
-      "--host",
-      "127.0.0.1",
-      "--port",
-      "5173",
-      "--strictPort",
-    ],
-    {
-      env: {
-        ...process.env,
-        VITE_API_BASE_URL: API,
-        ...(DEMO ? { VITE_COACH_DEMO_WAIT: "1" } : {}),
-      },
-    },
+    args.frontend === "production"
+      ? [
+          join(dirname(process.execPath), "node_modules/npm/bin/npm-cli.js"),
+          "exec",
+          "--yes",
+          `--package=wrangler@${WRANGLER_VERSION}`,
+          "--",
+          "wrangler",
+          "dev",
+          "--config",
+          ".output/server/wrangler.json",
+          "--local",
+          "--ip",
+          BIND,
+          "--port",
+          "5173",
+          "--inspector-port",
+          "9335",
+          "--show-interactive-dev-session=false",
+        ]
+      : ["node_modules/vite/bin/vite.js", "dev", "--host", BIND, "--port", "5173", "--strictPort"],
+    { env: clientEnv },
   );
   await waitForUrl(WEB, "frontend");
 
@@ -1082,12 +1452,38 @@ async function main() {
     await screenshot("crash").catch(() => {});
   }
 
+  const telemetry = readTelemetry();
+  const providerSettings = REAL ? effectiveSettings(sourceSettings(), DEMO, telemetry) : null;
+  const bobEvidence =
+    args.journey === "bob"
+      ? {
+          scope: "public selected-branch dialogue only",
+          cases: bob.cases,
+          denominators: denominators(bob.hints, bob.missing),
+          hints: bob.hints,
+          missing_hints: bob.missing,
+          follow_through: bob.follow_through,
+          transcripts: bob.transcripts,
+          reloads: bob.reloads,
+          forks: bob.forks,
+          persona_turns_attempted: bob.persona_turns_attempted,
+        }
+      : undefined;
+  if (bobEvidence) {
+    const leaks = forbiddenKeys({ bobEvidence, providerSettings });
+    check("report holds no private field names", leaks.length === 0, "harness", leaks.join(" "));
+  }
+
   const failed = results.filter((r) => r.status === "FAIL").length;
   const report = {
+    journey: args.journey,
     coach_mode: args.coach,
     demo_wait: DEMO,
+    frontend: args.frontend,
+    bind: BIND,
     wire_contract: "s3-coach-r2",
-    provider_delta: REAL ? "s3-coach-r2.token-2048.1" : null,
+    provider_settings: providerSettings,
+    meta_calls_observed: telemetry?.length ?? null,
     source_revision: revision.stdout.trim(),
     uncommitted_changes: dirty.stdout.trim().length > 0,
     database: "disposable, removed after this run",
@@ -1099,6 +1495,7 @@ async function main() {
     n1_pairs: n1Pairs,
     live_hint_stats: REAL ? liveHintStats() : undefined,
     saved_hints: savedHints,
+    bob: bobEvidence,
     summary: {
       passed: results.filter((r) => r.status === "pass").length,
       failed,
