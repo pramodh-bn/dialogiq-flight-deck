@@ -6,9 +6,14 @@ only the allowlisted public context assembled by ``coach_context``.
 
 Configuration is env-only (mirrors the persona client pattern):
 
-- ``META_MODEL_API_KEY``: required, no fallback to any other backend's key.
-- ``META_MODEL_API_BASE``: required, no default; must be plain https.
-- ``META_MODEL_API_MODEL``: default ``muse-spark-1.3`` (existing default).
+- ``COACH_PROVIDER``: ``meta`` (default) or ``fireworks`` (CS-80). Any
+  other value leaves the client inert. Keys never cross providers.
+- meta: ``META_MODEL_API_KEY`` required; ``META_MODEL_API_BASE`` required,
+  no default, plain https; ``META_MODEL_API_MODEL`` default
+  ``muse-spark-1.3``.
+- fireworks: ``FIREWORKS_API_KEY`` required; ``FIREWORKS_API_BASE`` default
+  ``https://api.fireworks.ai/inference/v1``; ``FIREWORKS_MODEL`` default
+  ``accounts/fireworks/models/muse-spark-open``.
 
 Effective parameters per the accepted contract plus adopted delta
 s3-coach-r2.token-2048.1: temperature 0.3, max_tokens 2048, one
@@ -59,6 +64,42 @@ REASON_MAX_CHARS = 360
 ENV_KEY = "META_MODEL_API_KEY"
 ENV_BASE = "META_MODEL_API_BASE"
 ENV_MODEL = "META_MODEL_API_MODEL"
+
+ENV_PROVIDER = "COACH_PROVIDER"
+PROVIDER_META = "meta"
+PROVIDER_FIREWORKS = "fireworks"
+
+
+@dataclass(frozen=True)
+class ProviderEnv:
+    """Env names and defaults for one OpenAI-compatible coach provider."""
+
+    key: str
+    base: str
+    model: str
+    default_base: str
+    default_model: str
+
+
+PROVIDERS = {
+    PROVIDER_META: ProviderEnv(ENV_KEY, ENV_BASE, ENV_MODEL, "", DEFAULT_MODEL),
+    PROVIDER_FIREWORKS: ProviderEnv(
+        "FIREWORKS_API_KEY",
+        "FIREWORKS_API_BASE",
+        "FIREWORKS_MODEL",
+        "https://api.fireworks.ai/inference/v1",
+        "accounts/fireworks/models/muse-spark-open",
+    ),
+}
+# Every env name a runner may copy from an env file for the coach.
+COACH_ENV_KEYS = (ENV_PROVIDER,) + tuple(
+    name for p in PROVIDERS.values() for name in (p.key, p.base, p.model)
+)
+
+
+def selected_provider() -> str:
+    """The coach provider named by COACH_PROVIDER (default meta), lowercased."""
+    return os.environ.get(ENV_PROVIDER, PROVIDER_META).strip().lower()
 
 
 class CoachError(Exception):
@@ -201,13 +242,23 @@ class MetaCoachClient:
         model: str | None = None,
         api_key: str | None = None,
     ) -> None:
-        raw_base = base_url if base_url is not None else os.environ.get(ENV_BASE, "")
-        raw_model = (
-            model if model is not None else os.environ.get(ENV_MODEL, DEFAULT_MODEL)
+        # CS-80: COACH_PROVIDER picks which env names to read. An unknown
+        # provider reads nothing, so the client stays inert.
+        self.provider = selected_provider()
+        env = PROVIDERS.get(self.provider)
+        env_base = os.environ.get(env.base, env.default_base) if env else ""
+        env_model = os.environ.get(env.model, env.default_model) if env else ""
+        env_key = os.environ.get(env.key, "") if env else ""
+        self.env_names = (
+            f"{env.key}, {env.base} and {env.model}"
+            if env
+            else f"{ENV_PROVIDER}=meta or fireworks"
         )
+        raw_base = base_url if base_url is not None else env_base
+        raw_model = model if model is not None else env_model
         # Passing "" (not None) stops any fallback to another backend's
-        # key when no Meta key is set.
-        raw_key = api_key if api_key is not None else os.environ.get(ENV_KEY, "")
+        # key when the selected provider's key is not set.
+        raw_key = api_key if api_key is not None else env_key
         # Blank (whitespace-only) values are missing config, never live input.
         self.base_url = raw_base.strip()
         self.model = raw_model.strip()
@@ -243,13 +294,13 @@ class MetaCoachClient:
         """
         if not self.api_key or not self.model:
             raise CoachNotConfiguredError(
-                "MetaCoachClient needs META_MODEL_API_KEY and "
-                "META_MODEL_API_MODEL to be set; no request was made."
+                f"MetaCoachClient ({self.provider}) needs {self.env_names} "
+                "with a key and model set; no request was made."
             )
         if not base_url_valid(self.base_url):
             raise CoachNotConfiguredError(
-                "MetaCoachClient needs META_MODEL_API_BASE to be a plain "
-                "https URL; no request was made."
+                f"MetaCoachClient ({self.provider}) needs a plain https base "
+                f"URL from {self.env_names}; no request was made."
             )
         # Built only after the checks above, so an unconfigured client
         # never reaches the library (which would otherwise raise, or

@@ -263,3 +263,91 @@ def test_default_timeout_stays_eight_seconds(monkeypatch) -> None:  # type: igno
     completions = _install_fake(monkeypatch, result)
     _client().respond(system_prompt="s", context_json="{}")
     assert completions.calls[0]["timeout"] == coach.COACH_TIMEOUT_SECONDS == 8.0
+
+
+# CS-80: provider selection by COACH_PROVIDER. Env-only, zero network.
+_ALL_COACH_ENV = coach.COACH_ENV_KEYS
+
+
+def _clear_coach_env(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    for name in _ALL_COACH_ENV:
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_provider_defaults_to_meta_env(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setenv("META_MODEL_API_KEY", "meta-key")
+    monkeypatch.setenv("META_MODEL_API_BASE", "https://meta.example/v1")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-key")
+    client = MetaCoachClient()
+    assert client.provider == "meta"
+    assert client.api_key == "meta-key"
+    assert client.base_url == "https://meta.example/v1"
+    assert client.model == "muse-spark-1.3"
+    assert client.configured
+
+
+def test_fireworks_provider_uses_its_own_env_and_defaults(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setenv("COACH_PROVIDER", " Fireworks ")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-key")
+    monkeypatch.setenv("META_MODEL_API_KEY", "meta-key")
+    monkeypatch.setenv("META_MODEL_API_BASE", "https://meta.example/v1")
+    client = MetaCoachClient()
+    assert client.provider == "fireworks"
+    assert client.api_key == "fw-key"
+    assert client.base_url == "https://api.fireworks.ai/inference/v1"
+    assert client.model == "accounts/fireworks/models/muse-spark-open"
+    assert client.configured
+
+
+def test_fireworks_without_its_key_never_borrows_meta_key(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setenv("COACH_PROVIDER", "fireworks")
+    monkeypatch.setenv("META_MODEL_API_KEY", "meta-key")
+    client = MetaCoachClient()
+    assert client.api_key == ""
+    assert not client.configured
+    try:
+        client.respond(system_prompt="s", context_json="{}")
+    except CoachNotConfiguredError as exc:
+        assert "FIREWORKS_API_KEY" in str(exc)
+        assert "meta-key" not in str(exc)
+    else:
+        raise AssertionError("expected CoachNotConfiguredError")
+
+
+def test_meta_without_its_key_never_borrows_fireworks_key(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setenv("META_MODEL_API_BASE", "https://meta.example/v1")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-key")
+    client = MetaCoachClient()
+    assert client.api_key == ""
+    assert not client.configured
+
+
+def test_unknown_provider_is_inert(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setenv("COACH_PROVIDER", "openai")
+    monkeypatch.setenv("META_MODEL_API_KEY", "meta-key")
+    monkeypatch.setenv("META_MODEL_API_BASE", "https://meta.example/v1")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-key")
+    client = MetaCoachClient()
+    assert not client.configured
+    try:
+        client.respond(system_prompt="s", context_json="{}")
+    except CoachNotConfiguredError as exc:
+        assert "COACH_PROVIDER" in str(exc)
+    else:
+        raise AssertionError("expected CoachNotConfiguredError")
+
+
+def test_fireworks_overrides_and_request_model(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _clear_coach_env(monkeypatch)
+    monkeypatch.setenv("COACH_PROVIDER", "fireworks")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-key")
+    monkeypatch.setenv("FIREWORKS_API_BASE", "https://fw.example/v1")
+    monkeypatch.setenv("FIREWORKS_MODEL", "accounts/x/models/y")
+    completions = _install_fake(monkeypatch, _FakeCompletion(VALID_HINT, "stop", 10, 0))
+    MetaCoachClient().respond(system_prompt="s", context_json="{}")
+    assert completions.calls[0]["model"] == "accounts/x/models/y"

@@ -11,7 +11,16 @@ from typing import Any
 import uvicorn
 from probe_persona_live import ENV_KEYS, parse_env_file
 
-META_ENV_KEYS = ("META_MODEL_API_KEY", "META_MODEL_API_BASE", "META_MODEL_API_MODEL")
+# CS-80: coach env for either provider (see backend/coach.py COACH_ENV_KEYS).
+META_ENV_KEYS = (
+    "META_MODEL_API_KEY",
+    "META_MODEL_API_BASE",
+    "META_MODEL_API_MODEL",
+    "COACH_PROVIDER",
+    "FIREWORKS_API_KEY",
+    "FIREWORKS_API_BASE",
+    "FIREWORKS_MODEL",
+)
 COACH_DEMO_ENV_KEYS = ("COACH_DEMO_WAIT",)
 
 
