@@ -102,6 +102,11 @@ function tagFor({ empathy, question_type }: Coaching) {
 
 type TurnNodeData = { t: TurnNode; selected: boolean; dimmed: boolean };
 
+// Sessions pinned to a behavior revision say what the score counts, not "Breakthrough".
+function kindLabel(kind: Kind, pinned: boolean): string {
+  return pinned && kind === "breakthrough" ? "Need uncovered" : palette[kind].label;
+}
+
 function TurnCard({ data }: NodeProps<Node<TurnNodeData>>) {
   const { t, selected, dimmed } = data;
   const p = palette[t.coaching.outcome];
@@ -114,7 +119,7 @@ function TurnCard({ data }: NodeProps<Node<TurnNodeData>>) {
         <span className="font-mono text-muted-foreground">TURN {t.turn_number}</span>
         <span className="flex items-center gap-1 text-foreground">
           <span className={`h-2 w-2 rounded-full ${p.dot}`} />
-          {p.label}
+          {kindLabel(t.coaching.outcome, Boolean(t.conversation_progress))}
         </span>
       </div>
       <p className="mt-1.5 line-clamp-2 text-xs font-medium text-foreground">“{t.user_text}”</p>
@@ -204,8 +209,8 @@ function Recorder({ sessionId }: { sessionId: number }) {
       session={session.data}
       tree={tree.data}
       title={scenario.data.title}
-      opening={scenario.data.persona.opening_message}
-      personaName={scenario.data.persona.name}
+      opening={(session.data.persona ?? scenario.data.persona).opening_message}
+      personaName={(session.data.persona ?? scenario.data.persona).name}
     />
   );
 }
@@ -430,7 +435,7 @@ function RecorderView({
             sub={`across ${tree.branches.length} ${tree.branches.length === 1 ? "branch" : "branches"}`}
           />
           <Stat
-            label="Breakthrough score"
+            label={session.conversation_progress ? "Needs uncovered" : "Breakthrough score"}
             value={`${viewed?.score ?? 0}/${viewed?.total_needs ?? 7}`}
             sub={viewed?.id === tree.active_branch_id ? "active branch" : "selected branch"}
             accent
@@ -487,7 +492,7 @@ function RecorderView({
           {(Object.keys(palette) as Kind[]).map((k) => (
             <span key={k} className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${palette[k].dot}`} />
-              {palette[k].label}
+              {kindLabel(k, Boolean(session.conversation_progress))}
             </span>
           ))}
         </div>
@@ -512,7 +517,7 @@ function RecorderView({
                     <span
                       className={`h-2 w-2 rounded-full ${palette[selected.coaching.outcome].dot}`}
                     />
-                    {palette[selected.coaching.outcome].label}
+                    {kindLabel(selected.coaching.outcome, Boolean(selected.conversation_progress))}
                   </p>
                 </div>
                 <button
@@ -524,6 +529,19 @@ function RecorderView({
                 </button>
               </div>
               <div className="flex-1 space-y-5 overflow-y-auto p-4">
+                {selected.conversation_progress && (
+                  <section data-testid="stance">
+                    <h3 className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+                      {personaName}'s simulated stance
+                    </h3>
+                    <p className="text-sm font-semibold capitalize">
+                      {selected.conversation_progress.stance}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {selected.conversation_progress.explanation}
+                    </p>
+                  </section>
+                )}
                 <section>
                   <h3 className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
                     Transcript

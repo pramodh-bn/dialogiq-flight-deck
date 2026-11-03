@@ -993,9 +993,90 @@ def test_coach_system_prompt_example_line_sentence_and_refusal_exception() -> No
     )
 
 
+def test_coach_system_prompt_behavior_revision_selects_bob_variant() -> None:
+    """CS-73: s4-bob-r1 swaps only the mandatory-question paragraph."""
+    baseline = build_coach_system_prompt("Bob", "Team member").split("\n\n")
+    variant = build_coach_system_prompt(
+        "Bob", "Team member", behavior_revision="s4-bob-r1"
+    ).split("\n\n")
+    assert len(variant) == 7
+    assert variant[:4] == baseline[:4]
+    assert variant[6:] == baseline[6:]
+    assert variant[4] != baseline[4]
+    assert "most useful next move" in variant[4]
+    assert "at most one question" in variant[4]
+    assert "no question about the present moment" in variant[4]
+    # CS-73 stop gate, second pass: the 9619b4a run invented "I kept going"
+    # in a first hint too, so the stop rule itself forbids recounting.
+    assert "without apologizing for or describing anything" in variant[4]
+    # CS-73 correction: previous hints are not dialogue (CS-C471).
+    assert variant[5].startswith(
+        baseline[5].removesuffix(" Do not explain your reasoning.")
+    )
+    assert "not things anyone said or did" in variant[5]
+    assert "pushed, pressed, or kept going" in variant[5]
+    assert "pushed" not in baseline[5]
+    # CS-73 stop gate (CS-C499/C504): a stop request is the last event, so
+    # a second hint may repeat the pause rather than invent a repair.
+    assert "nothing has happened since that request" in variant[5]
+    assert "may again simply accept the pause" in variant[5]
+    assert "after the request" not in baseline[5]
+
+
+def test_coach_system_prompt_behavior_revision_defaults_to_baseline() -> None:
+    """CS-73: omitted or unknown revisions preserve baseline bytes exactly."""
+    baseline = build_coach_system_prompt("Bob", "Team member")
+    assert (
+        build_coach_system_prompt("Bob", "Team member", behavior_revision=None)
+        == baseline
+    )
+    assert (
+        build_coach_system_prompt("Bob", "Team member", behavior_revision="unknown-r9")
+        == baseline
+    )
+
+
 def test_coach_system_prompt_stays_single_variant() -> None:
     """CS-61: only the persona name/role interpolate across personas."""
     first = build_coach_system_prompt("Maya", "Teenage daughter").split("\n\n")
     second = build_coach_system_prompt("Bob", "Team member").split("\n\n")
     assert first[1:] == second[1:]
     assert "Maya" in first[0] and "Bob" not in first[0]
+
+
+def test_pinned_session_revision_selects_coach_prompt(
+    coach_harness: CoachHarness,
+) -> None:
+    """CS-73: the coach prompt follows the session's pinned behavior_revision.
+
+    A legacy Bob session (no revision) keeps the baseline bytes; an opted-in
+    s4-bob-r1 session gets the Bob variant. Zero paid calls (stub provider).
+    """
+    client, _, _, coach = coach_harness
+    bob_id = next(
+        s["id"]
+        for s in client.get("/api/scenarios").json()
+        if s["title"].startswith("Bob:")
+    )
+    prompts = {}
+    for revision in (None, "s4-bob-r1"):
+        body: dict[str, object] = {"scenario_id": bob_id}
+        if revision:
+            body["behavior_revision"] = revision
+        created = client.post("/api/sessions", json=body, headers=headers())
+        assert created.status_code == 201, created.text
+        moved = send(client, created.json(), "Did the work get done?")["session"]
+        response = ask(client, moved["id"], hint_payload(moved))
+        assert response.status_code == 200, response.text
+        prompts[revision] = coach.calls[-1]["system_prompt"]
+    # Paragraph 0 interpolates the persona; every later paragraph is fixed.
+    baseline = build_coach_system_prompt("X", "Y").split(PARA)[1:]
+    variant = build_coach_system_prompt("X", "Y", behavior_revision="s4-bob-r1").split(
+        PARA
+    )[1:]
+    assert prompts[None].split(PARA)[1:] == baseline
+    assert prompts["s4-bob-r1"].split(PARA)[1:] == variant
+    assert baseline != variant
+
+
+PARA = chr(10) * 2
