@@ -1,5 +1,13 @@
 # DialogIQ (Version 2) — Technical Specification & Architecture
 
+> **Historical planning document (Sprint 1).** The provider plan below is not
+> what shipped. As built: Baseten serves the persona (`muse-spark-open-1026`);
+> the coach runs on Fireworks `muse-spark-open` (Meta API optional, selected by
+> `COACH_PROVIDER`); the judge and Bob's stance are deterministic local code with
+> no model; there is no Meta AI analytics service. See the [README](../README.md)
+> for current setup and limits and [api_contract.md](api_contract.md) for the
+> wire contract.
+
 ## 1. Overview & Objectives
 DialogIQ is an advanced AI-powered conversational sparring and simulation platform designed to help professionals practice and master high-stakes interpersonal communication. Version 2 evolves the core engine into a robust, multi-tier architecture featuring dynamic persona synthesis, real-time coaching "whispers," and longitudinal skill analytics.
 
