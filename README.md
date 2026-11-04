@@ -150,7 +150,7 @@ personas keep their original behavior; only new Bob sessions use `s4-bob-r1`.
 
 ### Opt-in semantic feedback
 
-The semantic candidate replaces phrase matching for **new Bob sessions** when
+Semantic feedback replaces phrase matching for **new Bob sessions** when
 the backend is started with these settings (or loads them from the ignored env
 file through `scripts/run_backend.py`):
 
@@ -221,17 +221,19 @@ Push-Location backend
 Pop-Location
 npx tsc --noEmit
 npm.cmd test
+npm.cmd run build
 ```
 
-The test suites make no paid calls.
+These checks make no paid calls. The production build is also run automatically
+by `scripts/start_demo.py --mode frontend` before the Worker starts.
 
 ## Known limits
 
-The optional concise Bob coach candidate uses `COACH_NEXT_MOVE_ENABLED=1` on
+The optional concise Bob coach mode uses `COACH_NEXT_MOVE_ENABLED=1` on
 the backend. It applies to **new** Bob sessions only; saved sessions keep their
-earlier prompts. See the [candidate contract](docs/coach-next-move-contract.md)
+earlier prompts. See the [mode contract](docs/coach-next-move-contract.md)
 and [demo rehearsal](docs/coach-demo-walkthrough.md). The historical coach
-measurements below predate this candidate and do not establish its quality.
+measurements below predate this mode and do not establish its quality.
 
 - **The legacy judge is lexical.** It counts open questions by their opening words
   (what, how, why, tell me, walk me through, describe and similar). A useful
@@ -259,11 +261,12 @@ measurements below predate this candidate and do not establish its quality.
   run: median 13.7 s for a first hint and 22.0 s for a second hint, with a
   slowest hint of 83.9 s. This misses the original goal of a quick hint and is
   a finite sample, not a guarantee.
-- **Grounding is imperfect.** Final integrated review found one hint asserting
+- **Grounding is imperfect.** An earlier integrated review found one hint asserting
   that a spec changed after an update was sent, although the public dialogue did
-  not establish that order. The owner accepted this additional known miss; it
-  was documented, not fixed. See the
-  [public text review](docs/evidence/cs78-live-text-review.md).
+  not establish that order. The later concise coach mode targets this failure,
+  but its small authored checks do not prove it is eliminated. See the
+  [public text review](docs/evidence/cs78-live-text-review.md) and
+  [new mode checks](docs/coach-next-move-verification.md).
 - **Local single user.** There is no login and no multi-user authorization;
   CORS is not authentication.
 
