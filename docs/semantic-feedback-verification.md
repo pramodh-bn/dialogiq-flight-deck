@@ -2,7 +2,14 @@
 
 Issue47, Codex branch codex/semantic-feedback. This candidate changes new Bob
 sessions only when FEEDBACK_ENABLED=1 and the client selects semantic-r1.
-The existing recording app and its private database are not migrated/restarted.
+The recording app now serves this candidate on `http://127.0.0.1:5173`, with
+the API on `127.0.0.1:8080`. The redundant `127.0.0.2` preview was stopped
+after owner review revealed that the familiar address still served old code.
+The recording database was backed up before restart; its four saved sessions
+remain on their original rules, without rescoring. The arena now identifies
+older Bob sessions and links to the catalog to choose New Session for AI feedback.
+The canonical API health and advertised semantic-r1 capability were checked.
+Private owner dialogue was inspected locally and is excluded from this report.
 
 ## Current checkpoint: Baseten candidate ready for owner review
 

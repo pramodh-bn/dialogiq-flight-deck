@@ -491,6 +491,14 @@ function ArenaSession({
             ))}
           </div>
           <div className="space-y-4 p-4">
+            {progress && !feedback && (
+              <div className="rounded-lg border border-border p-3 text-sm" role="status">
+                <p>This saved session uses earlier feedback rules.</p>
+                <Link to="/" className="mt-1 inline-block text-primary underline">
+                  Choose New Session on Bob's card for AI feedback
+                </Link>
+              </div>
+            )}
             <SemanticFeedback
               feedback={feedback ?? null}
               turns={metrics?.turns ?? 0}
