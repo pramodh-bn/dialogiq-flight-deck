@@ -875,9 +875,7 @@ describe("CoachHint", () => {
   });
 
   it("removes the old suggestion once the learner has moved on and no replacement is loading", () => {
-    const { rerender } = render(
-      <CoachHint {...base} pending earlier={fixtures.success.hint} />,
-    );
+    const { rerender } = render(<CoachHint {...base} pending earlier={fixtures.success.hint} />);
     expect(screen.getByText(fixtures.success.hint.example)).toBeInTheDocument();
 
     rerender(<CoachHint {...base} earlier={fixtures.success.hint} />);
