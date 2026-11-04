@@ -1,0 +1,130 @@
+1
+00:00:00,267 --> 00:00:02,733
+Hard conversations rarely get a second
+take.
+
+2
+00:00:03,100 --> 00:00:05,059
+DialogIQ lets you practice one.
+
+3
+00:00:06,633 --> 00:00:08,576
+Say it badly. Rewind. Try again.
+
+4
+00:00:10,167 --> 00:00:12,711
+Built by Pramodh and a team of AI agents.
+
+5
+00:00:13,067 --> 00:00:14,992
+Powered by Meta's Muse Spark Open.
+
+6
+00:00:15,333 --> 00:00:16,386
+Now meet Bob.
+
+7
+00:00:19,333 --> 00:00:22,619
+Here's DialogIQ. Pick a conversation
+you're dreading.
+
+8
+00:00:23,633 --> 00:00:27,418
+Today: Bob. He missed his Q3 deadlines,
+and he's on the defensive.
+
+9
+00:00:27,733 --> 00:00:31,424
+You get his opening line, your situation,
+and a coach on the side.
+
+10
+00:00:32,233 --> 00:00:33,542
+First, lead with pressure.
+
+11
+00:00:37,833 --> 00:00:39,583
+He explains, but stays guarded.
+
+12
+00:00:41,833 --> 00:00:43,565
+The coach suggests a different move.
+
+13
+00:00:47,533 --> 00:00:48,469
+So, rewind.
+
+14
+00:00:50,333 --> 00:00:53,209
+Back to the moment before it went wrong.
+Second take.
+
+15
+00:00:55,833 --> 00:00:58,758
+Acknowledge it's been hard. Then ask
+what's in the way.
+
+16
+00:01:02,133 --> 00:01:03,106
+He opens up.
+
+17
+00:01:05,533 --> 00:01:06,810
+Now, offer real help.
+
+18
+00:01:11,733 --> 00:01:13,137
+And he names what he needs.
+
+19
+00:01:15,833 --> 00:01:18,712
+Pressure: guarded. Empathy: open, two
+needs uncovered.
+
+20
+00:01:20,933 --> 00:01:23,469
+Bob runs on Muse Spark Open through
+Baseten.
+
+21
+00:01:23,833 --> 00:01:27,903
+Local rules track stance. A separate judge
+counts needs uncovered.
+
+22
+00:01:28,300 --> 00:01:33,139
+Fireworks hosts the coach. It sees the
+conversation, never Bob's hidden needs.
+
+23
+00:01:34,733 --> 00:01:36,170
+Do these hints fit the moment?
+
+24
+00:01:36,567 --> 00:01:42,892
+In a small test graded by agents: 52
+usable hints out of 78. Before, 23.
+
+25
+00:01:43,533 --> 00:01:47,430
+In one stop-request case, all six hints
+respected Bob's request.
+
+26
+00:01:49,067 --> 00:01:51,151
+Same moment. Different first move.
+
+27
+00:01:51,567 --> 00:01:53,049
+That is the power of practice.
+
+28
+00:01:54,500 --> 00:01:57,885
+DialogIQ. Practice the conversation before
+it matters.
+
+29
+00:01:58,233 --> 00:02:00,862
+Find the project on GitHub. Link below.
+
+\n
