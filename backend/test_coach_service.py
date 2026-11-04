@@ -7,6 +7,7 @@ real monotonic clock, never a staged clock.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import threading
@@ -1143,4 +1144,23 @@ def test_unknown_next_move_version_does_not_replace_saved_bob_prompt() -> None:
     baseline = build_coach_system_prompt("Maya", "Daughter")
     assert baseline == build_coach_system_prompt(
         "Maya", "Daughter", coach_prompt_revision=NEXT_MOVE_REVISION
+    )
+
+
+def test_first_next_move_revision_keeps_owner_reviewed_prompt_bytes() -> None:
+    """The r2 refinement cannot silently change an existing r1 session."""
+    prompt = build_coach_system_prompt(
+        "Bob",
+        "Team member",
+        behavior_revision="s4-bob-r1",
+        coach_prompt_revision="bob-next-move-r1",
+    )
+    assert hashlib.sha256(prompt.encode()).hexdigest() == (
+        "6669121fe370d032f398b5a591bcfd0f546d295f91f1f2c2fafc54c7a0ca8002"
+    )
+    assert prompt != build_coach_system_prompt(
+        "Bob",
+        "Team member",
+        behavior_revision="s4-bob-r1",
+        coach_prompt_revision=NEXT_MOVE_REVISION,
     )

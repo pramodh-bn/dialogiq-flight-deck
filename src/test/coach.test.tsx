@@ -873,4 +873,15 @@ describe("CoachHint", () => {
 
     expect(screen.getByRole("status")).not.toHaveTextContent(fixtures.success.hint.approach);
   });
+
+  it("removes the old suggestion once the learner has moved on and no replacement is loading", () => {
+    const { rerender } = render(
+      <CoachHint {...base} pending earlier={fixtures.success.hint} />,
+    );
+    expect(screen.getByText(fixtures.success.hint.example)).toBeInTheDocument();
+
+    rerender(<CoachHint {...base} earlier={fixtures.success.hint} />);
+    expect(screen.queryByText(fixtures.success.hint.example)).not.toBeInTheDocument();
+    expect(screen.getByText(/Ask for a hint at any point/)).toBeInTheDocument();
+  });
 });

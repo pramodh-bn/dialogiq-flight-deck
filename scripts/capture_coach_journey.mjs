@@ -22,7 +22,7 @@ const api = createHttpApi(baseUrl);
 const report = {
   source: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
   scope: "Codex synthetic evolving dialogue, actual frontend adapter in Node; not a browser",
-  expected_prompt_revision: "bob-next-move-r1",
+  expected_prompt_revision: "bob-next-move-r2",
   limits: { coach: 4, persona: 4, feedback: 4 },
   turns: [],
   hints: [],

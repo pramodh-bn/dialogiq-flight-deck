@@ -26,7 +26,8 @@ HINT_FIELDS = ("approach", "example", "reason")
 
 
 BEHAVIOR_REVISION_BOB = "s4-bob-r1"
-NEXT_MOVE_REVISION = "bob-next-move-r1"
+PREVIOUS_NEXT_MOVE_REVISION = "bob-next-move-r1"
+NEXT_MOVE_REVISION = "bob-next-move-r2"
 
 _BASELINE_MOVE_PARAGRAPH = (
     "Make the example line one short acknowledgment of what the "
@@ -127,6 +128,22 @@ _NEXT_MOVE_REPEAT_PARAGRAPH = (
     "Do not explain your reasoning."
 )
 
+_NEXT_MOVE_REQUEST_PARAGRAPH = (
+    "When the other person asks the learner to decide or help settle priorities, "
+    "do not return that decision with 'which should come first?' or 'which "
+    "deadline would you like to sort first?'. If the work or deadlines are "
+    "unknown, ask for those missing facts while offering to help get an order "
+    "agreed. Once the competing work is known, take the next controllable step "
+    "toward the requested decision rather than asking for the list again. "
+    "If they explain why raising the workload felt difficult, acknowledge that "
+    "specific concern rather than only saying thanks for flagging it. Do not "
+    "guarantee how others will judge them. State the learner's own offered "
+    "action as a plain commitment or conditional offer, not a statement ending "
+    "in a question mark or an unnecessary request for permission. Answer a "
+    "request to review together before committing; do not replace it with "
+    "another broad question about support or invent a meeting time."
+)
+
 
 def build_coach_system_prompt(
     persona_name: str,
@@ -146,16 +163,21 @@ def build_coach_system_prompt(
     are not dialogue; omitted or unknown revisions return the baseline
     bytes exactly.
 
-    ``coach_prompt_revision="bob-next-move-r1"`` selects concise next-move
-    guidance only with the Bob behavior revision. Unknown versions preserve
-    the previous prompt, including its historical non-repeat behavior.
+    Pinned bob-next-move-r1 keeps its exact prompt bytes; bob-next-move-r2
+    adds targeted request-ownership and action guidance. Both require the
+    Bob behavior revision. Unknown versions preserve the previous prompt.
     """
     bob = behavior_revision == BEHAVIOR_REVISION_BOB
     move_paragraph = _BOB_MOVE_PARAGRAPH if bob else _BASELINE_MOVE_PARAGRAPH
     repeat_paragraph = _BOB_REPEAT_PARAGRAPH if bob else _BASELINE_REPEAT_PARAGRAPH
-    if bob and coach_prompt_revision == NEXT_MOVE_REVISION:
+    if bob and coach_prompt_revision in (
+        PREVIOUS_NEXT_MOVE_REVISION,
+        NEXT_MOVE_REVISION,
+    ):
         move_paragraph = _NEXT_MOVE_PARAGRAPH
         repeat_paragraph = _NEXT_MOVE_REPEAT_PARAGRAPH
+        if coach_prompt_revision == NEXT_MOVE_REVISION:
+            move_paragraph += " " + _NEXT_MOVE_REQUEST_PARAGRAPH
     return "\n\n".join(
         [
             (

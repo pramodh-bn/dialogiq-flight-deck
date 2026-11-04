@@ -43,17 +43,27 @@ def main() -> None:
         "--case-ids", help="Comma-separated subset for a recorded checkpoint."
     )
     parser.add_argument("--candidate-only", action="store_true")
+    parser.add_argument(
+        "--cases-file", type=Path, default=ROOT / "docs/coach-next-move-cases.json"
+    )
+    parser.add_argument("--max-coach-calls", type=int, default=16)
+    parser.add_argument("--max-persona-calls", type=int, default=4)
     args = parser.parse_args()
     if args.out.exists():
         raise SystemExit("Use a new report path; never overwrite a paid run.")
-    cases = json.loads((ROOT / "docs/coach-next-move-cases.json").read_text())
+    if not 1 <= args.max_coach_calls <= 16 or not 0 <= args.max_persona_calls <= 4:
+        raise SystemExit("Call caps must be coach1..16 and persona0..4.")
+    cases = json.loads(args.cases_file.read_text(encoding="utf-8"))
     if args.case_ids:
         selected = set(args.case_ids.split(","))
         if selected - {case["id"] for case in cases["cases"]}:
             raise SystemExit("Unknown case ID; no paid calls made.")
         cases["cases"] = [case for case in cases["cases"] if case["id"] in selected]
     if not args.live:
-        print("Plan: at most16 coach and4 persona calls. Add --live to execute.")
+        print(
+            f"Plan: at most{args.max_coach_calls} coach and"
+            f"{args.max_persona_calls} persona calls. Add --live to execute."
+        )
         return
     env = parse_env_file(args.env_file)
     for key in COACH_ENV_KEYS + ENV_KEYS:
@@ -71,6 +81,8 @@ def main() -> None:
         "scope": cases["authorship"],
         "provider": client.provider,
         "model": client.model,
+        "prompt_revision": NEXT_MOVE_REVISION,
+        "cases_file": args.cases_file.name,
         "settings": {
             "temperature": 0.3,
             "max_tokens": 16384,
@@ -79,7 +91,7 @@ def main() -> None:
             "retries": 0,
         },
         "attempts": {"coach": 0, "persona": 0},
-        "limits": {"coach": 16, "persona": 4},
+        "limits": {"coach": args.max_coach_calls, "persona": args.max_persona_calls},
         "rows": [],
         "failures": 0,
     }
@@ -188,7 +200,7 @@ def main() -> None:
                     row["ok"]
                     and variant == "candidate"
                     and attempt == 1
-                    and case["id"] in follow_cases
+                    and (case.get("follow") or case["id"] in follow_cases)
                 ):
                     history = [{"role": "assistant", "content": cases["opening"]}]
                     for learner, reply in case["turns"]:

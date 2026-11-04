@@ -6,12 +6,18 @@ stacked on PR48. Codex owns the change; owner learner review remains outstanding
 ## Accepted implementation boundary
 
 New Bob sessions with `behavior_revision=s4-bob-r1` pin the internal
-`coach_prompt_revision=bob-next-move-r1` only when the server environment has
+`coach_prompt_revision=bob-next-move-r2` only when the server environment has
 `COACH_NEXT_MOVE_ENABLED=1`. Existing sessions, saved hints and other personas
 retain their prompt behavior. Flag changes never rewrite session configuration.
 The coach receives neither this private config nor grader data. Session-create
 and hint request/response DTOs stay unchanged; `s3-coach-r2` names the response
 contract, not the prompt version. No DB migration is needed.
+
+The earlier `bob-next-move-r1` remains supported with exact original prompt
+bytes. Revision2 adds targeted latest-request ownership, acknowledgement of
+reluctance to raise workload, and declarative offers. Old sessions never acquire
+it through a flag change. The UI no longer displays an earlier actionable hint
+when neither a current hint nor a pending replacement exists.
 
 The provider still receives selected-branch public dialogue (latest six turns,
 existing string bounds), opening/public situation and current-head previous

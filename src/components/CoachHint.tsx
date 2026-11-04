@@ -68,7 +68,7 @@ export function CoachHint({
           </div>
         </details>
       )}
-      {!current && earlier && (
+      {!current && earlier && pending && (
         <div className="space-y-2 rounded-lg p-3 opacity-70 ring-1 ring-border">
           <p className="text-xs font-semibold text-muted-foreground">{earlierLabel}</p>
           <SourceLabel hint={earlier} />
