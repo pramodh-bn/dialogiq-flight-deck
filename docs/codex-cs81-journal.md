@@ -150,3 +150,54 @@ Plan <=6coach/2fixture-persona calls, checkpoint then <=4coach/4persona/4grader
 actual-client journey. Preserve r1 prompt bytes and all pinned sessions. Scope:
 new-session r2 selection, precise request/concern/action guidance and hiding stale
 hints outside pending state. No new provider, API, scoring or persona changes.
+
+## Revision2 checkpoint — 2026-11-03 evening
+
+Runtime `f64baca`, with test-format-only follow-up `185b365`.39coach service
+tests (two existing TestClient warnings),115frontend tests, TypeScript, changed
+ESLint/Ruff, production build and realHTTP fixture pass. One initial build hit
+the running Worker's output-directory lock; stopped my frontend, rebuilt and
+restarted it. One new test initially needed Prettier formatting, now clean.
+No filesystem cleanup, owner DB reset or provider change was used to fix it.
+
+Eighteen exact prompt comparisons against f071363 preserve old/unknown/r1
+paths. New r2 selection uses the same new-session flag; old r1 sessions keep
+their prompt. UI stale-hint hiding applies to all scenarios.
+
+Recorded targeted6coach/2fixture-persona batch completed without provider/parse
+failure. Hints ask for missing deadline facts while owning help with a decision,
+acknowledge the specific reluctance to raise workload, answer a joint-review
+request directly and use declarative action offers. First/second stop hints
+accept the pause. Median5.85s/max9.58s in this small authored sample is not a
+speed guarantee. CS-C593 records the checkpoint and next bounded HTTP journey.
+
+User asked whether this improves other scenarios or is a demo workaround.
+Clarified: no scripted transcript matching or hidden scoring answer key; model
+uses actual branch-public dialogue. Prompt/grading changes are Bob-only; other
+scenarios get shared UI improvements but retain their coach prompts. Broader
+coaching rollout needs scenario-specific evaluation and is not inferred from
+that question. No claim that all scenarios were improved or independently tested.
+
+## Current handoff — revision2 candidate ready
+
+Runtime f64baca/test-format185b365; final actual-client journey passed4turns,
+4hints with3examples sent verbatim,4ready grades and reload verification.
+Actual coach median16.14s/max16.45s, fullturn median11.39s/max12.45s. No provider
+errors/fallback/retries. One hint remained36words and asked to review now after
+Bob had accepted review; this limitation is retained, not declared solved.
+He still needed a concrete priority decision at the final turn.
+
+Cumulative task attempts35coach/15persona/8grader. Five r2 synthetic evidence
+files audited for forbidden/private fields and actual credential values; no
+private owner dialogue committed. Verification report leads with r2 and keeps
+all r1 evidence. Full r2 checks39coach/115frontend plus TypeScript/ESLint/Ruff,
+production build, fixture HTTP and18exact legacy/r1 prompts passed.
+
+Canonical backend restarted from r2 code with recording DB backed up; seven
+owner Bob sessions preserved, including session7 on r1. Current live own sessions
+backend34354/frontend82534, no verification quotas. Temporary .2 API stopped.
+Owner next: refresh and start a **new Bob session** for revision2; the shared
+stale-hint UI fix also applies to existing sessions and other personas. Other
+scenario prompts/semantic grading are unchanged. No rollout beyond Bob or merge
+inferred from the user's question. PR49 updated; owner r2 review/integration
+outstanding. No recurring watch or scheduled morning action.

@@ -1,5 +1,73 @@
 # CS-81 candidate verification
 
+## Latest: targeted revision2 after owner conversation review
+
+Owner reported revision1 conversations looked good, then explicitly requested
+further review/tightening. Codex reviewed the latest owner's three branches
+locally, without publishing the transcript. The new scoped findings were a
+priority decision returned to Bob, a generic acknowledgment skipping reluctance
+to raise workload, a declarative offer ending as a question, and stale earlier
+hints staying visible outside loading. The UI issue could contribute to reusing
+an old suggestion; its role in the observed reuse is not proven.
+
+Before prompt edits, synthetic r2 cases were committed as `6173297`. Runtime
+`f64baca` (test-format follow-up `185b365`) pins `bob-next-move-r2` for newly
+created opted-in Bob sessions. Revision1 remains byte-for-byte supported;
+18exact old/unknown/r1 prompt comparisons against `f071363` pass. The shared
+UI now removes an older suggestion when no replacement is pending. New coach
+rules and semantic grading remain Bob-only. Other scenarios get UI changes but
+keep their earlier prompts; no cross-scenario improvement has been established.
+
+Actual r2 checks:39coach service tests,115frontend tests, TypeScript,
+changed-file ESLint/Ruff, production build and realHTTP fixture pass. Same two
+TestClient deprecation warnings. An initial build hit my running Worker's output
+lock; stopping my frontend, rebuilding and restarting resolved it. A test-format
+lint failure was corrected with Prettier. These failures are retained here;
+neither required clearing owner data. No new browser verification was claimed.
+
+Targeted sample:6Fireworks coach +2fixture-persona attempts, no provider/parse
+errors. Coach median5.85s/max9.58s, not a speed guarantee. Reviewed lines ask for
+missing deadlines while offering to get a priority agreed, acknowledge the
+specific concern about raising workload, state controllable actions plainly,
+and directly accept the requested joint review. Both stop hints accept the
+pause. This is an authored development sample, not independent validation.
+See `evidence/cs81/r2-targeted.json`.
+
+Final r2 actual-client journey:4coach/4persona/4grader attempts admitted by SDK
+caps,0blocked/0retries/0fallbacks, all gradesready. Three hint examples sent
+verbatim to actual Bob; four nodes/four hints verified after reload. Coach
+median16.14s/max16.45s; turn median11.39s/max12.45s. The actual frontend adapter
+ran in Node, not a browser. Bob described competing commitments, reluctance to
+raise workload and loss of confidence, accepted joint review, and supplied
+concrete deadline conflicts. He still needed a priority decision at the end;
+this was an end-to-end four-turn exercise, not a resolved conversation.
+
+Remaining quality limits: one example had36words versus the soft35word target,
+and the final hint asked to review together now after Bob had already accepted
+the review. It did offer to get an explicit order agreed rather than asking Bob
+to choose it, but unnecessary permission/checking is not eliminated. No claim
+that all hints are ideal or that prompt rules guarantee compliant outputs.
+
+Cumulative task attempts including r2: **35coach +15persona +8grader**, no
+provider/parse failure or retries. Sources, public dialogue and operational
+usage are in `r2-targeted.json`, `r2-journey.json`, `r2-journey-budget.jsonl`,
+`r2-journey-telemetry.jsonl` and `r2-legacy-prompts.json`. Credential-value and
+forbidden-field audits passed. Private owner conversations are excluded.
+
+Reproduce the targeted batch with `scripts/evaluate_next_move_coach.py` using
+`--cases-file docs/coach-next-move-r2-cases.json --candidate-only
+--max-coach-calls 6 --max-persona-calls 2`, plus server-only env/new report path
+and `--live`. Existing capped journey instructions below apply; the script now
+records expected revision2. Reports are never overwritten.
+
+Canonical app now runs revision2 code at127.0.0.1:5173/API8080; seven owner Bob
+sessions are preserved after DB backup. Existing session7 stays on revision1.
+Choose **New Session** for the new prompt. All temporary .2 verification servers
+are stopped. Owner's positive review applies to revision1; revision2 learner
+review and integration remain separate gates.
+
+## Retained revision1 implementation and evidence
+
 Codex implementation/review, not independent evaluation. User requested more
 useful in-app hints after a separate walkthrough helped Bob explain his view.
 Source before prompt edits: `dceaaa9` cases/contract. First candidate `59d8bc2`;
@@ -96,7 +164,7 @@ usage for all4coach/4grader completions. Direct fixture-persona calls expose
 reply/error/elapsed but not completion/token metadata through their existing
 adapter; missing usage is not zero billing.
 
-Total this task so far: **25coach +9persona +4grader admitted attempts**. All
+Revision1-phase total: **25coach +9persona +4grader admitted attempts**. All
 completed, no SDK retries. No universal reliability or provider speed claim.
 Broad user credit authorization applied; each batch/checkpoint was finite.
 
