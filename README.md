@@ -21,7 +21,7 @@ It is rehearsal, not surveillance: nothing records or scores real conversations.
 The coach never sees the character's hidden needs or private prompt, and the
 persona never sees the coach's hints.
 
-## Quick start (mock, no keys)
+## Quick start (UI mock, no keys)
 
 Needs Node 26.13.0 and npm 11.20.0.
 
@@ -30,8 +30,10 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-With `VITE_API_BASE_URL` unset the frontend uses an in-browser mock API. This is
-useful for looking at the UI. It is not the real app: no backend, no models.
+Open `http://localhost:5173`. With `VITE_API_BASE_URL` unset the frontend uses
+an in-browser mock API. This is useful for looking at the UI; it does not run
+the backend or models. For the complete conversation flow, use the real-app
+setup below.
 
 ## Run the real app
 
@@ -46,38 +48,66 @@ backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
 npm.cmd ci --ignore-scripts
 ```
 
-Provider keys are server-only and are never sent to the frontend. Put them in an
-env file outside version control. `scripts/run_backend.py --env-file <path>`
-loads only the known names into the backend process and never prints values.
+Provider keys are server-only and are never sent to the frontend. Create an
+ignored `.env` in the repository root, or use another private env-file path.
+`scripts/run_backend.py --env-file <path>` loads only known names into the
+backend process and never prints values. A complete Bob demo configuration is:
 
 ```sh
 BASETEN_API_KEY=...          # persona replies
 COACH_PROVIDER=fireworks     # coach provider; meta is the code default
 FIREWORKS_API_KEY=...        # coach, model accounts/fireworks/models/muse-spark-open
 COACH_DEMO_WAIT=1            # required for Fireworks: low reasoning, no cutoff
+FEEDBACK_ENABLED=1           # semantic feedback for new Bob sessions
+FEEDBACK_PROVIDER=baseten    # separate evaluator call after Bob replies
+COACH_NEXT_MOVE_ENABLED=1    # concise next-move hints for new Bob sessions
 ```
 
-Backend terminal (port 8080):
+From the repository root, first check this worktree's Python, jiter, Node and
+npm. On this machine, use the actual Node executable behind the nvm shim. For
+another Node installation, set `$demoNode` to its `node.exe`; see the
+[demo guide](docs/demo-script.md#start-a-regular-local-demo-on-windows).
 
 ```powershell
-$env:DIALOGIQ_CORS_ORIGINS = 'http://127.0.0.1:5173,http://localhost:5173'
-backend/.venv/Scripts/python.exe scripts/run_backend.py --env-file <path-to-env> --port 8080
+$demoNode = Join-Path $env:LOCALAPPDATA 'Author Software/nvm/installs/v26.13.0/node.exe'
+backend/.venv/Scripts/python.exe scripts/start_demo.py --mode check --node $demoNode
 ```
 
-Frontend terminal (port 5173). Vite reads these at startup, so restart after
-changing them:
+Then start each server in its own PowerShell terminal from the repository root:
 
 ```powershell
-$env:VITE_API_BASE_URL = 'http://127.0.0.1:8080'
-$env:VITE_COACH_DEMO_WAIT = '1'     # pairs with COACH_DEMO_WAIT=1
-npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort
+# Terminal 1: FastAPI on 127.0.0.1:8080, SQLite in ignored demo.local/demo.db
+$demoNode = Join-Path $env:LOCALAPPDATA 'Author Software/nvm/installs/v26.13.0/node.exe'
+backend/.venv/Scripts/python.exe scripts/start_demo.py --mode backend --node $demoNode --env-file .env
+
+# Terminal 2: production frontend on 127.0.0.1:5173
+$demoNode = Join-Path $env:LOCALAPPDATA 'Author Software/nvm/installs/v26.13.0/node.exe'
+backend/.venv/Scripts/python.exe scripts/start_demo.py --mode frontend --node $demoNode
 ```
 
-Open `http://127.0.0.1:5173`. The database is `backend/dialogiq.db` and is
-created and seeded on first start; set `DIALOGIQ_DB_PATH` to use a separate,
-disposable database. The persona needs `BASETEN_API_KEY`: without it, sending a
-turn returns a `persona_unavailable` error (HTTP 503). Without a configured coach
-provider, hints fall back to deterministic text.
+The frontend command builds the app and serves the production Worker using
+pinned Wrangler 4.156.2. Its first run may download Wrangler; port 9335 is also
+used for the local inspector. This path avoids the Vite development SSR
+`fetchModule` timeout seen during recording. Open `http://127.0.0.1:5173`, then
+choose **New Session** on Bob's card. Check the API with
+`Invoke-RestMethod http://127.0.0.1:8080/health`; it should report
+`status: healthy`. Each server runs in the foreground; press Ctrl+C in each
+terminal to stop it. The launcher refuses occupied ports and does not stop
+another process.
+
+The demo database is retained across restarts. Pass `--database <path>` in the
+backend terminal for a separate disposable database. Direct use of
+`scripts/run_backend.py` defaults to `backend/dialogiq.db` and accepts
+`DIALOGIQ_DB_PATH`. Without `BASETEN_API_KEY`, sending a turn returns
+`persona_unavailable` (HTTP 503). Without a configured coach provider, hints
+fall back to deterministic text. Each real turn, evaluator call and live hint
+can use paid provider credits.
+
+For frontend hot reload, add `--frontend dev` to the frontend command. This
+uses Vite's development server and can be less reliable for long recording
+sessions. The launcher sets `VITE_API_BASE_URL` and `VITE_COACH_DEMO_WAIT` for
+both frontend modes; Vite reads them at startup, so restart after changing
+frontend settings.
 
 ### Normal and demo settings
 
@@ -160,6 +190,10 @@ separate terminals with Fireworks and paired demo-wait settings. Follow the
 script's setup instructions; its default database is `demo.local/demo.db`,
 separate from the direct backend recipe above. On Windows with an nvm shim,
 pass `--node` with the actual Node installation path as shown in the demo guide.
+The accepted [v5.1 presentation](submission/video/v5.1/out/DialogIQ-presentation-v5.1.mp4),
+[captions](submission/video/v5.1/out/DialogIQ-presentation-v5.1.srt) and
+[rebuildable source](submission/video/v5.1/README.md) are checked in separately
+from the app runtime.
 For recording, frontend mode builds and serves the production output with
 pinned Wrangler 4.156.2, avoiding the Vite development SSR module loader. Use
 `--frontend dev` only when you want the development server and hot reload.
