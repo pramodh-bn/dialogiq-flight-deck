@@ -124,3 +124,12 @@ hints and review usefulness. Old semantic sessions keep the old coach too.
 Owner GUI/learner verdict is outstanding. Draft [PR49](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/49)
 is open; implementation/evidence commit `b45a80a` is pushed. Integration follows;
 PR48 and PR46 remain integration dependencies. No merge authorized or claimed.
+
+## Owner feedback — latest conversations
+
+User reported: “just now had some conversations and it looked good”, then
+asked whether further tightening is worthwhile. This is positive learner
+feedback on the running candidate, not a broad reliability claim or merge
+authorization. Recommendation: freeze the prompt for the morning demo; keep
+overlapping second hints and provider latency as documented follow-ups. No
+additional prompt edits or paid experiments were made for this feedback.
