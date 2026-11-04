@@ -1,0 +1,44 @@
+{
+  "source": "1303b99a2efa695d5b10572b038e6a3ebc28cf6e",
+  "model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+  "revision": "semantic-r1",
+  "scope": "small authored qualification, not independent or unseen",
+  "cases": [
+    {
+      "case": 1,
+      "learner": "Could you walk me through what's still unresolved for this release?",
+      "persona": "Three things, really. API migration's mostly done but still needs integration testing, docs are maybe halfway, and the flag cleanup got bumped after the design changes. So timelines are off by a week or so depending what you count.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        }
+      ],
+      "status": "failed",
+      "error": "CoachInvalidResponseError",
+      "elapsed_ms": 500
+    },
+    {
+      "case": 2,
+      "learner": "Let's put the remaining work on one page and identify who can share it.",
+      "persona": "Okay. I can put the three items on one page with where they stand.\n\nNot sure who actually has bandwidth to take anything on right now though.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        },
+        {
+          "role": "user",
+          "content": "Could you walk me through what's still unresolved for this release?"
+        },
+        {
+          "role": "assistant",
+          "content": "Three things, really. API migration's mostly done but still needs integration testing, docs are maybe halfway, and the flag cleanup got bumped after the design changes. So timelines are off by a week or so depending what you count."
+        }
+      ],
+      "status": "failed",
+      "error": "CoachInvalidResponseError",
+      "elapsed_ms": 78
+    }
+  ]
+}

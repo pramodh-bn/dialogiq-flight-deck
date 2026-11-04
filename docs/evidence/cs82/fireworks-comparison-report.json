@@ -1,0 +1,98 @@
+{
+  "source": "8b6e68409c86c4c58008f3b3a02f0dca43ce4286",
+  "provider": "fireworks",
+  "model": "accounts/fireworks/models/gpt-oss-120b",
+  "revision": "semantic-r1",
+  "scope": "small authored qualification, not independent or unseen",
+  "cases": [
+    {
+      "case": 1,
+      "learner": "Could you walk me through what's still unresolved for this release?",
+      "persona": "Yeah. Backend sync for the new flow is still open, migration script needs rework after the spec changed, and QA is blocked until that's done. Docs are half-finished. That's the list.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        }
+      ],
+      "decision": {
+        "question_type": "open",
+        "question_quote": "Could you walk me through what's still unresolved for this release?",
+        "acknowledgment": false,
+        "acknowledgment_quote": "",
+        "pressure": false,
+        "pressure_quote": "",
+        "stance_signal": "clarity",
+        "stance_change": 0,
+        "stance_quote": "Could you walk me through what's still unresolved for this release?",
+        "reaction_quote": "",
+        "revealed_need": null
+      },
+      "status": "validated",
+      "elapsed_ms": 2890
+    },
+    {
+      "case": 2,
+      "learner": "Let's put the remaining work on one page and identify who can share it.",
+      "persona": "We could list it out, sure. My concern is just that splitting it now adds a bunch of handoff overhead \u2014 I'd have to walk someone through the migration rework and the sync edge cases from the last spec change. So I'm not sure sharing it actually saves time at this point.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        },
+        {
+          "role": "user",
+          "content": "Could you walk me through what's still unresolved for this release?"
+        },
+        {
+          "role": "assistant",
+          "content": "Yeah. Backend sync for the new flow is still open, migration script needs rework after the spec changed, and QA is blocked until that's done. Docs are half-finished. That's the list."
+        }
+      ],
+      "decision": {
+        "question_type": "statement",
+        "question_quote": "",
+        "acknowledgment": false,
+        "acknowledgment_quote": "",
+        "pressure": false,
+        "pressure_quote": "",
+        "stance_signal": "support",
+        "stance_change": 0,
+        "stance_quote": "Let's put the remaining work on one page and identify who can share it.",
+        "reaction_quote": "",
+        "revealed_need": null
+      },
+      "status": "validated",
+      "elapsed_ms": 1782
+    },
+    {
+      "case": 5,
+      "learner": "You've been carrying the integration and release work on your own. That sounds exhausting.",
+      "persona": "It has been. I need someone to share the release work.",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "You wanted to see me? If this is about Q3, I already sent the update."
+        }
+      ],
+      "decision": {
+        "question_type": "statement",
+        "question_quote": "",
+        "acknowledgment": false,
+        "acknowledgment_quote": "",
+        "pressure": false,
+        "pressure_quote": "",
+        "stance_signal": "support",
+        "stance_change": 1,
+        "stance_quote": "You've been carrying the integration and release work on your own.",
+        "reaction_quote": "I need someone to share the release work.",
+        "revealed_need": {
+          "need_id": "n6",
+          "persona_quote": "I need someone to share the release work."
+        }
+      },
+      "status": "validated",
+      "elapsed_ms": 2360
+    }
+  ]
+}

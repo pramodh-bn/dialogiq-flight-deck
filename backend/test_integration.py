@@ -125,6 +125,7 @@ def test_scenario_session_hub_cors_and_idempotent_seed(harness: Harness) -> None
             "description",
             "persona",
             "behavior_revisions",
+            "feedback_revisions",
         }
         expected = ["s4-bob-r1"] if scenario["title"].startswith("Bob:") else []
         assert scenario["behavior_revisions"] == expected

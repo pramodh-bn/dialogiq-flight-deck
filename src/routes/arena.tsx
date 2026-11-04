@@ -3,6 +3,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CoachHint } from "@/components/CoachHint";
+import { SemanticFeedback } from "@/components/SemanticFeedback";
 import {
   api,
   ApiError,
@@ -319,7 +320,11 @@ function ArenaSession({
   const metrics = session.data?.metrics;
   const asked = metrics ? metrics.open_questions + metrics.closed_questions : 0;
   const openPct = metrics ? Math.round(metrics.open_question_ratio * 100) : 0;
-  const empathy = metrics?.turns ? Math.round((metrics.empathy_turns / metrics.turns) * 100) : 0;
+  const feedback = session.data?.feedback;
+  const empathyDenominator = feedback ? feedback.evaluated_turns : metrics?.turns;
+  const empathy = empathyDenominator
+    ? Math.round(((metrics?.empathy_turns ?? 0) / empathyDenominator) * 100)
+    : 0;
   const resistance = RESISTANCE[session.data?.resistance ?? "guarded"];
   const progress = session.data?.conversation_progress;
   const score = session.data?.score ?? 0;
@@ -486,49 +491,75 @@ function ArenaSession({
             ))}
           </div>
           <div className="space-y-4 p-4">
-            <Meter
-              label="Needs Uncovered"
-              value={Math.round((score / total) * 100)}
-              display={`${score}/${total}`}
-              hint="Scored by the judge on this branch"
-              tone="accent"
-            />
-            <Meter
-              label="Open vs. Closed Ratio"
-              value={openPct}
-              hint={
-                asked
-                  ? `${metrics?.open_questions} open · ${metrics?.closed_questions} closed`
-                  : "No questions yet"
-              }
-              tone="accent"
-            />
-            <Meter
-              label="Empathy Index"
-              value={empathy}
-              hint={`${metrics?.empathy_turns ?? 0} empathy markers`}
-              tone="primary"
-            />
-            {progress ? (
-              <div data-testid="stance">
-                <div className="flex items-baseline justify-between text-xs">
-                  <p className="font-semibold text-muted-foreground">
-                    {persona?.name ?? "Persona"}'s simulated stance
-                  </p>
-                  <p className="font-mono text-foreground">{RESISTANCE[progress.stance].label}</p>
-                </div>
-                {change && <p className="mt-1 text-xs text-foreground">{STANCE_CHANGE[change]}</p>}
-                <p className="mt-1 text-xs text-muted-foreground">{progress.explanation}</p>
+            {progress && !feedback && (
+              <div className="rounded-lg border border-border p-3 text-sm" role="status">
+                <p>This saved session uses earlier feedback rules.</p>
+                <Link to="/" className="mt-1 inline-block text-primary underline">
+                  Choose New Session on Bob's card for AI feedback
+                </Link>
               </div>
-            ) : (
-              <Meter
-                label={`${persona?.name ?? "Persona"}'s Resistance`}
-                value={resistance.value}
-                display={resistance.label}
-                hint="Lower is better"
-                tone="warning"
-              />
             )}
+            <SemanticFeedback
+              feedback={feedback ?? null}
+              turns={metrics?.turns ?? 0}
+              persona={persona?.name ?? "Persona"}
+            >
+              <Meter
+                label="Needs Uncovered"
+                value={Math.round((score / total) * 100)}
+                display={`${score}/${total}`}
+                hint={
+                  feedback
+                    ? "Supported by evidence in Bob's replies"
+                    : "Scored by the judge on this branch"
+                }
+                tone="accent"
+              />
+              <Meter
+                label="Open vs. Closed Ratio"
+                value={openPct}
+                display={!asked ? "—" : `${openPct}%`}
+                hint={
+                  asked
+                    ? `${metrics?.open_questions} open · ${metrics?.closed_questions} closed`
+                    : "No questions yet"
+                }
+                tone="accent"
+              />
+              <Meter
+                label={feedback ? "Acknowledgment" : "Empathy Index"}
+                value={empathy}
+                display={feedback && !feedback.evaluated_turns ? "—" : `${empathy}%`}
+                hint={
+                  feedback
+                    ? `${metrics?.empathy_turns ?? 0} turns acknowledged a specific concern`
+                    : `${metrics?.empathy_turns ?? 0} empathy markers`
+                }
+                tone="primary"
+              />
+              {progress ? (
+                <div data-testid="stance">
+                  <div className="flex items-baseline justify-between text-xs">
+                    <p className="font-semibold text-muted-foreground">
+                      {persona?.name ?? "Persona"}'s simulated stance
+                    </p>
+                    <p className="font-mono text-foreground">{RESISTANCE[progress.stance].label}</p>
+                  </div>
+                  {change && (
+                    <p className="mt-1 text-xs text-foreground">{STANCE_CHANGE[change]}</p>
+                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">{progress.explanation}</p>
+                </div>
+              ) : (
+                <Meter
+                  label={`${persona?.name ?? "Persona"}'s Resistance`}
+                  value={resistance.value}
+                  display={resistance.label}
+                  hint="Lower is better"
+                  tone="warning"
+                />
+              )}
+            </SemanticFeedback>
           </div>
         </aside>
       </div>

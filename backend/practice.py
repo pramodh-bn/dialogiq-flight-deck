@@ -2,6 +2,7 @@
 
 import copy
 import json
+import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from uuid import uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session as DbSession
 
+import semantic_feedback
 import stance
 from api_errors import ApiError, conflict, not_found
 from conversation_context import ancestor_chain, build_history
@@ -77,8 +79,11 @@ def state_at(db: DbSession, session_id: int, node_id: int | None) -> dict:
     if node:
         return copy.deepcopy(node.state)
     initial = State().model_dump()
-    if get_session(db, session_id).scenario_config.get("behavior_revision"):
+    config = get_session(db, session_id).scenario_config
+    if config.get("behavior_revision"):
         initial.update(stance.initial_state_fields())
+    if config.get("feedback_revision"):
+        initial["feedback"] = semantic_feedback.initial()
     return initial
 
 
@@ -110,7 +115,15 @@ def scenario_dto(scenario: Scenario) -> dict:
         description=scenario.description,
         persona=scenario.public_persona,
         behavior_revisions=behavior_revisions(scenario),
+        feedback_revisions=feedback_revisions(scenario),
     ).model_dump()
+
+
+def feedback_revisions(scenario: Scenario) -> list[str]:
+    """Advertise new feedback only when explicitly enabled on complete Bob."""
+    if os.environ.get("FEEDBACK_ENABLED") == "1" and behavior_revisions(scenario):
+        return [semantic_feedback.REVISION]
+    return []
 
 
 def pinned_persona(session: Session) -> Persona:
@@ -270,7 +283,11 @@ def mutate(
 
 
 def create_session(
-    db: DbSession, scenario_id: int, key: str, behavior_revision: str | None = None
+    db: DbSession,
+    scenario_id: int,
+    key: str,
+    behavior_revision: str | None = None,
+    feedback_revision: str | None = None,
 ) -> tuple[int, dict]:
     def operation(owner: str) -> tuple[int, dict]:
         write_lock(db)
@@ -283,6 +300,11 @@ def create_session(
                 "validation_error",
                 "That behavior revision is not available for this scenario.",
             )
+        if feedback_revision and (
+            feedback_revision not in feedback_revisions(scenario)
+            or behavior_revision != stance.BEHAVIOR_REVISION
+        ):
+            raise ApiError(422, "validation_error", "Feedback revision is unavailable.")
         session = Session(
             user_id=get_or_create_demo_user(db).id,
             scenario_id=scenario_id,
@@ -290,6 +312,8 @@ def create_session(
             revision=0,
             scenario_config=pin_scenario(scenario, behavior_revision),
         )
+        if feedback_revision:
+            session.scenario_config["feedback_revision"] = feedback_revision
         db.add(session)
         db.flush()
         branch = Branch(session_id=session.id)
@@ -302,6 +326,8 @@ def create_session(
     body: dict = {"scenario_id": scenario_id}
     if behavior_revision:
         body["behavior_revision"] = behavior_revision
+    if feedback_revision:
+        body["feedback_revision"] = feedback_revision
     return mutate(db, key, "POST", "/api/sessions", body, operation)
 
 
@@ -339,18 +365,27 @@ def real_persona(**kwargs: object) -> str:
 
 
 def send_turn(
-    db: DbSession, payload: ChatTurnRequest, key: str, provider: Provider
+    db: DbSession,
+    payload: ChatTurnRequest,
+    key: str,
+    provider: Provider,
+    feedback_provider: semantic_feedback.Provider = semantic_feedback.real_provider,
 ) -> tuple[int, dict]:
     def operation(owner: str) -> tuple[int, dict]:
         context = turn_context(db, payload)
-        state, coaching, newly = evaluate(
-            payload.user_message,
-            context.previous,
-            context.config["needs"],
-            context.config["revision"].split(":", 1)[0],
-        )
         config = context.config
-        if config.get("behavior_revision"):
+        semantic = config.get("feedback_revision") == semantic_feedback.REVISION
+        if semantic:
+            # No lexical reveal or signal can bias the persona before evaluation.
+            state, coaching, newly = copy.deepcopy(context.previous), {}, []
+        else:
+            state, coaching, newly = evaluate(
+                payload.user_message,
+                context.previous,
+                config["needs"],
+                config["revision"].split(":", 1)[0],
+            )
+        if config.get("behavior_revision") and not semantic:
             # Stance comes from public wording and this branch's ledger, not score.
             state = stance.apply_turn(state, context.previous, payload.user_message)
         brief = PersonaBrief(
@@ -369,8 +404,12 @@ def send_turn(
             # pass neither keyword, so their provider call is unchanged.
             variant = {
                 "behavior_revision": config["behavior_revision"],
-                "stance_signal": state["conversation_progress"]["last_signal"],
+                "stance_signal": "none"
+                if semantic
+                else state["conversation_progress"]["last_signal"],
             }
+            if semantic:
+                variant["feedback_revision"] = semantic_feedback.REVISION
         response = provider(
             brief=brief,
             user_text=payload.user_message,
@@ -385,6 +424,15 @@ def send_turn(
             from persona import PersonaInvalidResponseError
 
             raise PersonaInvalidResponseError("Persona returned no dialogue.")
+        if semantic:
+            state, coaching = semantic_feedback.evaluate(
+                context.previous,
+                payload.user_message,
+                response.strip(),
+                context.history,
+                config["needs"],
+                feedback_provider,
+            )
         write_lock(db)
         turn_context(db, payload)  # Recheck revision/head/ownership after generation.
         session = get_session(db, payload.session_id)
