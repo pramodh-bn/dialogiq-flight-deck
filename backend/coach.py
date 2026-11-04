@@ -241,10 +241,12 @@ class MetaCoachClient:
         base_url: str | None = None,
         model: str | None = None,
         api_key: str | None = None,
+        *,
+        provider: str | None = None,
     ) -> None:
         # CS-80: COACH_PROVIDER picks which env names to read. An unknown
         # provider reads nothing, so the client stays inert.
-        self.provider = selected_provider()
+        self.provider = (provider or selected_provider()).strip().lower()
         env = PROVIDERS.get(self.provider)
         env_base = os.environ.get(env.base, env.default_base) if env else ""
         env_model = os.environ.get(env.model, env.default_model) if env else ""
@@ -278,6 +280,7 @@ class MetaCoachClient:
         max_tokens: int = COACH_MAX_TOKENS,
         timeout: float | None = COACH_TIMEOUT_SECONDS,
         reasoning_effort: str | None = None,
+        response_format: dict[str, object] | None = None,
     ) -> CoachCompletion:
         """Return one raw completion for serialized coach context.
 
@@ -320,6 +323,8 @@ class MetaCoachClient:
         }
         if reasoning_effort is not None:
             create_kwargs["reasoning_effort"] = reasoning_effort
+        if response_format is not None:
+            create_kwargs["response_format"] = response_format
         try:
             completion = client.chat.completions.create(**create_kwargs)  # type: ignore[arg-type]
         except APITimeoutError as exc:

@@ -89,10 +89,17 @@ const palette: Record<Kind, { ring: string; dot: string; label: string; stroke: 
     label: "Neutral",
     stroke: "var(--color-primary)",
   },
+  unavailable: {
+    ring: "border-border bg-muted/20",
+    dot: "bg-muted-foreground",
+    label: "Feedback unavailable",
+    stroke: "var(--color-muted-foreground)",
+  },
 };
 
-function tagFor({ empathy, question_type }: Coaching) {
-  if (empathy) return "Empathy" as const;
+function tagFor({ empathy, question_type, source }: Coaching) {
+  if (question_type === "unavailable") return "Not evaluated" as const;
+  if (empathy) return source === "semantic" ? ("Acknowledgment" as const) : ("Empathy" as const);
   return question_type === "open"
     ? ("Open" as const)
     : question_type === "closed"
@@ -155,8 +162,7 @@ function FlightRecorder() {
 }
 
 type RecorderRequest =
-  | ({ route: "rewind" } & CreateBranchRequest)
-  | ({ route: "select" } & SelectBranchRequest);
+  ({ route: "rewind" } & CreateBranchRequest) | ({ route: "select" } & SelectBranchRequest);
 
 // Matches max-w-sm on the drawer.
 const DRAWER_WIDTH = 384;

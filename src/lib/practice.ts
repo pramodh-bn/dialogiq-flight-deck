@@ -61,8 +61,15 @@ export function storeSession(client: QueryClient, session: PracticeSession) {
 
 export function applyTurn(tree: Tree, res: ChatTurnResponse): Tree {
   if (res.session.revision <= tree.revision) return tree;
-  const { score, total_needs, revealed_needs, resistance, metrics, conversation_progress } =
-    res.node;
+  const {
+    score,
+    total_needs,
+    revealed_needs,
+    resistance,
+    metrics,
+    conversation_progress,
+    feedback,
+  } = res.node;
   return {
     ...tree,
     revision: res.session.revision,
@@ -78,6 +85,7 @@ export function applyTurn(tree: Tree, res: ChatTurnResponse): Tree {
             resistance,
             metrics,
             conversation_progress,
+            ...(feedback === undefined ? {} : { feedback }),
           }
         : b,
     ),
@@ -281,7 +289,9 @@ export async function reconcileAction<T extends { expected_revision: number }, R
   try {
     return { kind: "recovered", result: await replay() };
   } catch (error) {
-    return failureAction(error) === "retry" ? { kind: "unknown" } : { kind: "state_changed", error };
+    return failureAction(error) === "retry"
+      ? { kind: "unknown" }
+      : { kind: "state_changed", error };
   }
 }
 
@@ -310,6 +320,7 @@ export const coachHintsQuery = (sessionId: number, branchId: number, headId: num
 export function isStalled(chain: TurnNode[]): boolean {
   const head = chain.at(-1);
   if (!head) return false;
+  if (head.feedback?.status === "unavailable") return false;
   const parentScore = chain.at(-2)?.score ?? 0;
   return head.score === parentScore && head.score < MAX_SCORE;
 }
@@ -319,7 +330,13 @@ const BEHAVIOR_REVISION = "s4-bob-r1";
 // The opt-in comes from the scenario's capability list, never from its name or id.
 export function createSessionBody(scenario: Scenario): CreateSessionRequest {
   return scenario.behavior_revisions?.includes(BEHAVIOR_REVISION)
-    ? { scenario_id: scenario.id, behavior_revision: BEHAVIOR_REVISION }
+    ? {
+        scenario_id: scenario.id,
+        behavior_revision: BEHAVIOR_REVISION,
+        ...(scenario.feedback_revisions?.includes("semantic-r1")
+          ? { feedback_revision: "semantic-r1" as const }
+          : {}),
+      }
     : { scenario_id: scenario.id };
 }
 

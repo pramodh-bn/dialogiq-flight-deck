@@ -394,6 +394,7 @@ def _prepare_provider_input(
         persona["name"],
         persona["role"],
         behavior_revision=config.get("behavior_revision"),
+        coach_prompt_revision=config.get("coach_prompt_revision"),
     )
     fallback = _fallback_fields(len(earlier), payload.head_node_id, payload.attempt)
     return system_prompt, serialize_coach_context(context), fallback

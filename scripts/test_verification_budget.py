@@ -53,6 +53,27 @@ def test_budget_requires_new_evidence_file(tmp_path: Path) -> None:
         CallBudget({"coach": 1}, path)
 
 
+def test_feedback_and_coach_have_independent_pre_sdk_caps(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+    from coach import CoachUnavailableError
+    from run_bounded_verification_backend import bounded_feedback_client
+    from semantic_feedback import SYSTEM_PROMPT
+
+    budget = CallBudget({"coach": 1, "feedback": 0}, tmp_path / "separate.jsonl")
+    sdk = Mock(return_value="coach-result")
+    call = bounded_feedback_client(sdk, budget)
+    with pytest.raises(CoachUnavailableError):
+        call(system_prompt=SYSTEM_PROMPT)
+    assert call(system_prompt="coach instructions") == "coach-result"
+    with pytest.raises(CoachUnavailableError):
+        call(system_prompt="coach instructions")
+    assert sdk.call_count == 1
+    assert budget.counts == {"coach": 1, "feedback": 0}
+    assert budget.blocked == {"coach": 1, "feedback": 1}
+
+
 def test_zero_caps_reach_real_api_boundaries_without_sdk_calls(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

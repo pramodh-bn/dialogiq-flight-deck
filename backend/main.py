@@ -19,6 +19,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 import coach_service
 import practice
+import semantic_feedback
 from api_errors import ApiError, not_found
 from database import engine
 from migrations import initialize_database
@@ -64,6 +65,10 @@ def coach_provider_dependency(request: Request) -> coach_service.CoachProvider:
     return request.app.state.coach_provider
 
 
+def feedback_provider_dependency(request: Request) -> semantic_feedback.Provider:
+    return request.app.state.feedback_provider
+
+
 def idempotency_key(request: Request) -> str:
     values = request.headers.getlist("Idempotency-Key")
     value = values[0] if len(values) == 1 else ""
@@ -83,6 +88,9 @@ ProviderDep = Annotated[practice.Provider, Depends(provider_dependency)]
 CoachProviderDep = Annotated[
     coach_service.CoachProvider, Depends(coach_provider_dependency)
 ]
+FeedbackProviderDep = Annotated[
+    semantic_feedback.Provider, Depends(feedback_provider_dependency)
+]
 
 
 def reply(result: tuple[int, dict]) -> JSONResponse:
@@ -94,6 +102,7 @@ def create_app(
     db_engine: Engine = engine,
     provider: practice.Provider | None = None,
     coach_provider: coach_service.CoachProvider | None = None,
+    feedback_provider: semantic_feedback.Provider | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -105,6 +114,9 @@ def create_app(
         bind=db_engine, expire_on_commit=False
     )
     application.state.provider = provider or practice.real_persona
+    application.state.feedback_provider = (
+        feedback_provider or semantic_feedback.real_provider
+    )
     application.state.coach_provider = (
         coach_provider or coach_service.real_coach_provider
     )
@@ -207,7 +219,11 @@ def create_app(
     def create(payload: SessionCreateRequest, key: KeyDep, db: DbDep) -> JSONResponse:
         return reply(
             practice.create_session(
-                db, payload.scenario_id, key, payload.behavior_revision
+                db,
+                payload.scenario_id,
+                key,
+                payload.behavior_revision,
+                payload.feedback_revision,
             )
         )
 
@@ -245,9 +261,13 @@ def create_app(
 
     @application.post("/api/chat/turn", response_model=ChatTurnResponse)
     def turn(
-        payload: ChatTurnRequest, key: KeyDep, db: DbDep, provider_call: ProviderDep
+        payload: ChatTurnRequest,
+        key: KeyDep,
+        db: DbDep,
+        provider_call: ProviderDep,
+        feedback_call: FeedbackProviderDep,
     ) -> JSONResponse:
-        return reply(practice.send_turn(db, payload, key, provider_call))
+        return reply(practice.send_turn(db, payload, key, provider_call, feedback_call))
 
     @application.post(
         "/api/sessions/{session_id}/branches",

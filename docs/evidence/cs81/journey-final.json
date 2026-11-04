@@ -1,0 +1,454 @@
+{
+  "source": "6bac22884d179a36c5d5ed898a794e5b964605af",
+  "scope": "Codex synthetic evolving dialogue, actual frontend adapter in Node; not a browser",
+  "expected_prompt_revision": "bob-next-move-r1",
+  "limits": {
+    "coach": 4,
+    "persona": 4,
+    "feedback": 4
+  },
+  "turns": [
+    {
+      "node": {
+        "score": 1,
+        "total_needs": 7,
+        "revealed_needs": [
+          {
+            "id": "n1",
+            "title": "Quarter experience",
+            "description": "The quarter has been difficult to keep up with."
+          }
+        ],
+        "resistance": "guarded",
+        "metrics": {
+          "turns": 1,
+          "open_questions": 1,
+          "closed_questions": 0,
+          "empathy_turns": 0,
+          "open_question_ratio": 1
+        },
+        "conversation_progress": {
+          "behavior_revision": "s4-bob-r1",
+          "stance": "guarded",
+          "last_signal": "clarity",
+          "explanation": "You invited or provided clarification; stance reflects Bob's response."
+        },
+        "feedback": {
+          "revision": "semantic-r1",
+          "status": "ready",
+          "evaluated_turns": 1,
+          "skipped_turns": 0,
+          "failure_reason": null,
+          "latency_ms": 3891,
+          "evidence": [
+            {
+              "kind": "question",
+              "role": "user",
+              "quote": "Bob, could you walk me through what's making this deadline difficult?",
+              "need_id": null
+            },
+            {
+              "kind": "stance",
+              "role": "user",
+              "quote": "Bob, could you walk me through what's making this deadline difficult?",
+              "need_id": null
+            },
+            {
+              "kind": "need",
+              "role": "assistant",
+              "quote": "This quarter's just been hard to keep up with.",
+              "need_id": "n1"
+            }
+          ]
+        },
+        "id": 1,
+        "session_id": 1,
+        "parent_id": null,
+        "turn_number": 1,
+        "user_text": "Bob, could you walk me through what's making this deadline difficult?",
+        "character_text": "This quarter's just been hard to keep up with. Spec changed twice, so I had to redo a bunch of work and the timeline slipped. That's basically it logistics-wise.",
+        "coaching": {
+          "source": "semantic",
+          "question_type": "open",
+          "empathy": false,
+          "leading": false,
+          "outcome": "breakthrough",
+          "alternatives": [],
+          "whispers": []
+        }
+      },
+      "revision": 1,
+      "elapsed_ms": 9007
+    },
+    {
+      "node": {
+        "score": 2,
+        "total_needs": 7,
+        "revealed_needs": [
+          {
+            "id": "n1",
+            "title": "Quarter experience",
+            "description": "The quarter has been difficult to keep up with."
+          },
+          {
+            "id": "n2",
+            "title": "Conflicting priorities",
+            "description": "Competing deadlines make prioritization hard."
+          }
+        ],
+        "resistance": "warming",
+        "metrics": {
+          "turns": 2,
+          "open_questions": 2,
+          "closed_questions": 0,
+          "empathy_turns": 1,
+          "open_question_ratio": 1
+        },
+        "conversation_progress": {
+          "behavior_revision": "s4-bob-r1",
+          "stance": "warming",
+          "last_signal": "acknowledgment",
+          "explanation": "You acknowledged a specific concern; stance reflects Bob's response."
+        },
+        "feedback": {
+          "revision": "semantic-r1",
+          "status": "ready",
+          "evaluated_turns": 2,
+          "skipped_turns": 0,
+          "failure_reason": null,
+          "latency_ms": 2453,
+          "evidence": [
+            {
+              "kind": "question",
+              "role": "user",
+              "quote": "Thanks for explaining that — when the spec changed twice and you had to redo work, what was hardest to keep up with?",
+              "need_id": null
+            },
+            {
+              "kind": "acknowledgment",
+              "role": "user",
+              "quote": "Thanks for explaining that — when the spec changed twice and you had to redo work, what was hardest to keep up with?",
+              "need_id": null
+            },
+            {
+              "kind": "stance",
+              "role": "user",
+              "quote": "Thanks for explaining that — when the spec changed twice and you had to redo work, what was hardest to keep up with?",
+              "need_id": null
+            },
+            {
+              "kind": "reaction",
+              "role": "assistant",
+              "quote": "Q3 stuff, plus support escalations, plus the platform review — everything's due at once and it's hard to know what I'm supposed to prioritize.",
+              "need_id": null
+            },
+            {
+              "kind": "need",
+              "role": "assistant",
+              "quote": "Q3 stuff, plus support escalations, plus the platform review — everything's due at once and it's hard to know what I'm supposed to prioritize.",
+              "need_id": "n2"
+            }
+          ]
+        },
+        "id": 2,
+        "session_id": 1,
+        "parent_id": 1,
+        "turn_number": 2,
+        "user_text": "Thanks for explaining that — when the spec changed twice and you had to redo work, what was hardest to keep up with?",
+        "character_text": "Honestly, it's the competing deadlines. Q3 stuff, plus support escalations, plus the platform review — everything's due at once and it's hard to know what I'm supposed to prioritize.",
+        "coaching": {
+          "source": "semantic",
+          "question_type": "open",
+          "empathy": true,
+          "leading": false,
+          "outcome": "breakthrough",
+          "alternatives": [],
+          "whispers": []
+        }
+      },
+      "revision": 2,
+      "elapsed_ms": 6202
+    },
+    {
+      "node": {
+        "score": 3,
+        "total_needs": 7,
+        "revealed_needs": [
+          {
+            "id": "n1",
+            "title": "Quarter experience",
+            "description": "The quarter has been difficult to keep up with."
+          },
+          {
+            "id": "n2",
+            "title": "Conflicting priorities",
+            "description": "Competing deadlines make prioritization hard."
+          },
+          {
+            "id": "n5",
+            "title": "Clear priorities",
+            "description": "Bob needs explicit agreement on what matters first."
+          }
+        ],
+        "resistance": "open",
+        "metrics": {
+          "turns": 3,
+          "open_questions": 3,
+          "closed_questions": 0,
+          "empathy_turns": 2,
+          "open_question_ratio": 1
+        },
+        "conversation_progress": {
+          "behavior_revision": "s4-bob-r1",
+          "stance": "open",
+          "last_signal": "acknowledgment",
+          "explanation": "You acknowledged a specific concern; stance reflects Bob's response."
+        },
+        "feedback": {
+          "revision": "semantic-r1",
+          "status": "ready",
+          "evaluated_turns": 3,
+          "skipped_turns": 0,
+          "failure_reason": null,
+          "latency_ms": 3265,
+          "evidence": [
+            {
+              "kind": "question",
+              "role": "user",
+              "quote": "Thanks for sharing that — with Q3, support escalations, and platform review all due at once, what would help make priorities clearer?",
+              "need_id": null
+            },
+            {
+              "kind": "acknowledgment",
+              "role": "user",
+              "quote": "Thanks for sharing that — with Q3, support escalations, and platform review all due at once, what would help make priorities clearer?",
+              "need_id": null
+            },
+            {
+              "kind": "stance",
+              "role": "user",
+              "quote": "Thanks for sharing that — with Q3, support escalations, and platform review all due at once, what would help make priorities clearer?",
+              "need_id": null
+            },
+            {
+              "kind": "reaction",
+              "role": "assistant",
+              "quote": "Honestly just a straight call on what has to be first would help.",
+              "need_id": null
+            },
+            {
+              "kind": "need",
+              "role": "assistant",
+              "quote": "Honestly just a straight call on what has to be first would help.",
+              "need_id": "n5"
+            }
+          ]
+        },
+        "id": 3,
+        "session_id": 1,
+        "parent_id": 2,
+        "turn_number": 3,
+        "user_text": "Thanks for sharing that — with Q3, support escalations, and platform review all due at once, what would help make priorities clearer?",
+        "character_text": "Honestly just a straight call on what has to be first would help. Like if you say Q3 is the one that can't slip and the platform review can wait a week, then I know where to put the hours instead of guessing.\n\nI've been kind of avoiding pinning you down on it, didn't want it to look like I can't handle the workload.",
+        "coaching": {
+          "source": "semantic",
+          "question_type": "open",
+          "empathy": true,
+          "leading": false,
+          "outcome": "breakthrough",
+          "alternatives": [],
+          "whispers": []
+        }
+      },
+      "revision": 3,
+      "elapsed_ms": 9296
+    },
+    {
+      "node": {
+        "score": 4,
+        "total_needs": 7,
+        "revealed_needs": [
+          {
+            "id": "n1",
+            "title": "Quarter experience",
+            "description": "The quarter has been difficult to keep up with."
+          },
+          {
+            "id": "n2",
+            "title": "Conflicting priorities",
+            "description": "Competing deadlines make prioritization hard."
+          },
+          {
+            "id": "n4",
+            "title": "Confidence impact",
+            "description": "Repeated misses are undermining Bob's confidence."
+          },
+          {
+            "id": "n5",
+            "title": "Clear priorities",
+            "description": "Bob needs explicit agreement on what matters first."
+          }
+        ],
+        "resistance": "open",
+        "metrics": {
+          "turns": 4,
+          "open_questions": 3,
+          "closed_questions": 1,
+          "empathy_turns": 3,
+          "open_question_ratio": 0.75
+        },
+        "conversation_progress": {
+          "behavior_revision": "s4-bob-r1",
+          "stance": "open",
+          "last_signal": "clarity",
+          "explanation": "You invited or provided clarification; stance reflects Bob's response."
+        },
+        "feedback": {
+          "revision": "semantic-r1",
+          "status": "ready",
+          "evaluated_turns": 4,
+          "skipped_turns": 0,
+          "failure_reason": null,
+          "latency_ms": 5468,
+          "evidence": [
+            {
+              "kind": "question",
+              "role": "user",
+              "quote": "Can we check together whether Q3 or the platform review should come first?",
+              "need_id": null
+            },
+            {
+              "kind": "acknowledgment",
+              "role": "user",
+              "quote": "Thanks for saying that — asking for a clear priority is a reasonable way to manage competing deadlines.",
+              "need_id": null
+            },
+            {
+              "kind": "stance",
+              "role": "user",
+              "quote": "Can we check together whether Q3 or the platform review should come first?",
+              "need_id": null
+            },
+            {
+              "kind": "reaction",
+              "role": "assistant",
+              "quote": "We can check it, yeah.",
+              "need_id": null
+            },
+            {
+              "kind": "need",
+              "role": "assistant",
+              "quote": "But I've missed a couple dates in a row now and it's got me second-guessing my own estimates, so I don't really trust my call on it.",
+              "need_id": "n4"
+            }
+          ]
+        },
+        "id": 4,
+        "session_id": 1,
+        "parent_id": 3,
+        "turn_number": 4,
+        "user_text": "Thanks for saying that — asking for a clear priority is a reasonable way to manage competing deadlines. Can we check together whether Q3 or the platform review should come first?",
+        "character_text": "Yeah, thanks for saying that — I was kind of bracing for a lecture.\n\nWe can check it, yeah. From where I sit Q3 is the one that's actually late already, platform review isn't due till next Friday. But I've missed a couple dates in a row now and it's got me second-guessing my own estimates, so I don't really trust my call on it.\n\nIf you can just say flat out \"Q3 first, platform review can slide\" then I know I'm not guessing wrong.",
+        "coaching": {
+          "source": "semantic",
+          "question_type": "closed",
+          "empathy": true,
+          "leading": false,
+          "outcome": "breakthrough",
+          "alternatives": [],
+          "whispers": []
+        }
+      },
+      "revision": 4,
+      "elapsed_ms": 10833
+    }
+  ],
+  "hints": [
+    {
+      "response": {
+        "session_id": 1,
+        "branch_id": 1,
+        "head_node_id": 1,
+        "revision": 1,
+        "hint": {
+          "id": 1,
+          "contract_revision": "s3-coach-r2",
+          "attempt": 1,
+          "approach": "Explore redo work challenge",
+          "example": "Thanks for explaining that — when the spec changed twice and you had to redo work, what was hardest to keep up with?",
+          "reason": "Follows his logistics explanation and invites more detail without assuming cause.",
+          "source": "meta",
+          "fallback_reason": null,
+          "latency_ms": 10000
+        }
+      },
+      "elapsed_ms": 11023
+    },
+    {
+      "response": {
+        "session_id": 1,
+        "branch_id": 1,
+        "head_node_id": 1,
+        "revision": 1,
+        "hint": {
+          "id": 2,
+          "contract_revision": "s3-coach-r2",
+          "attempt": 2,
+          "approach": "Explore support for timeline",
+          "example": "Thanks for explaining the spec changes and redo work — what would help you stay on track with the timeline from here?",
+          "reason": "Builds on his logistics update and shifts toward collaborative next steps.",
+          "source": "meta",
+          "fallback_reason": null,
+          "latency_ms": 10000
+        }
+      },
+      "elapsed_ms": 14554
+    },
+    {
+      "response": {
+        "session_id": 1,
+        "branch_id": 1,
+        "head_node_id": 2,
+        "revision": 2,
+        "hint": {
+          "id": 3,
+          "contract_revision": "s3-coach-r2",
+          "attempt": 1,
+          "approach": "Clarify prioritization support",
+          "example": "Thanks for sharing that — with Q3, support escalations, and platform review all due at once, what would help make priorities clearer?",
+          "reason": "Directly addresses his latest concern about competing deadlines and prioritization confusion.",
+          "source": "meta",
+          "fallback_reason": null,
+          "latency_ms": 10000
+        }
+      },
+      "elapsed_ms": 10636
+    },
+    {
+      "response": {
+        "session_id": 1,
+        "branch_id": 1,
+        "head_node_id": 3,
+        "revision": 3,
+        "hint": {
+          "id": 4,
+          "contract_revision": "s3-coach-r2",
+          "attempt": 1,
+          "approach": "Normalize asking and clarify priority",
+          "example": "Thanks for saying that — asking for a clear priority is a reasonable way to manage competing deadlines. Can we check together whether Q3 or the platform review should come first?",
+          "reason": "Addresses his stated worry about asking for help before moving to a priority decision.",
+          "source": "meta",
+          "fallback_reason": null,
+          "latency_ms": 10000
+        }
+      },
+      "elapsed_ms": 23861
+    }
+  ],
+  "session_id": 1,
+  "branch_id": 1,
+  "opening": "You wanted to see me? If this is about Q3, I already sent the update.",
+  "public_context": "You are meeting to discuss missed deadlines.",
+  "complete": true,
+  "reload_verified": true
+}

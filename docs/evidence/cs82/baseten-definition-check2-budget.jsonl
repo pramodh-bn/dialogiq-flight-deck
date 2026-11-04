@@ -1,0 +1,3 @@
+{"kind": "startup", "admitted": false, "limits": {"feedback": 2, "coach": 0}, "attempts_admitted": {"feedback": 0, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 2, "coach": 0}, "attempts_admitted": {"feedback": 1, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 2, "coach": 0}, "attempts_admitted": {"feedback": 2, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}

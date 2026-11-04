@@ -1,0 +1,13 @@
+{"kind": "startup", "admitted": false, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 0, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 1, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 2, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 3, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 4, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 5, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 6, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 7, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 8, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 9, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 10, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 11, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}
+{"kind": "feedback", "admitted": true, "limits": {"feedback": 12, "coach": 0}, "attempts_admitted": {"feedback": 12, "coach": 0}, "attempts_blocked": {"feedback": 0, "coach": 0}}

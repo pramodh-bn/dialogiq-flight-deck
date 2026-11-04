@@ -1,0 +1,84 @@
+{
+  "voice": "am_puck",
+  "speed": 1.08,
+  "gap": 0.3,
+  "pronounce": {"Pramodh": "pɹəmˈoʊd", "Meta's": "mˈɛtəz"},
+  "scenes": [
+    {"id": "s1", "visual": "hook", "lead": 1.0, "lines": [
+      "You're about to tell someone their work isn't good enough.",
+      "You rehearse it for days.",
+      "It still goes badly.",
+      "Most managers were promoted for doing the job. Not for hard conversations.",
+      "Nobody gets to practice the moment that matters most."
+    ], "beats": [
+      "Their work *isn't good enough.*",
+      "You rehearse it *for days.*",
+      "It still goes *badly.*",
+      "Promoted for the job. *Not for this.*",
+      "Nobody gets to *practice* the moment that matters most."
+    ]},
+    {"id": "s2", "visual": "reframe", "lines": [
+      "Pilots get simulators, because crashing is expensive.",
+      "So what if you could rewind a hard conversation?"
+    ], "beats": [
+      "Pilots get *simulators.*",
+      "What if you could *rewind* a hard conversation?"
+    ]},
+    {"id": "s3", "visual": "intro", "lines": [
+      "Meet DialogIQ.",
+      "Built by indie developer Pramodh, leading a team of AI agents, on Meta's Muse Spark Open models.",
+      "Practice with a believable character.",
+      "Get one coaching hint.",
+      "Then rewind, and try again.",
+      "It rehearses the conversation. It never records the real one."
+    ], "beats": [
+      "Meet Dialog*IQ.*",
+      "Built by Pramodh + a team of AI agents on *Muse Spark Open*",
+      "*Practice* with a believable character",
+      "*Learn* from one coaching hint",
+      "*Rewind* and try again",
+      "Rehearse the talk. *Never record the real one.*"
+    ]},
+    {"id": "dtitle", "visual": "demoTitle", "silent": 2.0},
+    {"id": "demo", "visual": "demo", "length": 61.5, "cues": [
+      {"at": 0.4, "text": "Here's DialogIQ. Pick a conversation you're dreading."},
+      {"at": 4.7, "text": "Today: Bob. He missed his Q3 deadlines, and he's on the defensive."},
+      {"at": 8.8, "text": "You get his opening line, your situation, and a coach on the side."},
+      {"at": 13.3, "text": "First, lead with pressure."},
+      {"at": 18.9, "text": "He explains, but stays guarded."},
+      {"at": 22.9, "text": "The coach suggests a different move."},
+      {"at": 28.6, "text": "So, rewind."},
+      {"at": 31.4, "text": "Back to the moment before it went wrong. Second take."},
+      {"at": 36.9, "text": "Acknowledge it's been hard. Then ask what's in the way."},
+      {"at": 43.2, "text": "He opens up."},
+      {"at": 46.6, "text": "Now, offer real help."},
+      {"at": 52.8, "text": "And he names what he needs."},
+      {"at": 56.9, "text": "Pressure: guarded. Empathy: open, two needs uncovered."}
+    ]},
+    {"id": "arch", "visual": "diagram", "lines": [
+      "Under the hood: three roles, kept apart.",
+      "Bob runs on Muse Spark Open through Base Ten, with hidden needs he won't just hand over.",
+      "A deterministic judge tracks his stance, turn by turn.",
+      "The coach runs on Muse Spark Open too, through Fireworks. It sees the conversation, but never Bob's hidden needs.",
+      "A good coach shouldn't know the answers. It should know you."
+    ]},
+    {"id": "stats", "visual": "stats", "lines": [
+      "Does the coaching help?",
+      "After we redesigned the coach, usable hints jumped from twenty-three to fifty-two, out of seventy-eight, in small agent-graded tests.",
+      "And when Bob asked to stop, the coach respected it. Six out of six."
+    ]},
+    {"id": "close", "visual": "close", "lines": [
+      "We let surgeons practice before they operate.",
+      "But the conversation that decides whether a good person stays or leaves?",
+      "One take."
+    ], "beats": [
+      "Surgeons *practice* first.",
+      "The conversation that decides who *stays*…",
+      "gets *one take.*"
+    ]},
+    {"id": "tag", "visual": "closing", "tail": 2.8, "lines": [
+      "DialogIQ. Practice the conversation, before it matters.",
+      "Find it on GitHub. The link is below."
+    ]}
+  ]
+}

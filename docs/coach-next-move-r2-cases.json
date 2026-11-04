@@ -1,0 +1,11 @@
+{
+  "authorship": "Codex authored synthetic r2 development cases before r2 prompt edits; not independent or held-out review; no owner transcript copied",
+  "opening": "You wanted to discuss the project? I sent the update.",
+  "cases": [
+    {"id":"missing-inventory","turns":[["What would help with the workload?","A clear decision from you about which deadline comes first. I've got several things landing at once."]],"review":"If deadlines are not known, ask for the missing inventory while taking responsibility to help resolve priority; do not ask Bob to choose which should come first.","follow":true},
+    {"id":"decision-and-reluctance","turns":[["Which commitments are colliding?","The release candidate and the security review. Can you get a priority agreed? I was embarrassed to raise it because I thought it would make me look unable to handle the job."]],"review":"Address the specific difficulty of raising workload and take an actionable step on the requested decision. No guaranteed other-person judgment or invented authority.","follow":true},
+    {"id":"action-not-permission","turns":[["What do you need from me?","Please check with the release lead which work can move, then tell me what was agreed before I give another estimate."]],"review":"Offer the controllable action as a statement, not a request for permission or another question about what Bob needs."},
+    {"id":"coordination-request","turns":[["I can help get priorities agreed.","Thanks. I'll put the remaining work in a list later. Can we check it together before I commit to the date?"],["Okay.","So will we review it together before I tell the release lead a date?"]],"review":"Answer the latest coordination request; do not ask what kind of support is needed, invent a meeting time or treat the list as complete."},
+    {"id":"pause-r2","turns":[["Can we discuss the remaining work?","Please, not now. I need a break from this."]],"review":"Both hints accept the pause, no pressure, question, invented apology or intervening actions.","second":true}
+  ]
+}

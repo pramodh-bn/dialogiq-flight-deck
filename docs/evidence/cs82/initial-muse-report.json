@@ -1,0 +1,136 @@
+{
+  "source_revision": "2f5ee6d183d7e92eb17e1ae77dbbd6f45746d1a6",
+  "transport": "real HTTP",
+  "cases": [
+    {
+      "case": "collaborate-and-follow-hint",
+      "opening": "You wanted to see me? If this is about Q3, I already sent the update.",
+      "public_context": "You are meeting to discuss missed deadlines.",
+      "session_id": 1,
+      "turns": [
+        {
+          "elapsed_ms": 18094,
+          "node": {
+            "score": 0,
+            "total_needs": 7,
+            "revealed_needs": [],
+            "resistance": "guarded",
+            "metrics": {
+              "turns": 1,
+              "open_questions": 0,
+              "closed_questions": 0,
+              "empathy_turns": 0,
+              "open_question_ratio": 0.0
+            },
+            "conversation_progress": {
+              "behavior_revision": "s4-bob-r1",
+              "stance": "guarded",
+              "last_signal": "initial",
+              "explanation": "This is Bob's simulated starting stance, not a measure of trust."
+            },
+            "feedback": {
+              "revision": "semantic-r1",
+              "status": "unavailable",
+              "evaluated_turns": 0,
+              "skipped_turns": 1,
+              "failure_reason": "timeout",
+              "latency_ms": 12015,
+              "evidence": []
+            },
+            "id": 1,
+            "session_id": 1,
+            "parent_id": null,
+            "turn_number": 1,
+            "user_text": "Could you walk me through what's still unresolved for this release?",
+            "character_text": "Three things, really. API migration's mostly done but still needs integration testing, docs are maybe halfway, and the flag cleanup got bumped after the design changes. So timelines are off by a week or so depending what you count.",
+            "coaching": {
+              "source": "semantic",
+              "question_type": "unavailable",
+              "empathy": null,
+              "leading": null,
+              "outcome": "unavailable",
+              "alternatives": [],
+              "whispers": []
+            }
+          },
+          "session_revision": 1
+        },
+        {
+          "elapsed_ms": 18156,
+          "node": {
+            "score": 0,
+            "total_needs": 7,
+            "revealed_needs": [],
+            "resistance": "guarded",
+            "metrics": {
+              "turns": 2,
+              "open_questions": 0,
+              "closed_questions": 0,
+              "empathy_turns": 0,
+              "open_question_ratio": 0.0
+            },
+            "conversation_progress": {
+              "behavior_revision": "s4-bob-r1",
+              "stance": "guarded",
+              "last_signal": "initial",
+              "explanation": "This is Bob's simulated starting stance, not a measure of trust."
+            },
+            "feedback": {
+              "revision": "semantic-r1",
+              "status": "unavailable",
+              "evaluated_turns": 0,
+              "skipped_turns": 2,
+              "failure_reason": "timeout",
+              "latency_ms": 12000,
+              "evidence": []
+            },
+            "id": 2,
+            "session_id": 1,
+            "parent_id": 1,
+            "turn_number": 2,
+            "user_text": "Let's put the remaining work on one page and identify who can share it.",
+            "character_text": "Okay. I can put the three items on one page with where they stand.\n\nNot sure who actually has bandwidth to take anything on right now though.",
+            "coaching": {
+              "source": "semantic",
+              "question_type": "unavailable",
+              "empathy": null,
+              "leading": null,
+              "outcome": "unavailable",
+              "alternatives": [],
+              "whispers": []
+            }
+          },
+          "session_revision": 2
+        }
+      ],
+      "hints": [
+        {
+          "response": {
+            "session_id": 1,
+            "branch_id": 1,
+            "head_node_id": 2,
+            "revision": 2,
+            "hint": {
+              "id": 1,
+              "contract_revision": "s3-coach-r2",
+              "attempt": 1,
+              "approach": "Acknowledge Bob's bandwidth concern and make the one-page plan actionable with clear ownership and effort.",
+              "example": "You flagged bandwidth might be tight \u2014 let's list those three items with what's left for each, and I can help check who has capacity to share the load this week.",
+              "reason": "Bob just said he's unsure who has bandwidth to help, so addressing that directly shows you heard his concern while keeping the one-page plan you both agreed on moving forward.",
+              "source": "meta",
+              "fallback_reason": null,
+              "latency_ms": 10000
+            }
+          },
+          "elapsed_ms": 15500
+        }
+      ]
+    }
+  ],
+  "plan": {
+    "persona": 8,
+    "feedback": 8,
+    "coach": 4
+  },
+  "scope": "Codex authored synthetic shared sample, not independent or unseen"
+}

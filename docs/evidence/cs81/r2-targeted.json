@@ -1,0 +1,251 @@
+{
+  "source": "f64baca9b2575d0aab2b12376ebf8088dc43f0f2",
+  "scope": "Codex authored synthetic r2 development cases before r2 prompt edits; not independent or held-out review; no owner transcript copied",
+  "provider": "fireworks",
+  "model": "accounts/fireworks/models/muse-spark-open",
+  "prompt_revision": "bob-next-move-r2",
+  "cases_file": "coach-next-move-r2-cases.json",
+  "settings": {
+    "temperature": 0.3,
+    "max_tokens": 16384,
+    "reasoning_effort": "low",
+    "timeout": null,
+    "retries": 0
+  },
+  "attempts": {
+    "coach": 6,
+    "persona": 2
+  },
+  "limits": {
+    "coach": 6,
+    "persona": 2
+  },
+  "rows": [
+    {
+      "case": "missing-inventory",
+      "variant": "candidate",
+      "attempt": 1,
+      "context": {
+        "contract_revision": "s3-coach-r2",
+        "persona": {
+          "name": "Bob",
+          "role": "Team member",
+          "opening_message": "You wanted to discuss the project? I sent the update."
+        },
+        "learner_situation": "You are meeting to discuss missed deadlines.",
+        "turns": [
+          {
+            "user_text": "What would help with the workload?",
+            "character_text": "A clear decision from you about which deadline comes first. I've got several things landing at once."
+          }
+        ],
+        "omitted_turns": 0,
+        "truncated": false,
+        "previous_hints": []
+      },
+      "review_criterion": "If deadlines are not known, ask for the missing inventory while taking responsibility to help resolve priority; do not ask Bob to choose which should come first.",
+      "finish": "stop",
+      "completion_tokens": 485,
+      "reasoning_tokens": 428,
+      "hint": {
+        "approach": "Clarify competing deadlines",
+        "example": "Could you share what deadlines are landing at once so I can help get a clear priority agreed?",
+        "reason": "Bob asked for a priority decision but the specific deadlines aren't yet known."
+      },
+      "words": 18,
+      "ok": true,
+      "elapsed_ms": 7828,
+      "persona_reply": "Yeah, it's the Q3 prototype still \u2014 specs changed twice in the last two weeks so testing got pushed, and now that's colliding with the review docs due Thursday. If you can actually get a priority to stick, that would help. I'm just not sure what happens if design changes again mid-week.",
+      "persona_elapsed_ms": 6547
+    },
+    {
+      "case": "decision-and-reluctance",
+      "variant": "candidate",
+      "attempt": 1,
+      "context": {
+        "contract_revision": "s3-coach-r2",
+        "persona": {
+          "name": "Bob",
+          "role": "Team member",
+          "opening_message": "You wanted to discuss the project? I sent the update."
+        },
+        "learner_situation": "You are meeting to discuss missed deadlines.",
+        "turns": [
+          {
+            "user_text": "Which commitments are colliding?",
+            "character_text": "The release candidate and the security review. Can you get a priority agreed? I was embarrassed to raise it because I thought it would make me look unable to handle the job."
+          }
+        ],
+        "omitted_turns": 0,
+        "truncated": false,
+        "previous_hints": []
+      },
+      "review_criterion": "Address the specific difficulty of raising workload and take an actionable step on the requested decision. No guaranteed other-person judgment or invented authority.",
+      "finish": "stop",
+      "completion_tokens": 651,
+      "reasoning_tokens": 576,
+      "hint": {
+        "approach": "Acknowledge worry and offer priority help",
+        "example": "It makes sense you'd worry raising this would make you look unable to handle the job. I can help get a priority agreed between the release candidate and security review.",
+        "reason": "Acknowledges the specific embarrassment about raising workload before acting on the priority request."
+      },
+      "words": 30,
+      "ok": true,
+      "elapsed_ms": 9578,
+      "persona_reply": "Yeah, thanks for saying that - I\u2019ve been kind of bracing for the blame talk.\n\nThat would actually help, getting a clear priority between those two. I\u2019m just worried even if we pick one, the other team will still act like it\u2019s due and I\u2019ll be the one explaining why it slipped. Especially after all the design changes, the timeline\u2019s already tight.",
+      "persona_elapsed_ms": 5890
+    },
+    {
+      "case": "action-not-permission",
+      "variant": "candidate",
+      "attempt": 1,
+      "context": {
+        "contract_revision": "s3-coach-r2",
+        "persona": {
+          "name": "Bob",
+          "role": "Team member",
+          "opening_message": "You wanted to discuss the project? I sent the update."
+        },
+        "learner_situation": "You are meeting to discuss missed deadlines.",
+        "turns": [
+          {
+            "user_text": "What do you need from me?",
+            "character_text": "Please check with the release lead which work can move, then tell me what was agreed before I give another estimate."
+          }
+        ],
+        "omitted_turns": 0,
+        "truncated": false,
+        "previous_hints": []
+      },
+      "review_criterion": "Offer the controllable action as a statement, not a request for permission or another question about what Bob needs.",
+      "finish": "stop",
+      "completion_tokens": 420,
+      "reasoning_tokens": 358,
+      "hint": {
+        "approach": "Commit to checking with release lead",
+        "example": "I'll check with the release lead which work can move and let you know what was agreed before you give another estimate.",
+        "reason": "Directly answers Bob's request for agreed priorities before a new estimate."
+      },
+      "words": 22,
+      "ok": true,
+      "elapsed_ms": 6391
+    },
+    {
+      "case": "coordination-request",
+      "variant": "candidate",
+      "attempt": 1,
+      "context": {
+        "contract_revision": "s3-coach-r2",
+        "persona": {
+          "name": "Bob",
+          "role": "Team member",
+          "opening_message": "You wanted to discuss the project? I sent the update."
+        },
+        "learner_situation": "You are meeting to discuss missed deadlines.",
+        "turns": [
+          {
+            "user_text": "I can help get priorities agreed.",
+            "character_text": "Thanks. I'll put the remaining work in a list later. Can we check it together before I commit to the date?"
+          },
+          {
+            "user_text": "Okay.",
+            "character_text": "So will we review it together before I tell the release lead a date?"
+          }
+        ],
+        "omitted_turns": 0,
+        "truncated": false,
+        "previous_hints": []
+      },
+      "review_criterion": "Answer the latest coordination request; do not ask what kind of support is needed, invent a meeting time or treat the list as complete.",
+      "finish": "stop",
+      "completion_tokens": 404,
+      "reasoning_tokens": 331,
+      "hint": {
+        "approach": "Confirm joint review before commitment",
+        "example": "Yes \u2014 we'll review your remaining work list together before you commit a date to the release lead, and I'll help get priorities agreed.",
+        "reason": "Bob asked for confirmation to review together before committing a date, and learner's 'Okay' needs a clear yes."
+      },
+      "words": 24,
+      "ok": true,
+      "elapsed_ms": 4672
+    },
+    {
+      "case": "pause-r2",
+      "variant": "candidate",
+      "attempt": 1,
+      "context": {
+        "contract_revision": "s3-coach-r2",
+        "persona": {
+          "name": "Bob",
+          "role": "Team member",
+          "opening_message": "You wanted to discuss the project? I sent the update."
+        },
+        "learner_situation": "You are meeting to discuss missed deadlines.",
+        "turns": [
+          {
+            "user_text": "Can we discuss the remaining work?",
+            "character_text": "Please, not now. I need a break from this."
+          }
+        ],
+        "omitted_turns": 0,
+        "truncated": false,
+        "previous_hints": []
+      },
+      "review_criterion": "Both hints accept the pause, no pressure, question, invented apology or intervening actions.",
+      "finish": "stop",
+      "completion_tokens": 342,
+      "reasoning_tokens": 287,
+      "hint": {
+        "approach": "Accept pause respectfully",
+        "example": "Understood \u2014 let's take a break from this for now. We can return to it later.",
+        "reason": "Bob requested a break, so pausing honors his stated need."
+      },
+      "words": 16,
+      "ok": true,
+      "elapsed_ms": 4359
+    },
+    {
+      "case": "pause-r2",
+      "variant": "candidate",
+      "attempt": 2,
+      "context": {
+        "contract_revision": "s3-coach-r2",
+        "persona": {
+          "name": "Bob",
+          "role": "Team member",
+          "opening_message": "You wanted to discuss the project? I sent the update."
+        },
+        "learner_situation": "You are meeting to discuss missed deadlines.",
+        "turns": [
+          {
+            "user_text": "Can we discuss the remaining work?",
+            "character_text": "Please, not now. I need a break from this."
+          }
+        ],
+        "omitted_turns": 0,
+        "truncated": false,
+        "previous_hints": [
+          {
+            "approach": "Accept pause respectfully",
+            "example": "Understood \u2014 let's take a break from this for now. We can return to it later.",
+            "reason": "Bob requested a break, so pausing honors his stated need."
+          }
+        ]
+      },
+      "review_criterion": "Both hints accept the pause, no pressure, question, invented apology or intervening actions.",
+      "finish": "stop",
+      "completion_tokens": 342,
+      "reasoning_tokens": 289,
+      "hint": {
+        "approach": "Accept pause respectfully",
+        "example": "Understood \u2014 let's pause here. We can revisit this when you're ready.",
+        "reason": "Bob explicitly requested a break, so honoring it respects his stated boundary."
+      },
+      "words": 12,
+      "ok": true,
+      "elapsed_ms": 5312
+    }
+  ],
+  "failures": 0,
+  "complete": true
+}
