@@ -39,10 +39,19 @@ def main() -> None:
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--live", action="store_true")
+    parser.add_argument(
+        "--case-ids", help="Comma-separated subset for a recorded checkpoint."
+    )
+    parser.add_argument("--candidate-only", action="store_true")
     args = parser.parse_args()
     if args.out.exists():
         raise SystemExit("Use a new report path; never overwrite a paid run.")
     cases = json.loads((ROOT / "docs/coach-next-move-cases.json").read_text())
+    if args.case_ids:
+        selected = set(args.case_ids.split(","))
+        if selected - {case["id"] for case in cases["cases"]}:
+            raise SystemExit("Unknown case ID; no paid calls made.")
+        cases["cases"] = [case for case in cases["cases"] if case["id"] in selected]
     if not args.live:
         print("Plan: at most16 coach and4 persona calls. Add --live to execute.")
         return
@@ -93,7 +102,11 @@ def main() -> None:
     }
     for case in cases["cases"]:
         previous = []
-        variants = ["previous", "candidate"] if case.get("compare") else ["candidate"]
+        variants = (
+            ["previous", "candidate"]
+            if case.get("compare") and not args.candidate_only
+            else ["candidate"]
+        )
         for variant in variants:
             for attempt in range(1, 3 if case.get("second") else 2):
                 context = build_coach_context(
