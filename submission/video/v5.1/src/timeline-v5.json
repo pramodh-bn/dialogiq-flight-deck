@@ -1,0 +1,93 @@
+[
+ {
+  "id": "s1",
+  "visual": "hook",
+  "frames": 184,
+  "starts": [
+   8,
+   93
+  ]
+ },
+ {
+  "id": "s2",
+  "visual": "reframe",
+  "frames": 106,
+  "starts": [
+   15
+  ]
+ },
+ {
+  "id": "s3",
+  "visual": "intro",
+  "frames": 233,
+  "starts": [
+   15,
+   102,
+   170
+  ]
+ },
+ {
+  "id": "dtitle",
+  "visual": "demoTitle",
+  "frames": 45,
+  "starts": []
+ },
+ {
+  "id": "demo",
+  "visual": "demo",
+  "frames": 1845,
+  "starts": [
+   12,
+   141,
+   264,
+   399,
+   567,
+   687,
+   858,
+   942,
+   1107,
+   1296,
+   1398,
+   1584,
+   1707
+  ]
+ },
+ {
+  "id": "arch",
+  "visual": "diagram",
+  "frames": 414,
+  "starts": [
+   15,
+   102,
+   236
+  ]
+ },
+ {
+  "id": "stats",
+  "visual": "stats",
+  "frames": 430,
+  "starts": [
+   15,
+   70,
+   279
+  ]
+ },
+ {
+  "id": "close",
+  "visual": "close",
+  "frames": 163,
+  "starts": [
+   15,
+   90
+  ]
+ },
+ {
+  "id": "tag",
+  "visual": "closing",
+  "frames": 232,
+  "starts": [
+   15,
+   127
+  ]
+ }
+]

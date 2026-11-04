@@ -1,0 +1,151 @@
+{
+  "voice": "am_puck",
+  "speed": 1.08,
+  "gap": 0.23,
+  "pronounce": {
+    "Pramodh": "pɹəmˈoʊd",
+    "Meta's": "mˈɛtəz"
+  },
+  "scenes": [
+    {
+      "id": "s1",
+      "visual": "hook",
+      "lead": 0.25,
+      "lines": [
+        "Hard conversations rarely get a second take.",
+        "DialogIQ lets you practice one."
+      ],
+      "beats": [
+        "Hard conversations deserve a *second take.*",
+        "Meet *DialogIQ.*"
+      ]
+    },
+    {
+      "id": "s2",
+      "visual": "reframe",
+      "lines": [
+        "Say it badly. Rewind. Try again."
+      ],
+      "beats": [
+        "Say it badly. *Rewind.* Try again."
+      ]
+    },
+    {
+      "id": "s3",
+      "visual": "intro",
+      "lines": [
+        "Built by Pramodh and a team of AI agents.",
+        "Powered by Meta's Muse Spark Open.",
+        "Now meet Bob."
+      ],
+      "beats": [
+        "Built by *Pramodh* and AI agents",
+        "Powered by *Muse Spark Open*",
+        "Now meet *Bob.*"
+      ]
+    },
+    {
+      "id": "dtitle",
+      "visual": "demoTitle",
+      "silent": 1.5
+    },
+    {
+      "id": "demo",
+      "visual": "demo",
+      "length": 61.5,
+      "cues": [
+        {
+          "at": 0.4,
+          "text": "Here's DialogIQ. Pick a conversation you're dreading."
+        },
+        {
+          "at": 4.7,
+          "text": "Today: Bob. He missed his Q3 deadlines, and he's on the defensive."
+        },
+        {
+          "at": 8.8,
+          "text": "You get his opening line, your situation, and a coach on the side."
+        },
+        {
+          "at": 13.3,
+          "text": "First, lead with pressure."
+        },
+        {
+          "at": 18.9,
+          "text": "He explains, but stays guarded."
+        },
+        {
+          "at": 22.9,
+          "text": "The coach suggests a different move."
+        },
+        {
+          "at": 28.6,
+          "text": "So, rewind."
+        },
+        {
+          "at": 31.4,
+          "text": "Back to the moment before it went wrong. Second take."
+        },
+        {
+          "at": 36.9,
+          "text": "Acknowledge it's been hard. Then ask what's in the way."
+        },
+        {
+          "at": 43.2,
+          "text": "He opens up."
+        },
+        {
+          "at": 46.6,
+          "text": "Now, offer real help."
+        },
+        {
+          "at": 52.8,
+          "text": "And he names what he needs."
+        },
+        {
+          "at": 56.9,
+          "text": "Pressure: guarded. Empathy: open, two needs uncovered."
+        }
+      ]
+    },
+    {
+      "id": "arch",
+      "visual": "diagram",
+      "lines": [
+        "Bob runs on Muse Spark Open through Baseten.",
+        "Local rules track stance. A separate judge counts needs uncovered.",
+        "Fireworks hosts the coach. It sees the conversation, never Bob's hidden needs."
+      ]
+    },
+    {
+      "id": "stats",
+      "visual": "stats",
+      "lines": [
+        "Do these hints fit the moment?",
+        "In a small test graded by agents: fifty-two usable hints out of seventy-eight. Before, twenty-three.",
+        "In one stop-request case, all six hints respected Bob's request."
+      ]
+    },
+    {
+      "id": "close",
+      "visual": "close",
+      "lines": [
+        "Same moment. Different first move.",
+        "That is the power of practice."
+      ],
+      "beats": [
+        "Same moment. *Different first move.*",
+        "The power of *practice.*"
+      ]
+    },
+    {
+      "id": "tag",
+      "visual": "closing",
+      "tail": 0.5,
+      "lines": [
+        "DialogIQ. Practice the conversation before it matters.",
+        "Find the project on GitHub. Link below."
+      ]
+    }
+  ]
+}
