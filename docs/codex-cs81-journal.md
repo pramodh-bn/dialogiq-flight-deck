@@ -51,3 +51,75 @@ warnings),56frontend coaching tests pass, TypeScript and changed-file ESLint
 pass. Ruff changed files and diff whitespace checks pass. These are unit/mocked
 checks; they do not yet prove live coaching usefulness or browser behavior.
 The next run is the previously recorded16coach/4persona bounded comparison.
+
+## Milestone — runtime checks and first live observations
+
+Implementation source `59d8bc2`; `ec75900` adds only a reproducible journey
+script.306backend tests pass (same two TestClient warnings),114frontend tests
+pass, production build passes. RealHTTP fixture journey on127.0.0.2:8080 passes
+four turns, two chained hints, cache/replay/fork/reload and unavailable feedback;
+the fixture asserts the candidate prompt selection. Zero paid calls for these
+checks; fixture process was stopped by its harness.
+
+First paid batch is in progress, not yet a delivery claim. Early candidate
+suggestions move beyond cause confirmation, address concern about how help is
+perceived, and accept a proposed list/check-in without claiming work is done.
+The corresponding fixture-persona replies develop conditions and practical
+support. Some approach/reason text is still verbose; provider latency remains
+variable. No statistical reliability or independent-review claim follows.
+
+Browser host retry through CUA failed with “browser access host is unavailable”.
+Do not bypass it with another UI automation mechanism. The journey capture uses
+the actual frontend HTTP adapter in Node; this is real client/HTTP evidence,
+explicitly not a browser/rendering/usability test. Owner GUI review remains.
+
+## Milestone — first batch review and correction
+
+First batch finished16coach calls (4previous,12candidate) and4fixture-persona
+follow-through calls with no provider/parse failures. Retained all outputs.
+Review found one derived quantity (“redo ... twice” from two design changes),
+loose stakeholder/rework attribution in a reason, verbose secondary text and a
+near-paraphrase second hint. CS-C589 records the findings and bounded rerun.
+
+Runtime `6bac228` discourages recaps/derived counts, separates concerns, asks for
+shorter labels/reasons and a different exploratory angle. Corrective batch
+finished5coach/1fixture-persona calls with no provider/parse failures. The rework
+quantity is now attached to the stated design changes, and the stakeholder line
+focuses on Bob's rework. Secondary text is shorter. The second exploratory hint
+still overlaps with the first; no claim that alternative-hint diversity is
+solved. No further prompt tuning before the fresh owner journey.
+
+Post-refinement8selection/pinning tests and Ruff pass. The realHTTP fixture
+rerun initially refused an occupied verification port (my idle verification
+server); after stopping that server, the same check passed. No paid requests
+were made by that failed attempt. Full306/114results apply to the unchanged
+non-prompt code; targeted prompt/pinning checks and HTTP cover this refinement.
+
+Beginning the previously planned final4coach/4persona/4grader journey against
+the actual frontend adapter with a disposable DB and hard SDK attempt caps.
+No owner recording is used or changed by this verification.
+
+## Current milestone — candidate running for owner review
+
+Final runtime `6bac228`; candidate frontend component bytes remain those tested
+and built on59d8bc2. Final journey passed4turns/4hints using the actual frontend
+HTTP adapter and live providers; three example lines sent verbatim to Bob,
+all feedback ready, reload verified. No implication of a resolved conversation:
+Bob still asked for a concrete priority decision at the fourth turn.
+
+Total this task:25coach/9persona/4grader admitted attempts, no provider/parse
+errors, fallback or retries. Journey hint median12.79s/max23.86s; prior batch
+max41.11s remains a demo limitation. Exploratory second-hint overlap remains.
+Full details and retained evidence in coach-next-move-verification.md.
+
+Canonical app restarted from this worktree after backing up its recording DB;
+six owner sessions preserved with original prompt/feedback selection. API8080
+healthy, production frontend5173 responds200. COACH_NEXT_MOVE_ENABLED=1 selects
+the candidate only on new opted-in Bob sessions. No verification quota on the
+owner app; all temporary .2 servers stopped. Current own live exec sessions:
+backend74709, frontend15727. No unattended watch or future scheduled run claimed.
+
+Owner next: refresh127.0.0.1:5173, start a **new** Bob session, use only in-app
+hints and review usefulness. Old semantic sessions keep the old coach too.
+Owner GUI/learner verdict is outstanding. Draft PR delivery/integration follows;
+PR48 and PR46 remain integration dependencies. No merge authorized or claimed.
