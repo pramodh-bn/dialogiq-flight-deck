@@ -121,5 +121,6 @@ backend74709, frontend15727. No unattended watch or future scheduled run claimed
 
 Owner next: refresh127.0.0.1:5173, start a **new** Bob session, use only in-app
 hints and review usefulness. Old semantic sessions keep the old coach too.
-Owner GUI/learner verdict is outstanding. Draft PR delivery/integration follows;
+Owner GUI/learner verdict is outstanding. Draft [PR49](https://github.com/pramodh-bn/dialogiq-flight-deck/pull/49)
+is open; implementation/evidence commit `b45a80a` is pushed. Integration follows;
 PR48 and PR46 remain integration dependencies. No merge authorized or claimed.

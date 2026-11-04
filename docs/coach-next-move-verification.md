@@ -26,7 +26,7 @@ persona prompt, public DTO, context expansion or provider setting was introduced
 ## Checks actually run
 
 - Python3.12.10/jiter, Node26.13/npm11.20; task-local dependencies installed.
--306backend tests,114frontend tests, TypeScript, changed-file ESLint/Ruff and
+- 306 backend tests, 114 frontend tests, TypeScript, changed-file ESLint/Ruff and
   production build pass on the first candidate. Two existing TestClient timeout
   deprecation warnings remain. The final refinement changes prompt strings and
   a manual probe only;8prompt-selection/pinning tests, Ruff and realHTTP fixture
@@ -35,7 +35,7 @@ persona prompt, public DTO, context expansion or provider setting was introduced
   saved/replayed turns, fork/reload and unavailable feedback;0paid calls.
   One rerun initially refused my occupied verification port; after stopping my
   idle server, the rerun passed. No request/model call occurred in that refusal.
--12exact old/unknown-version coach-prompt comparisons against `b1c8a0d` pass.
+- 12 exact old/unknown-version coach-prompt comparisons against `b1c8a0d` pass.
   The initial ad hoc comparison used Windows' default decoding and failed on
   non-ASCII text; explicitly decoding Git source as UTF-8 resolved the harness
   error. It was not a product prompt regression.
