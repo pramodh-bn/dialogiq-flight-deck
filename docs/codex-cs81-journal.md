@@ -133,3 +133,20 @@ feedback on the running candidate, not a broad reliability claim or merge
 authorization. Recommendation: freeze the prompt for the morning demo; keep
 overlapping second hints and provider latency as documented follow-ups. No
 additional prompt edits or paid experiments were made for this feedback.
+
+## Follow-up — user explicitly requests further review/tightening
+
+User then directed Codex to inspect the conversations and tighten what remains;
+this supersedes the freeze recommendation, not the positive earlier feedback.
+CS-C592 records scope and finite call plan. Latest owner session's three branches
+reviewed locally only. Findings: decision can be returned to Bob instead of
+helping resolve it; generic thanks can skip a specific concern about raising
+workload; an action offer was phrased as a question. UI also kept old actionable
+hints visible when no replacement was loading, a possible contributor to reuse
+at a later turn, not proven cause. Owner transcript remains private.
+
+Before prompt edits, synthetic r2 cases are in coach-next-move-r2-cases.json.
+Plan <=6coach/2fixture-persona calls, checkpoint then <=4coach/4persona/4grader
+actual-client journey. Preserve r1 prompt bytes and all pinned sessions. Scope:
+new-session r2 selection, precise request/concern/action guidance and hiding stale
+hints outside pending state. No new provider, API, scoring or persona changes.
