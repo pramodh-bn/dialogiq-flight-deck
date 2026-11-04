@@ -26,6 +26,7 @@ HINT_FIELDS = ("approach", "example", "reason")
 
 
 BEHAVIOR_REVISION_BOB = "s4-bob-r1"
+NEXT_MOVE_REVISION = "bob-next-move-r1"
 
 _BASELINE_MOVE_PARAGRAPH = (
     "Make the example line one short acknowledgment of what the "
@@ -82,27 +83,72 @@ _BOB_REPEAT_PARAGRAPH = (
     "learner did after the request. Do not explain your reasoning."
 )
 
+_NEXT_MOVE_PARAGRAPH = (
+    "Help the learner take the conversation one useful step forward. Read the "
+    "latest reply in the context of what has already been answered: what is "
+    "still unresolved, and is the other person asking for an answer, decision, "
+    "help, or space? Address that before changing subjects. Do not ask them to "
+    "confirm or repeat a clear answer just to demonstrate listening. A brief "
+    "specific reflection can lead into exploring an unresolved concern, but "
+    "neither a reflection prefix nor a question is mandatory. Address a voiced "
+    "concern about accepting help before seeking a commitment. Do not assert "
+    "reassurance about how other people will judge them. When a decision is "
+    "needed, offer to clarify it with the relevant people rather than inventing "
+    "a priority or authority. Commit only to actions the learner can control; "
+    "otherwise offer to check or seek agreement. A short interjection such as "
+    "'what?' is ambiguous: do not invent learner fault, the other person's "
+    "confusion, or an apology. Respond to the substantive reply or clarify the "
+    "specific ambiguity. If they request a pause or wind down, simply accept "
+    "it without another question. Keep who owns each concern straight. Preserve "
+    "whether an action is offered, planned, or already complete: never thank "
+    "someone for work they only offered to do. Two mentioned events do not "
+    "establish before/after order or a causal link. Use only dialogue evidence. "
+    "Write a concise, speakable example, normally under35words, carrying out "
+    "one move with at most one question. Avoid a recap, a menu of solutions, "
+    "therapy jargon, and a script that does both people's talking. The approach "
+    "is a short move label; the reason is one short sentence naming why this "
+    "move fits the latest reply, without claiming trust or progress is assured."
+)
+
+_NEXT_MOVE_REPEAT_PARAGRAPH = (
+    "previous_hints are suggestions, never things anyone said or did. Nothing "
+    "has happened since the latest quoted reply. For another hint, offer a "
+    "different useful move if the dialogue supports one. Do not force novelty "
+    "that avoids a direct request or a boundary: the same necessary answer or "
+    "pause may be offered in fresh words. Never infer that the learner used or "
+    "ignored a hint, pushed after a refusal, or completed a suggested action. "
+    "Do not explain your reasoning."
+)
+
 
 def build_coach_system_prompt(
     persona_name: str,
     persona_role: str,
     *,
     behavior_revision: str | None = None,
+    coach_prompt_revision: str | None = None,
 ) -> str:
     """Return the single fixed system instruction for every score.
 
-    Only the persona name/role interpolate; the variant never changes.
-    Includes the CS-C196 non-repeat requirement for all scores.
+    Only persona name/role interpolate. Pinned revisions select fixed variants;
+    no score or private scenario data selects the instruction.
 
     ``behavior_revision="s4-bob-r1"`` (CS-73, contract s4-bob-r1)
     replaces the mandatory what/how paragraph with a useful-next-move
     paragraph and adds to the non-repeat paragraph that previous hints
     are not dialogue; omitted or unknown revisions return the baseline
     bytes exactly.
+
+    ``coach_prompt_revision="bob-next-move-r1"`` selects concise next-move
+    guidance only with the Bob behavior revision. Unknown versions preserve
+    the previous prompt, including its historical non-repeat behavior.
     """
     bob = behavior_revision == BEHAVIOR_REVISION_BOB
     move_paragraph = _BOB_MOVE_PARAGRAPH if bob else _BASELINE_MOVE_PARAGRAPH
     repeat_paragraph = _BOB_REPEAT_PARAGRAPH if bob else _BASELINE_REPEAT_PARAGRAPH
+    if bob and coach_prompt_revision == NEXT_MOVE_REVISION:
+        move_paragraph = _NEXT_MOVE_PARAGRAPH
+        repeat_paragraph = _NEXT_MOVE_REPEAT_PARAGRAPH
     return "\n\n".join(
         [
             (

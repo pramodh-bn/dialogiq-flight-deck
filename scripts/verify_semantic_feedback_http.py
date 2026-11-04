@@ -29,7 +29,9 @@ REPLIES = [
 
 def serve(database: str, events: Path) -> None:
     """Run an isolated fixture app, never the live providers."""
-    os.environ.update(DIALOGIQ_DB_PATH=database, FEEDBACK_ENABLED="1")
+    os.environ.update(
+        DIALOGIQ_DB_PATH=database, FEEDBACK_ENABLED="1", COACH_NEXT_MOVE_ENABLED="1"
+    )
     sys.path.insert(0, str(ROOT / "backend"))
     import uvicorn
     from coach import CoachCompletion
@@ -75,6 +77,14 @@ def serve(database: str, events: Path) -> None:
     def coach(system_prompt: str, context_json: str) -> CoachCompletion:
         event("coach")
         assert "rubric" not in json.loads(context_json)
+        from coach_context import NEXT_MOVE_REVISION, build_coach_system_prompt
+
+        assert system_prompt == build_coach_system_prompt(
+            "Bob",
+            "Team member",
+            behavior_revision="s4-bob-r1",
+            coach_prompt_revision=NEXT_MOVE_REVISION,
+        )
         return CoachCompletion(
             json.dumps(
                 {

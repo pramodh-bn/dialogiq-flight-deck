@@ -32,11 +32,11 @@ from coach import (
     CoachTimeoutError,
     CoachUnavailableError,
 )
-from coach_context import build_coach_system_prompt
+from coach_context import NEXT_MOVE_REVISION, build_coach_system_prompt
 from database import create_sqlite_engine
 from main import create_app
 from migrations import SCHEMA_VERSION, initialize_database
-from models import CoachHint, CoachSlotLease, IdempotencyRecord
+from models import CoachHint, CoachSlotLease, IdempotencyRecord, Session
 from schemas import CoachHintRequest
 from test_integration import Recorder, fork, headers, send, start
 
@@ -1080,3 +1080,67 @@ def test_pinned_session_revision_selects_coach_prompt(
 
 
 PARA = chr(10) * 2
+
+
+def test_next_move_is_pinned_at_creation_not_hint_time(
+    coach_harness: CoachHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Flag changes cannot migrate old sessions or alter saved hint bytes."""
+    client, engine, _, coach = coach_harness
+    bob = next(
+        s for s in client.get("/api/scenarios").json() if s["title"].startswith("Bob:")
+    )
+
+    def create() -> dict:
+        response = client.post(
+            "/api/sessions",
+            json={"scenario_id": bob["id"], "behavior_revision": "s4-bob-r1"},
+            headers=headers(),
+        )
+        assert response.status_code == 201
+        return response.json()
+
+    monkeypatch.delenv("COACH_NEXT_MOVE_ENABLED", raising=False)
+    old = create()
+    monkeypatch.setenv("COACH_NEXT_MOVE_ENABLED", "1")
+    new = create()
+    legacy = client.post(
+        "/api/sessions", json={"scenario_id": bob["id"]}, headers=headers()
+    ).json()
+    other = start(client, title="Teenage Daughter:")
+    monkeypatch.setenv("COACH_NEXT_MOVE_ENABLED", "0")
+    for session in (old, new, legacy, other):
+        with sessionmaker(bind=engine)() as db:
+            config = db.get(Session, session["id"]).scenario_config
+            assert (config.get("coach_prompt_revision") == NEXT_MOVE_REVISION) == (
+                session is new
+            )
+        response = ask(client, session["id"], hint_payload(session))
+        assert response.status_code == 200
+        expected = build_coach_system_prompt(
+            session["persona"]["name"],
+            session["persona"]["role"],
+            behavior_revision="s4-bob-r1" if session in (old, new) else None,
+            coach_prompt_revision=NEXT_MOVE_REVISION if session is new else None,
+        )
+        assert coach.calls[-1]["system_prompt"] == expected
+        assert "coach_prompt_revision" not in coach.calls[-1]["context_json"]
+        before = len(coach.calls)
+        cached = ask(client, session["id"], hint_payload(session))
+        assert cached.json()["hint"] == response.json()["hint"]
+        assert len(coach.calls) == before
+
+
+def test_unknown_next_move_version_does_not_replace_saved_bob_prompt() -> None:
+    """Unknown versions fail closed to the previous behavior, not a new prompt."""
+    old = build_coach_system_prompt("Bob", "Team member", behavior_revision="s4-bob-r1")
+    assert old == build_coach_system_prompt(
+        "Bob",
+        "Team member",
+        behavior_revision="s4-bob-r1",
+        coach_prompt_revision="unknown-r9",
+    )
+    baseline = build_coach_system_prompt("Maya", "Daughter")
+    assert baseline == build_coach_system_prompt(
+        "Maya", "Daughter", coach_prompt_revision=NEXT_MOVE_REVISION
+    )

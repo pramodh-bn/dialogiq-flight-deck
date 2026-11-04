@@ -5,9 +5,11 @@ const sourceLabel = (hint: Hint) => (hint.source === "meta" ? "AI coach" : "Basi
 function HintBody({ hint }: { hint: Hint }) {
   return (
     <div className="space-y-2 text-sm">
-      <p className="font-semibold">{hint.approach}</p>
-      <p className="rounded-md bg-secondary/50 px-3 py-2 italic">{hint.example}</p>
-      <p className="text-xs text-muted-foreground">{hint.reason}</p>
+      <p className="text-xs font-semibold text-muted-foreground">Try saying</p>
+      <p className="rounded-md bg-secondary/50 px-3 py-2 font-medium">{hint.example}</p>
+      <p className="text-xs text-muted-foreground">
+        <span className="font-semibold">{hint.approach}</span> — {hint.reason}
+      </p>
     </div>
   );
 }

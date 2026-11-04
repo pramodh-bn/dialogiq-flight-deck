@@ -38,3 +38,16 @@ not estimated billing. Existing broad user credit authorization applies.
 Remaining: implement, unit/HTTP checks, live comparison and full follow-through,
 production client build, owner fresh-session review, draft PR. Integration is a
 separate gate. No agent delegation or automatic merge authorized.
+
+## Milestone — implementation and focused checks
+
+Pre-prompt contract/cases committed as `dceaaa9`. Task-local Python3.12.10/jiter,
+npm11.20 and Node26.13 verified; pinned requirements and npm ci completed.
+Candidate pins `bob-next-move-r1` on new opted-in Bob sessions only. UI leads
+with “Try saying”. Existing context/provider/request contracts are unchanged.
+
+Actual checks:38coach service tests pass (two existing TestClient deprecation
+warnings),56frontend coaching tests pass, TypeScript and changed-file ESLint
+pass. Ruff changed files and diff whitespace checks pass. These are unit/mocked
+checks; they do not yet prove live coaching usefulness or browser behavior.
+The next run is the previously recorded16coach/4persona bounded comparison.
