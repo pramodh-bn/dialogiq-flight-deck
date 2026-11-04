@@ -126,6 +126,9 @@ separate terminals with Fireworks and paired demo-wait settings. Follow the
 script's setup instructions; its default database is `demo.local/demo.db`,
 separate from the direct backend recipe above. On Windows with an nvm shim,
 pass `--node` with the actual Node installation path as shown in the demo guide.
+For recording, frontend mode builds and serves the production output with
+pinned Wrangler 4.156.2, avoiding the Vite development SSR module loader. Use
+`--frontend dev` only when you want the development server and hot reload.
 
 The project owner accepted the final Bob preview on November 3, 2026, with
 the documented coaching and latency limits. The
