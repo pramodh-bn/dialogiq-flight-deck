@@ -201,3 +201,28 @@ stale-hint UI fix also applies to existing sessions and other personas. Other
 scenario prompts/semantic grading are unchanged. No rollout beyond Bob or merge
 inferred from the user's question. PR49 updated; owner r2 review/integration
 outstanding. No recurring watch or scheduled morning action.
+
+## Latest owner session review and presentation request
+
+User requested another review; then asked Codex to create an independent demo
+presentation while Claude works on theirs. Latest Bob sessions8/9 are confirmed
+pinnedr2. Both branches were reviewed locally; no owner dialogue published.
+Remaining findings: repeated short acknowledgments lead to repeated check-in
+confirmation hints instead of recognizing closure; a hint treats the date a
+specification changed as if the rework itself was due that day; some offers
+promise getting agreement rather than taking controllable steps toward it.
+Historical previous_hints include the last two selected-branch hints, which may
+carry earlier claims even when older dialogue has left the six-turn window.
+Any next prompt should treat earlier hints as suggestions, never evidence.
+
+Separate persona observation: Bob can settle into a plan after repeated minimal
+acknowledgments following pressure. This is not proof that the learner repaired
+the conversation or earned trust. Persona/scoring changes remain outside this
+coach task. No new prompt edits or paid calls yet for this latest review.
+Canonicalr2 remains running (backend34354/frontend82534); no watch or scheduled
+run. Next coach work: closure, event-vs-deadline grounding, bounded commitments,
+with authored cases and finite evaluation before another versioned change.
+
+Codex's independent presentation work uses separate codex/demo-presentation at
+.worktrees/demo-presentation, based on d945a20. It does not modify Claude's
+presentation or use owner dialogue. Preserve this handoff while building it.
