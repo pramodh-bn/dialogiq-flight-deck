@@ -868,3 +868,11 @@ Full fixture coverage is rerun, including new polite-preface, repeated-filler,
 hostility-filter, historical-sequence and guarded-early-n7 cases. Claude's r2
 approval and patch re-review waiver stand as recorded; Muse must review the
 final contract/commit, including early n7 and the typed persona boundary.
+# CS-81 candidate prompt and presentation delta
+
+The user-authorized, versioned Bob next-move candidate is documented in
+[coach-next-move-contract.md](coach-next-move-contract.md). It preserves existing
+routes, payloads, port bindings, context privacy and provider/fallback behavior.
+New Bob sessions opt in through server-side `COACH_NEXT_MOVE_ENABLED=1` and pin
+the internal prompt revision; saved sessions/hints are not migrated.
+

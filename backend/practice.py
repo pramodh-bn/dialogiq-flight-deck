@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session as DbSession
 import semantic_feedback
 import stance
 from api_errors import ApiError, conflict, not_found
+from coach_context import NEXT_MOVE_REVISION
 from conversation_context import ancestor_chain, build_history
 from judge import evaluate
 from models import Branch, ConversationNode, IdempotencyRecord, Scenario, Session
@@ -314,6 +315,11 @@ def create_session(
         )
         if feedback_revision:
             session.scenario_config["feedback_revision"] = feedback_revision
+        if (
+            behavior_revision == stance.BEHAVIOR_REVISION
+            and os.environ.get("COACH_NEXT_MOVE_ENABLED") == "1"
+        ):
+            session.scenario_config["coach_prompt_revision"] = NEXT_MOVE_REVISION
         db.add(session)
         db.flush()
         branch = Branch(session_id=session.id)

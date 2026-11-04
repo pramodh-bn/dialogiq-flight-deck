@@ -193,6 +193,12 @@ The test suites make no paid calls.
 
 ## Known limits
 
+The optional concise Bob coach candidate uses `COACH_NEXT_MOVE_ENABLED=1` on
+the backend. It applies to **new** Bob sessions only; saved sessions keep their
+earlier prompts. See the [candidate contract](docs/coach-next-move-contract.md)
+and [demo rehearsal](docs/coach-demo-walkthrough.md). The historical coach
+measurements below predate this candidate and do not establish its quality.
+
 - **The legacy judge is lexical.** It counts open questions by their opening words
   (what, how, why, tell me, walk me through, describe and similar). A useful
   question that starts with where, when, who or which gets no open-question
