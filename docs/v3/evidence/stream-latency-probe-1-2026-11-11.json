@@ -1,0 +1,164 @@
+[
+ {
+  "case": "baseten muse-spark-open-1026 default",
+  "run": 1,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.78,
+  "chars": 0,
+  "error": "BadRequestError: Error code: 400"
+ },
+ {
+  "case": "baseten muse-spark-open-1026 default",
+  "run": 2,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.2,
+  "chars": 0,
+  "error": "BadRequestError: Error code: 400"
+ },
+ {
+  "case": "baseten muse-spark-open-1026 default",
+  "run": 3,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.2,
+  "chars": 0,
+  "error": "BadRequestError: Error code: 400"
+ },
+ {
+  "case": "baseten muse-spark-open-1026 low",
+  "run": 1,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.23,
+  "chars": 0,
+  "error": "BadRequestError: Error code: 400"
+ },
+ {
+  "case": "baseten muse-spark-open-1026 low",
+  "run": 2,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.19,
+  "chars": 0,
+  "error": "BadRequestError: Error code: 400"
+ },
+ {
+  "case": "baseten muse-spark-open-1026 low",
+  "run": 3,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.2,
+  "chars": 0,
+  "error": "BadRequestError: Error code: 400"
+ },
+ {
+  "case": "fireworks muse-spark-open low",
+  "run": 1,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 1.53,
+  "chars": 0,
+  "error": null
+ },
+ {
+  "case": "fireworks muse-spark-open low",
+  "run": 2,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 1.32,
+  "chars": 0,
+  "error": null
+ },
+ {
+  "case": "fireworks muse-spark-open low",
+  "run": 3,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 1.33,
+  "chars": 0,
+  "error": null
+ },
+ {
+  "case": "baseten DeepSeek-V4.1-Flash-Fast",
+  "run": 1,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.31,
+  "chars": 0,
+  "error": "PermissionDeniedError: Error code: 403"
+ },
+ {
+  "case": "baseten DeepSeek-V4.1-Flash-Fast",
+  "run": 2,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 0.38,
+  "chars": 0,
+  "error": "PermissionDeniedError: Error code: 403"
+ },
+ {
+  "case": "baseten DeepSeek-V4.1-Flash-Fast",
+  "run": 3,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 2.7,
+  "chars": 0,
+  "error": "PermissionDeniedError: Error code: 403"
+ },
+ {
+  "case": "fireworks glm-5p3-fast",
+  "run": 1,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 1.5,
+  "chars": 0,
+  "error": null
+ },
+ {
+  "case": "fireworks glm-5p3-fast",
+  "run": 2,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 2.17,
+  "chars": 0,
+  "error": null
+ },
+ {
+  "case": "fireworks glm-5p3-fast",
+  "run": 3,
+  "first_content_s": null,
+  "first_sentence_s": null,
+  "total_s": 1.4,
+  "chars": 0,
+  "error": null
+ },
+ {
+  "case": "fireworks gpt-oss-120b low",
+  "run": 1,
+  "first_content_s": 0.4,
+  "first_sentence_s": 0.77,
+  "total_s": 0.9,
+  "chars": 172,
+  "error": null
+ },
+ {
+  "case": "fireworks gpt-oss-120b low",
+  "run": 2,
+  "first_content_s": 0.39,
+  "first_sentence_s": 0.65,
+  "total_s": 0.67,
+  "chars": 81,
+  "error": "APIError: server had an error while processing your request, please retry again after a brief wait"
+ },
+ {
+  "case": "fireworks gpt-oss-120b low",
+  "run": 3,
+  "first_content_s": 0.37,
+  "first_sentence_s": 0.59,
+  "total_s": 0.6,
+  "chars": 103,
+  "error": null
+ }
+]
