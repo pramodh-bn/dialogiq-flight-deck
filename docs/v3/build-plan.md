@@ -16,7 +16,7 @@ stays as it is; V3 is a new route beside it.
 ## What we measured before planning
 
 Read-only model listings and two small streaming probes on 2026-11-11
-(26 calls in total; scripts and raw results are in
+(26 calls in total, plus 7 Meta API calls; scripts and raw results are in
 [`scripts/v3/`](../../scripts/v3/) and [`evidence/`](evidence/)). These are
 small, unmatched samples on a short synthetic prompt. They show what is
 feasible; they are not reliability figures.
@@ -27,7 +27,8 @@ feasible; they are not reliability figures.
 | Muse Spark Open works on Fireworks, slowly for voice | Low reasoning, streaming: first full sentence after 2.2 s, 3.3 s and 3.5 s. Reasoning text arrives from about 0.4 s; the spoken answer waits behind it. |
 | A fast model is available on the same account | Fireworks `gpt-oss-120b`, low reasoning: first full sentence after 0.6 to 0.8 s in 3 calls. One of those streams ended with a provider error after 81 characters. |
 | Other candidates | Fireworks `glm-5p3-fast`: 2.2 to 3.2 s to first sentence. Baseten `DeepSeek-V4.1-Flash-Fast`: HTTP 403 on this key. |
-| Speech models | The Meta API account lists `muse-voice-transcribe-1.0`. Neither Fireworks nor Baseten lists a speech-to-text or text-to-speech model in its chat catalogue. The Meta API returned billing errors (HTTP 402) on Nov 3 and has not been retried. |
+| Meta API chat models (7 calls, later the same day) | `muse-spark-1.3`: first sentence after 6.3 and 6.7 s. `muse-wonder-1.0`: 3.3 and 4.1 s. `muse-spark-1.1`: 3.8 s once, then HTTP 402. `muse-ember-1.0`: HTTP 402 `billing_not_configured`. The account answers some calls again but its billing issue is not fully resolved. |
+| Speech models | The Meta API account lists `muse-voice-transcribe-1.0`. Neither Fireworks nor Baseten lists a speech-to-text or text-to-speech model in its chat catalogue. The transcribe model itself has not been called. |
 
 Consequence: the risk in V3 is Bob's reply delay as much as the coach's. A
 natural spoken exchange needs Bob to start talking about a second after the
@@ -68,6 +69,13 @@ mic -> voice activity detection (browser) -> speech events
   speech synthesis, which starts instantly and costs nothing. Then: Kokoro,
   the local voice model already used for the submission video, served by the
   backend one sentence at a time. Kokoro's speed on this machine is unmeasured.
+- **Modal as the hosted option for speech.** The owner has about $30 of Modal
+  credit. If browser speech recognition or browser voices are not good enough,
+  or pilot managers need the app without the owner's machine, an open
+  speech-to-text model and Kokoro can run on Modal behind the same two
+  interfaces. Risks to measure first: cold-start delay on the first request
+  and how many reps $30 covers. Nothing is deployed there until the browser
+  and local options have been tried.
 - **Bob's reply** streams from the backend as server-sent events, one sentence
   per event, so speech can start on the first sentence. Session and tree calls
   stay on the existing REST contract.
@@ -215,7 +223,8 @@ Megillah tasks.
 ## Cost
 
 Speech-to-text and speech synthesis cost nothing in the first implementations
-(browser and local). Model cost is Bob's replies and the occasional suggested
+(browser and local). Modal credit (about $30) is the reserve for hosted
+speech models or pilot hosting; Fireworks credit covers Bob and the coach. Model cost is Bob's replies and the occasional suggested
 line: roughly 15 to 25 short calls per rep. The cost per rep in dollars is not
 known yet; week 1 logs token usage per rep so it can be set against the $200
 budget before the pilot.
