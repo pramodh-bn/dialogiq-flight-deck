@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as FlightRecorderRouteImport } from './routes/flight-recorder'
+import { Route as RepRouteImport } from './routes/rep'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const FlightRecorderRoute = FlightRecorderRouteImport.update({
   path: '/flight-recorder',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RepRoute = RepRouteImport.update({
+  id: '/rep',
+  path: '/rep',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
+  '/rep': typeof RepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
+  '/rep': typeof RepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/arena': typeof ArenaRoute
   '/flight-recorder': typeof FlightRecorderRoute
+  '/rep': typeof RepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analytics' | '/arena' | '/flight-recorder'
+  fullPaths: '/' | '/analytics' | '/arena' | '/flight-recorder' | '/rep'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analytics' | '/arena' | '/flight-recorder'
-  id: '__root__' | '/' | '/analytics' | '/arena' | '/flight-recorder'
+  to: '/' | '/analytics' | '/arena' | '/flight-recorder' | '/rep'
+  id: '__root__' | '/' | '/analytics' | '/arena' | '/flight-recorder' | '/rep'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +76,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ArenaRoute: typeof ArenaRoute
   FlightRecorderRoute: typeof FlightRecorderRoute
+  RepRoute: typeof RepRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FlightRecorderRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rep': {
+      id: '/rep'
+      path: '/rep'
+      fullPath: '/rep'
+      preLoaderRoute: typeof RepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ArenaRoute: ArenaRoute,
   FlightRecorderRoute: FlightRecorderRoute,
+  RepRoute: RepRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
