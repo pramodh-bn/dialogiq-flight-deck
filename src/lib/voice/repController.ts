@@ -21,6 +21,9 @@ import type { Speaker } from "./speech";
 export const BARGE_IN_MS = 500;
 // Quiet time after the learner's last word before their turn is sent.
 export const TURN_GAP_MS = 700;
+// A turn that fails in a way the server calls retryable is resent this many
+// times before the learner is asked. In a spoken rep a button is a long stop.
+export const AUTO_RETRIES = 2;
 // Timing events are posted at least this often.
 const FLUSH_EVERY_MS = 3000;
 const BATCH_LIMIT = 200;
@@ -94,6 +97,7 @@ type Flight = {
   key: string;
   line: RepLine;
   timing: TurnTiming;
+  retries: number;
 };
 
 export class RepController {
@@ -265,6 +269,7 @@ export class RepController {
   retry(): void {
     if (this.phase !== "turn_failed" || !this.flight) return;
     this.error = null;
+    this.flight.retries = 0;
     void this.run(this.flight);
   }
 
@@ -329,6 +334,7 @@ export class RepController {
         first_sentence_ms: null,
         audio_start_ms: null,
       },
+      retries: 0,
     };
     this.lines.push(line);
     this.timings.push(flight.timing);
@@ -388,6 +394,16 @@ export class RepController {
       this.bob = null;
       this.deps.speaker.cancel();
       this.lines = this.lines.filter((line) => line !== reply);
+      const retryable =
+        (error instanceof RepStreamError || error instanceof ApiError) && error.retryable;
+      if (retryable && flight.retries < AUTO_RETRIES) {
+        // Same key, so a reply the server did save is replayed, not generated twice.
+        flight.retries += 1;
+        flight.timing.first_sentence_ms = null;
+        flight.timing.audio_start_ms = null;
+        void this.run(flight);
+        return;
+      }
       this.error = describe(error, "Bob's reply did not arrive.");
       this.setPhase("turn_failed");
     }

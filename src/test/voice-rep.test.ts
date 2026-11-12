@@ -381,13 +381,35 @@ describe("RepController", () => {
     expect(h.snap().learnerSpeaking).toBe(false);
   });
 
-  it("drops a lost reply and resends the same turn with the same key", async () => {
+  it("resends a lost reply by itself before asking the learner", async () => {
     const h = await started();
     h.turns.push({
       sentences: ["Half a"],
       nodeId: 0,
       fail: new RepStreamError("persona_unavailable", true),
     });
+    h.turns.push({ sentences: ["Whole answer."], nodeId: 31 });
+    h.at(3000);
+    h.controller.typed("what happened", 2500);
+    await settle();
+    expect(h.snap().phase).not.toBe("turn_failed");
+    expect(h.snap().error).toBeNull();
+    expect(h.requests[1]).toEqual(h.requests[0]);
+    expect(h.snap().lines.map((line) => line.text)).toEqual([
+      "You wanted to see me?",
+      "what happened",
+      "Whole answer.",
+    ]);
+  });
+
+  it("drops a lost reply and resends the same turn with the same key", async () => {
+    const h = await started();
+    for (let attempt = 0; attempt < 3; attempt++)
+      h.turns.push({
+        sentences: ["Half a"],
+        nodeId: 0,
+        fail: new RepStreamError("persona_unavailable", true),
+      });
     h.turns.push({ sentences: ["Whole answer."], nodeId: 31 });
     h.at(3000);
     h.controller.typed("what happened", 2500);
@@ -402,7 +424,8 @@ describe("RepController", () => {
 
     h.controller.retry();
     await settle();
-    expect(h.requests[1]).toEqual(h.requests[0]);
+    expect(h.requests).toHaveLength(4);
+    expect(h.requests[3]).toEqual(h.requests[0]);
     expect(h.snap().lines).toHaveLength(3);
     h.at(6000);
     h.speaker.end();
