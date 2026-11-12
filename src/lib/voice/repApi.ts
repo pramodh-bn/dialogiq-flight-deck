@@ -33,6 +33,15 @@ export type Scorecard = {
   rewind_recovery: { rewinds: number; recovered: number };
 };
 
+// One saved turn. The model times are measured by the server; the round trip
+// runs from the learner's last word to Bob's first audio, in the browser.
+export type TurnLatency = {
+  node_id: number;
+  model_first_sentence_ms: number;
+  model_total_ms: number;
+  voice_round_trip_ms: number | null;
+};
+
 export type RepResponse = {
   rep_id: number;
   rep_number: number;
@@ -43,6 +52,7 @@ export type RepResponse = {
   finished: boolean;
   score_ruleset: string;
   scorecard: Scorecard | null;
+  latency: TurnLatency[];
 };
 
 export type RepCreated = {

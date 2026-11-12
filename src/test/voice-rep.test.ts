@@ -236,6 +236,7 @@ function harness(options: { bargeIn?: boolean } = {}) {
           finished: true,
           score_ruleset: "v3-score-r1",
           scorecard: null,
+          latency: [],
         },
       };
     },

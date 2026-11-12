@@ -8,6 +8,7 @@ Routes are built by ``build_router`` and mounted under ``/api/v3``.
 import json
 import logging
 import re
+import time
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from typing import Annotated, Literal
@@ -23,7 +24,14 @@ import stance
 import v3_score
 from api_errors import ApiError, conflict, not_found
 from conversation_context import ancestor_chain
-from models import ConversationNode, Scenario, User, VoiceEvent, VoiceRep
+from models import (
+    ConversationNode,
+    Scenario,
+    User,
+    VoiceEvent,
+    VoiceRep,
+    VoiceTurnLatency,
+)
 from persona import (
     PersonaInvalidResponseError,
     PersonaTimeoutError,
@@ -132,7 +140,43 @@ def get_rep(db: DbSession, rep_id: int) -> VoiceRep:
     return rep
 
 
-def rep_dto(rep: VoiceRep) -> dict:
+def latency_rows(db: DbSession, rep: VoiceRep) -> list[dict]:
+    """One row per saved turn, oldest first.
+
+    ``model_*`` are timed by the server around the model call.
+    ``voice_round_trip_ms`` runs from the learner's last word to Bob's first
+    audio, both on the browser's clock; it is null when that audio never
+    started or its event was not logged.
+    """
+    audio_start: dict[int, int] = {}
+    for event in db.scalars(
+        select(VoiceEvent)
+        .where(VoiceEvent.rep_id == rep.id, VoiceEvent.kind == "bob_audio_start")
+        .order_by(VoiceEvent.t_ms, VoiceEvent.seq)
+    ):
+        audio_start.setdefault(event.data.get("node_id"), event.t_ms)
+    rows = []
+    for row in db.scalars(
+        select(VoiceTurnLatency)
+        .where(VoiceTurnLatency.rep_id == rep.id)
+        .order_by(VoiceTurnLatency.id)
+    ):
+        started = audio_start.get(row.node_id)
+        round_trip = None if started is None else started - row.speech_end_ms
+        rows.append(
+            {
+                "node_id": row.node_id,
+                "model_first_sentence_ms": row.model_first_sentence_ms,
+                "model_total_ms": row.model_total_ms,
+                "voice_round_trip_ms": (
+                    round_trip if round_trip is not None and round_trip >= 0 else None
+                ),
+            }
+        )
+    return rows
+
+
+def rep_dto(db: DbSession, rep: VoiceRep) -> dict:
     return {
         "rep_id": rep.id,
         "rep_number": rep.rep_number,
@@ -143,6 +187,7 @@ def rep_dto(rep: VoiceRep) -> dict:
         "finished": rep.scorecard is not None,
         "score_ruleset": rep.score_ruleset,
         "scorecard": rep.scorecard,
+        "latency": latency_rows(db, rep),
     }
 
 
@@ -284,7 +329,7 @@ def finish_rep(
             )
             rep.duration_ms = payload.duration_ms
             db.flush()
-        return practice.finish(db, key, owner, 200, {"rep": rep_dto(rep)})
+        return practice.finish(db, key, owner, 200, {"rep": rep_dto(db, rep)})
 
     return practice.mutate(
         db,
@@ -305,7 +350,7 @@ def list_reps(db: DbSession, scenario_id: int) -> list[dict]:
         .where(VoiceRep.scenario_id == scenario_id, VoiceRep.user_id == demo_id)
         .order_by(VoiceRep.rep_number, VoiceRep.id)
     )
-    return [rep_dto(rep) for rep in reps]
+    return [rep_dto(db, rep) for rep in reps]
 
 
 def sse(event: str, data: dict) -> str:
@@ -364,8 +409,10 @@ def open_turn(
             db.close()
             return replay_stream(replay[1])
         prepared = practice.prepare_turn(db, chat)
+        asked = time.monotonic()
         sentences = iter(provider(**prepared.provider_kwargs))
         first = next(sentences, None)
+        first_ms = round((time.monotonic() - asked) * 1000)
         if first is None:
             raise PersonaInvalidResponseError("Persona returned no dialogue.")
     except BaseException:
@@ -384,6 +431,7 @@ def open_turn(
             for text in sentences:
                 spoken.append(text)
                 yield sse("sentence", {"index": len(spoken) - 1, "text": text})
+            total_ms = round((time.monotonic() - asked) * 1000)
             node, session = practice.save_turn(
                 db,
                 chat,
@@ -391,6 +439,15 @@ def open_turn(
                 prepared.state,
                 prepared.coaching,
                 " ".join(spoken),
+            )
+            db.add(
+                VoiceTurnLatency(
+                    rep_id=rep_id,
+                    node_id=node.id,
+                    speech_end_ms=payload.speech_end_ms,
+                    model_first_sentence_ms=first_ms,
+                    model_total_ms=total_ms,
+                )
             )
             spoken_type = v3_score.classify_spoken(chat.user_message)
             done = {

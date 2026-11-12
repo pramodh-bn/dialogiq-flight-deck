@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from database import create_sqlite_engine
 from main import create_app
-from models import ConversationNode, IdempotencyRecord, VoiceEvent
+from models import ConversationNode, IdempotencyRecord, VoiceEvent, VoiceTurnLatency
 from persona import PersonaTimeoutError, PersonaUnavailableError
 
 
@@ -479,3 +479,35 @@ def test_existing_typed_turn_still_works_on_a_rep_session(harness: Harness):
     )
     assert response.status_code == 200
     assert response.json()["character_response"] == "Typed reply."
+
+
+def test_latency_is_reported_per_saved_turn(harness: Harness):
+    client, engine, _stream = harness
+    rep = new_rep(client)
+    first = say(client, rep, rep["session"], "is it late")
+    second = say(client, rep, first["session"], "what happened")
+    one, two = first["node"]["id"], second["node"]["id"]
+    # Bob's audio for the first turn starts 900 ms after speech_end_ms (2500);
+    # the second turn's audio never starts.
+    events = [{"seq": 1, "t_ms": 3400, "kind": "bob_audio_start", "node_id": one}]
+    assert post_events(client, rep, events).status_code == 200
+
+    listed = client.get(f"/api/v3/reps?scenario_id={scenario_id(client)}")
+    rows = listed.json()[0]["latency"]
+    assert [row["node_id"] for row in rows] == [one, two]
+    assert [row["voice_round_trip_ms"] for row in rows] == [900, None]
+    for row in rows:
+        assert 0 <= row["model_first_sentence_ms"] <= row["model_total_ms"]
+    assert count(engine, VoiceTurnLatency) == 2
+
+
+def test_failed_turn_records_no_latency(harness: Harness):
+    client, engine, stream = harness
+    rep = new_rep(client)
+    stream.fail_at = 1
+    client.post(
+        f"/api/v3/reps/{rep['rep_id']}/turns",
+        json=turn_body(rep["session"]),
+        headers=key(),
+    )
+    assert count(engine, VoiceTurnLatency) == 0

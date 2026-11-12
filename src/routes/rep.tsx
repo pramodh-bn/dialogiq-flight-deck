@@ -3,8 +3,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
-import { createRepApi, type RepResponse, type Scorecard } from "@/lib/voice/repApi";
-import { RepController, type RepSnapshot, type TurnTiming } from "@/lib/voice/repController";
+import {
+  createRepApi,
+  type RepResponse,
+  type Scorecard,
+  type TurnLatency,
+} from "@/lib/voice/repApi";
+import {
+  RepController,
+  TURN_GAP_MS,
+  type RepSnapshot,
+  type TurnTiming,
+} from "@/lib/voice/repController";
 import {
   createBrowserSpeaker,
   createRecognizer,
@@ -393,7 +403,10 @@ function RepScreen() {
         )}
 
         {phase === "finished" && snapshot?.result?.scorecard && (
-          <ScorecardView scorecard={snapshot.result.scorecard} timings={snapshot.timings} />
+          <>
+            <ScorecardView scorecard={snapshot.result.scorecard} timings={snapshot.timings} />
+            <LatencyTable rows={snapshot.result.latency ?? []} />
+          </>
         )}
 
         {ended && (
@@ -484,6 +497,62 @@ function ScorecardView({ scorecard, timings }: { scorecard: Scorecard; timings: 
           ). Scored with {scorecard.ruleset}.
         </p>
       )}
+    </section>
+  );
+}
+
+function ms(value: number | null): string {
+  return value === null ? "—" : `${value.toLocaleString()} ms`;
+}
+
+function LatencyTable({ rows }: { rows: TurnLatency[] }) {
+  if (!rows.length) return null;
+  const columns = [
+    (row: TurnLatency) => row.model_first_sentence_ms,
+    (row: TurnLatency) => row.model_total_ms,
+    (row: TurnLatency) => row.voice_round_trip_ms,
+  ];
+  const medians = columns.map((pick) =>
+    median(rows.map(pick).filter((value): value is number => value !== null)),
+  );
+  return (
+    <section className="bento overflow-x-auto p-4" aria-label="Response times">
+      <h2 className="mb-1 text-sm font-semibold">How fast Bob answered</h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Model times are measured on the server, from asking the model to its first full sentence and
+        to its last. The round trip is from your last word to Bob's voice starting; it includes the{" "}
+        {seconds(TURN_GAP_MS)} wait that confirms you have finished.
+      </p>
+      <table className="w-full min-w-[460px] text-left text-sm tabular-nums">
+        <thead className="text-xs text-muted-foreground">
+          <tr>
+            <th className="pb-2 font-medium">Turn</th>
+            <th className="pb-2 font-medium">Model: first sentence</th>
+            <th className="pb-2 font-medium">Model: whole reply</th>
+            <th className="pb-2 font-medium">Your last word to Bob's voice</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row.node_id} className="border-t border-border/50">
+              <td className="py-1.5">{index + 1}</td>
+              {columns.map((pick, column) => (
+                <td key={column} className="py-1.5">
+                  {ms(pick(row))}
+                </td>
+              ))}
+            </tr>
+          ))}
+          <tr className="border-t border-border font-medium">
+            <td className="py-1.5">Median</td>
+            {medians.map((value, column) => (
+              <td key={column} className="py-1.5">
+                {ms(value === null ? null : Math.round(value))}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
     </section>
   );
 }
