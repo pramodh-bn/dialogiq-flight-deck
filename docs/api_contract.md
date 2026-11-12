@@ -886,3 +886,11 @@ routes, payloads, port bindings, context privacy and provider/fallback behavior.
 New Bob sessions opt in through server-side `COACH_NEXT_MOVE_ENABLED=1` and pin
 the internal prompt revision; saved sessions/hints are not migrated.
 
+
+# V3 voice rep (draft, not yet served)
+
+The planned `/api/v3/reps` routes, the timed event log and the deterministic
+scorecard (`v3-score-r1`) are specified in
+[v3/voice-rep-contract.md](v3/voice-rep-contract.md). Only the scorer
+(`backend/v3_score.py`) exists so far; no V3 route is registered, and nothing
+above changes.
