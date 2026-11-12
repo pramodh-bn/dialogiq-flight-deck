@@ -276,16 +276,53 @@ def mutate(
     try:
         return operation(owner)
     except Exception:
-        db.rollback()
-        db.execute(
-            delete(IdempotencyRecord).where(
-                IdempotencyRecord.key == key,
-                IdempotencyRecord.owner == owner,
-                IdempotencyRecord.status.is_(None),
-            )
-        )
-        db.commit()
+        release(db, key, owner)
         raise
+
+
+def new_session(
+    db: DbSession,
+    scenario_id: int,
+    behavior_revision: str | None = None,
+    feedback_revision: str | None = None,
+) -> Session:
+    """Validate, pin and store a session with its first branch (caller holds the lock)."""
+    scenario = db.get(Scenario, scenario_id)
+    if scenario is None:
+        raise not_found("scenario")
+    if behavior_revision and behavior_revision not in behavior_revisions(scenario):
+        raise ApiError(
+            422,
+            "validation_error",
+            "That behavior revision is not available for this scenario.",
+        )
+    if feedback_revision and (
+        feedback_revision not in feedback_revisions(scenario)
+        or behavior_revision != stance.BEHAVIOR_REVISION
+    ):
+        raise ApiError(422, "validation_error", "Feedback revision is unavailable.")
+    session = Session(
+        user_id=get_or_create_demo_user(db).id,
+        scenario_id=scenario_id,
+        score=0,
+        revision=0,
+        scenario_config=pin_scenario(scenario, behavior_revision),
+    )
+    if feedback_revision:
+        session.scenario_config["feedback_revision"] = feedback_revision
+    if (
+        behavior_revision == stance.BEHAVIOR_REVISION
+        and os.environ.get("COACH_NEXT_MOVE_ENABLED") == "1"
+    ):
+        session.scenario_config["coach_prompt_revision"] = NEXT_MOVE_REVISION
+    db.add(session)
+    db.flush()
+    branch = Branch(session_id=session.id)
+    db.add(branch)
+    db.flush()
+    session.active_branch_id = branch.id
+    db.flush()
+    return session
 
 
 def create_session(
@@ -297,41 +334,7 @@ def create_session(
 ) -> tuple[int, dict]:
     def operation(owner: str) -> tuple[int, dict]:
         write_lock(db)
-        scenario = db.get(Scenario, scenario_id)
-        if scenario is None:
-            raise not_found("scenario")
-        if behavior_revision and behavior_revision not in behavior_revisions(scenario):
-            raise ApiError(
-                422,
-                "validation_error",
-                "That behavior revision is not available for this scenario.",
-            )
-        if feedback_revision and (
-            feedback_revision not in feedback_revisions(scenario)
-            or behavior_revision != stance.BEHAVIOR_REVISION
-        ):
-            raise ApiError(422, "validation_error", "Feedback revision is unavailable.")
-        session = Session(
-            user_id=get_or_create_demo_user(db).id,
-            scenario_id=scenario_id,
-            score=0,
-            revision=0,
-            scenario_config=pin_scenario(scenario, behavior_revision),
-        )
-        if feedback_revision:
-            session.scenario_config["feedback_revision"] = feedback_revision
-        if (
-            behavior_revision == stance.BEHAVIOR_REVISION
-            and os.environ.get("COACH_NEXT_MOVE_ENABLED") == "1"
-        ):
-            session.scenario_config["coach_prompt_revision"] = NEXT_MOVE_REVISION
-        db.add(session)
-        db.flush()
-        branch = Branch(session_id=session.id)
-        db.add(branch)
-        db.flush()
-        session.active_branch_id = branch.id
-        db.flush()
+        session = new_session(db, scenario_id, behavior_revision, feedback_revision)
         return finish(db, key, owner, 201, session_dto(db, session))
 
     body: dict = {"scenario_id": scenario_id}
@@ -380,6 +383,107 @@ def real_persona_stream(**kwargs: object) -> Iterator[str]:
     return generate_persona_reply_stream(persona_client(), **kwargs)
 
 
+@dataclass(frozen=True)
+class PreparedTurn:
+    """Everything decided before the persona is called; holds no ORM objects."""
+
+    context: GenerationContext
+    state: dict
+    coaching: dict
+    newly: list[str]
+    semantic: bool
+    provider_kwargs: dict
+
+
+def prepare_turn(db: DbSession, payload: ChatTurnRequest) -> PreparedTurn:
+    """Check the request, judge the learner's words and build the persona call.
+
+    Ends the read transaction, so the slow provider call holds no database lock.
+    """
+    context = turn_context(db, payload)
+    config = context.config
+    semantic = config.get("feedback_revision") == semantic_feedback.REVISION
+    if semantic:
+        # No lexical reveal or signal can bias the persona before evaluation.
+        state, coaching, newly = copy.deepcopy(context.previous), {}, []
+    else:
+        state, coaching, newly = evaluate(
+            payload.user_message,
+            context.previous,
+            config["needs"],
+            config["revision"].split(":", 1)[0],
+        )
+    if config.get("behavior_revision") and not semantic:
+        # Stance comes from public wording and this branch's ledger, not score.
+        state = stance.apply_turn(state, context.previous, payload.user_message)
+    brief = PersonaBrief(
+        character_name=config["persona"]["name"],
+        role=config["persona"]["role"],
+        persona_traits=config["persona_traits"],
+        system_prompt=config["system_prompt"],
+        hidden_need=json.dumps(config["needs"], ensure_ascii=False, sort_keys=True),
+    )
+    # No ORM objects/read transaction survive the slow provider operation.
+    db.rollback()
+    variant: dict[str, str] = {}
+    if config.get("behavior_revision"):
+        # CS-79: the pinned revision selects Bob's persona variant, which reacts
+        # to the same public signal the stance just recorded. Legacy sessions
+        # pass neither keyword, so their provider call is unchanged.
+        variant = {
+            "behavior_revision": config["behavior_revision"],
+            "stance_signal": "none"
+            if semantic
+            else state["conversation_progress"]["last_signal"],
+        }
+        if semantic:
+            variant["feedback_revision"] = semantic_feedback.REVISION
+    kwargs = {
+        "brief": brief,
+        "user_text": payload.user_message,
+        "history": context.history,
+        "revealed_titles": [n["title"] for n in context.previous["revealed_needs"]],
+        "newly_revealed_titles": newly,
+        "resistance": state["resistance"],
+        "timeout": 30.0,
+        **variant,
+    }
+    return PreparedTurn(context, state, coaching, newly, semantic, kwargs)
+
+
+def save_turn(
+    db: DbSession,
+    payload: ChatTurnRequest,
+    context: GenerationContext,
+    state: dict,
+    coaching: dict,
+    character_text: str,
+) -> tuple[ConversationNode, Session]:
+    """Store the finished turn after rechecking that nothing moved meanwhile."""
+    write_lock(db)
+    turn_context(db, payload)  # Recheck revision/head/ownership after generation.
+    session = get_session(db, payload.session_id)
+    branch = get_branch(db, session.id, payload.branch_id)
+    node = ConversationNode(
+        session_id=session.id,
+        parent_id=payload.parent_node_id,
+        turn_number=context.depth,
+        user_text=payload.user_message,
+        character_text=character_text,
+        question_tag=coaching["question_type"],
+        revealed_count=state["score"],
+        state=state,
+        coaching=coaching,
+    )
+    db.add(node)
+    db.flush()
+    branch.head_node_id = node.id
+    session.score = state["score"]
+    session.revision += 1
+    db.flush()
+    return node, session
+
+
 def send_turn(
     db: DbSession,
     payload: ChatTurnRequest,
@@ -388,88 +492,25 @@ def send_turn(
     feedback_provider: semantic_feedback.Provider = semantic_feedback.real_provider,
 ) -> tuple[int, dict]:
     def operation(owner: str) -> tuple[int, dict]:
-        context = turn_context(db, payload)
-        config = context.config
-        semantic = config.get("feedback_revision") == semantic_feedback.REVISION
-        if semantic:
-            # No lexical reveal or signal can bias the persona before evaluation.
-            state, coaching, newly = copy.deepcopy(context.previous), {}, []
-        else:
-            state, coaching, newly = evaluate(
-                payload.user_message,
-                context.previous,
-                config["needs"],
-                config["revision"].split(":", 1)[0],
-            )
-        if config.get("behavior_revision") and not semantic:
-            # Stance comes from public wording and this branch's ledger, not score.
-            state = stance.apply_turn(state, context.previous, payload.user_message)
-        brief = PersonaBrief(
-            character_name=config["persona"]["name"],
-            role=config["persona"]["role"],
-            persona_traits=config["persona_traits"],
-            system_prompt=config["system_prompt"],
-            hidden_need=json.dumps(config["needs"], ensure_ascii=False, sort_keys=True),
-        )
-        # No ORM objects/read transaction survive the slow provider operation.
-        db.rollback()
-        variant: dict[str, str] = {}
-        if config.get("behavior_revision"):
-            # CS-79: the pinned revision selects Bob's persona variant, which reacts
-            # to the same public signal the stance just recorded. Legacy sessions
-            # pass neither keyword, so their provider call is unchanged.
-            variant = {
-                "behavior_revision": config["behavior_revision"],
-                "stance_signal": "none"
-                if semantic
-                else state["conversation_progress"]["last_signal"],
-            }
-            if semantic:
-                variant["feedback_revision"] = semantic_feedback.REVISION
-        response = provider(
-            brief=brief,
-            user_text=payload.user_message,
-            history=context.history,
-            revealed_titles=[n["title"] for n in context.previous["revealed_needs"]],
-            newly_revealed_titles=newly,
-            resistance=state["resistance"],
-            timeout=30.0,
-            **variant,
-        )
+        prepared = prepare_turn(db, payload)
+        context, state, coaching = prepared.context, prepared.state, prepared.coaching
+        response = provider(**prepared.provider_kwargs)
         if not isinstance(response, str) or not response.strip():
             from persona import PersonaInvalidResponseError
 
             raise PersonaInvalidResponseError("Persona returned no dialogue.")
-        if semantic:
+        if prepared.semantic:
             state, coaching = semantic_feedback.evaluate(
                 context.previous,
                 payload.user_message,
                 response.strip(),
                 context.history,
-                config["needs"],
+                context.config["needs"],
                 feedback_provider,
             )
-        write_lock(db)
-        turn_context(db, payload)  # Recheck revision/head/ownership after generation.
-        session = get_session(db, payload.session_id)
-        branch = get_branch(db, session.id, payload.branch_id)
-        node = ConversationNode(
-            session_id=session.id,
-            parent_id=payload.parent_node_id,
-            turn_number=context.depth,
-            user_text=payload.user_message,
-            character_text=response.strip(),
-            question_tag=coaching["question_type"],
-            revealed_count=state["score"],
-            state=state,
-            coaching=coaching,
+        node, session = save_turn(
+            db, payload, context, state, coaching, response.strip()
         )
-        db.add(node)
-        db.flush()
-        branch.head_node_id = node.id
-        session.score = state["score"]
-        session.revision += 1
-        db.flush()
         result = ChatTurnResponse(
             turn_id=node.id,
             character_response=node.character_text,
@@ -480,6 +521,19 @@ def send_turn(
         return finish(db, key, owner, 200, result)
 
     return mutate(db, key, "POST", "/api/chat/turn", payload.model_dump(), operation)
+
+
+def release(db: DbSession, key: str, owner: str) -> None:
+    """Drop an unfinished idempotency reservation so the request can be resent."""
+    db.rollback()
+    db.execute(
+        delete(IdempotencyRecord).where(
+            IdempotencyRecord.key == key,
+            IdempotencyRecord.owner == owner,
+            IdempotencyRecord.status.is_(None),
+        )
+    )
+    db.commit()
 
 
 def create_branch(

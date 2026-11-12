@@ -207,3 +207,38 @@ class CoachSlotLease(Base):
     attempt: Mapped[int] = mapped_column(Integer)
     owner: Mapped[str] = mapped_column(String(36))
     expires_at: Mapped[float] = mapped_column(Float)
+
+
+class VoiceRep(Base):
+    """One timed spoken practice on a session (contract v3-r1)."""
+
+    __tablename__ = "voice_reps"
+    __table_args__: ClassVar[dict[str, bool]] = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenarios.id"), index=True)
+    rep_number: Mapped[int] = mapped_column(Integer)
+    started_at: Mapped[datetime] = mapped_column(DateTime)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_ruleset: Mapped[str] = mapped_column(String(32))
+    whisper_ruleset: Mapped[str] = mapped_column(String(32))
+    scorecard: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class VoiceEvent(Base):
+    """One browser-timed event of a rep; times are ms since the rep started."""
+
+    __tablename__ = "voice_events"
+    __table_args__ = (
+        UniqueConstraint("rep_id", "seq", name="uq_voice_event_seq"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rep_id: Mapped[int] = mapped_column(ForeignKey("voice_reps.id"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)
+    t_ms: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(32))
+    data: Mapped[dict] = mapped_column(JSON, default=dict)

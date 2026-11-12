@@ -891,6 +891,6 @@ the internal prompt revision; saved sessions/hints are not migrated.
 
 The planned `/api/v3/reps` routes, the timed event log and the deterministic
 scorecard (`v3-score-r1`) are specified in
-[v3/voice-rep-contract.md](v3/voice-rep-contract.md). Only the scorer
-(`backend/v3_score.py`) exists so far; no V3 route is registered, and nothing
-above changes.
+[v3/voice-rep-contract.md](v3/voice-rep-contract.md). Served now: create,
+streamed turn, events, finish and list (`backend/v3_reps.py`), with two
+additive tables, `voice_reps` and `voice_events`. Nothing above changes.
