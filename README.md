@@ -63,7 +63,7 @@ FIREWORKS_API_KEY=...        # coach, model accounts/fireworks/models/muse-spark
 COACH_DEMO_WAIT=1            # required for Fireworks: low reasoning, no cutoff
 FEEDBACK_ENABLED=1           # semantic feedback for new Bob sessions
 FEEDBACK_PROVIDER=fireworks  # evaluator; the Baseten default is deactivated (see below)
-COACH_NEXT_MOVE_ENABLED=1    # concise next-move hints for new Bob sessions
+COACH_NEXT_MOVE_ENABLED=1    # concise next-move hints for new sessions (all personas)
 ```
 
 From the repository root, first check this worktree's Python, jiter, Node and
@@ -239,9 +239,10 @@ by `scripts/start_demo.py --mode frontend` before the Worker starts.
 
 ## Known limits
 
-The optional concise Bob coach mode uses `COACH_NEXT_MOVE_ENABLED=1` on
-the backend. It applies to **new** Bob sessions only; saved sessions keep their
-earlier prompts. See the [mode contract](docs/coach-next-move-contract.md)
+The optional concise coach mode uses `COACH_NEXT_MOVE_ENABLED=1` on
+the backend. It applies to **new** sessions only (Bob, and since Nov 12 the
+other personas with a persona-neutral prompt that has had no live check yet);
+saved sessions keep their earlier prompts. See the [mode contract](docs/coach-next-move-contract.md)
 and [demo rehearsal](docs/coach-demo-walkthrough.md). The historical coach
 measurements below predate this mode and do not establish its quality.
 

@@ -13,6 +13,18 @@ The coach receives neither this private config nor grader data. Session-create
 and hint request/response DTOs stay unchanged; `s3-coach-r2` names the response
 contract, not the prompt version. No DB migration is needed.
 
+**Other personas (added Nov 12, user request).** With the same flag on, every
+new session that is not on `s4-bob-r1` (Maya, Karen and the rest, and Bob
+sessions created without a behavior revision) pins
+`coach_prompt_revision=next-move-r1`. It uses the same next-move and
+previous-hint paragraphs as Bob's coach, and a persona-neutral request
+paragraph in place of Bob's workload and deadline wording. It removes the
+baseline rule that every example is an acknowledgment followed by a what/how
+question, and tells the coach not to open with a stock phrase such as "I hear
+you". Sessions created before the flag, or before this change, keep the
+baseline prompt. `next-move-r1` is covered by prompt and pinning tests only; no
+live model run or learner review has checked its hints yet.
+
 The earlier `bob-next-move-r1` remains supported with exact original prompt
 bytes. Revision2 adds targeted latest-request ownership, acknowledgement of
 reluctance to raise workload, and declarative offers. Old sessions never acquire

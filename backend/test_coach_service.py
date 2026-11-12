@@ -33,7 +33,11 @@ from coach import (
     CoachTimeoutError,
     CoachUnavailableError,
 )
-from coach_context import NEXT_MOVE_REVISION, build_coach_system_prompt
+from coach_context import (
+    GENERAL_NEXT_MOVE_REVISION,
+    NEXT_MOVE_REVISION,
+    build_coach_system_prompt,
+)
 from database import create_sqlite_engine
 from main import create_app
 from migrations import SCHEMA_VERSION, initialize_database
@@ -1103,6 +1107,7 @@ def test_next_move_is_pinned_at_creation_not_hint_time(
 
     monkeypatch.delenv("COACH_NEXT_MOVE_ENABLED", raising=False)
     old = create()
+    other_old = start(client, title="Teenage Daughter:")
     monkeypatch.setenv("COACH_NEXT_MOVE_ENABLED", "1")
     new = create()
     legacy = client.post(
@@ -1110,19 +1115,24 @@ def test_next_move_is_pinned_at_creation_not_hint_time(
     ).json()
     other = start(client, title="Teenage Daughter:")
     monkeypatch.setenv("COACH_NEXT_MOVE_ENABLED", "0")
-    for session in (old, new, legacy, other):
+    cases = [
+        (old, "s4-bob-r1", None),
+        (other_old, None, None),
+        (new, "s4-bob-r1", NEXT_MOVE_REVISION),
+        (legacy, None, GENERAL_NEXT_MOVE_REVISION),
+        (other, None, GENERAL_NEXT_MOVE_REVISION),
+    ]
+    for session, behavior, pinned in cases:
         with sessionmaker(bind=engine)() as db:
             config = db.get(Session, session["id"]).scenario_config
-            assert (config.get("coach_prompt_revision") == NEXT_MOVE_REVISION) == (
-                session is new
-            )
+            assert config.get("coach_prompt_revision") == pinned
         response = ask(client, session["id"], hint_payload(session))
         assert response.status_code == 200
         expected = build_coach_system_prompt(
             session["persona"]["name"],
             session["persona"]["role"],
-            behavior_revision="s4-bob-r1" if session in (old, new) else None,
-            coach_prompt_revision=NEXT_MOVE_REVISION if session is new else None,
+            behavior_revision=behavior,
+            coach_prompt_revision=pinned,
         )
         assert coach.calls[-1]["system_prompt"] == expected
         assert "coach_prompt_revision" not in coach.calls[-1]["context_json"]
@@ -1144,6 +1154,32 @@ def test_unknown_next_move_version_does_not_replace_saved_bob_prompt() -> None:
     baseline = build_coach_system_prompt("Maya", "Daughter")
     assert baseline == build_coach_system_prompt(
         "Maya", "Daughter", coach_prompt_revision=NEXT_MOVE_REVISION
+    )
+
+
+def test_general_next_move_prompt_drops_the_forced_acknowledgment() -> None:
+    """Other personas get next-move guidance without Bob's workload wording."""
+    baseline = build_coach_system_prompt("Maya", "Daughter")
+    general = build_coach_system_prompt(
+        "Maya", "Daughter", coach_prompt_revision=GENERAL_NEXT_MOVE_REVISION
+    )
+    assert "one short acknowledgment" in baseline
+    assert "one short acknowledgment" not in general
+    assert "starts with what or how" not in general
+    assert "one useful step forward" in general
+    assert "'I hear you'" in general
+    for bob_only in ("deadline", "workload", "priorities"):
+        assert bob_only not in general
+    # Everything outside the move and repeat paragraphs is unchanged.
+    assert general.split(PARA)[:4] == baseline.split(PARA)[:4]
+    assert general.split(PARA)[-1] == baseline.split(PARA)[-1]
+    # A Bob-revision session never takes the general prompt.
+    bob = build_coach_system_prompt("Bob", "Team member", behavior_revision="s4-bob-r1")
+    assert bob == build_coach_system_prompt(
+        "Bob",
+        "Team member",
+        behavior_revision="s4-bob-r1",
+        coach_prompt_revision=GENERAL_NEXT_MOVE_REVISION,
     )
 
 
