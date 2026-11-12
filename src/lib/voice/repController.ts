@@ -3,6 +3,7 @@
 // and speech synthesis are passed in, so the logic runs in tests without them.
 
 import { ApiError } from "@/lib/api/http";
+import type { PracticeSession, TurnNode } from "@/lib/api/types";
 
 import {
   RepStreamError,
@@ -63,6 +64,10 @@ export type RepSnapshot = {
   error: string | null;
   result: RepResponse | null;
   timings: TurnTiming[];
+  // The practice session behind the rep and its saved turns, oldest first,
+  // for the coach panel: stance, needs uncovered, turn feedback and hints.
+  session: PracticeSession | null;
+  chain: TurnNode[];
 };
 
 export type RepDeps = {
@@ -99,6 +104,8 @@ export class RepController {
   private error: string | null = null;
   private result: RepResponse | null = null;
   private timings: TurnTiming[] = [];
+  private session: PracticeSession | null = null;
+  private chain: TurnNode[] = [];
 
   private branchId = 0;
   private headNodeId: number | null = null;
@@ -141,6 +148,8 @@ export class RepController {
       error: this.error,
       result: this.result,
       timings: this.timings.map((timing) => ({ ...timing })),
+      session: this.session,
+      chain: this.chain,
     };
   }
 
@@ -160,6 +169,8 @@ export class RepController {
       return;
     }
     const session = this.rep.session;
+    this.session = session;
+    this.chain = [];
     this.branchId = session.active_branch_id;
     this.headNodeId = session.active_head_node_id;
     this.revision = session.revision;
@@ -357,6 +368,8 @@ export class RepController {
       this.branchId = done.session.active_branch_id;
       this.headNodeId = done.node.id;
       this.revision = done.session.revision;
+      this.session = done.session;
+      this.chain = [...this.chain, done.node];
       this.flight = null;
       // The speaker callbacks set this.bob while the stream was awaited.
       const segment = this.bob as BobSegment | null;

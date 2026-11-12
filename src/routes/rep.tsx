@@ -1,8 +1,19 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
+import { CoachHint } from "@/components/CoachHint";
 import { api } from "@/lib/api";
+import type { Resistance, Whisper } from "@/lib/api/types";
+import { isStalled, stanceChange, useCoach, type StanceChange } from "@/lib/practice";
 import {
   createRepApi,
   type RepResponse,
@@ -300,7 +311,7 @@ function RepScreen() {
         {micProblem && <Notice title="Microphone">{micProblem}</Notice>}
 
         {snapshot && (running || ended) && (
-          <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+          <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
             <section className="bento flex max-h-[62vh] min-h-[320px] flex-col overflow-hidden">
               <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
                 {snapshot.lines.map((line, index) => (
@@ -384,6 +395,7 @@ function RepScreen() {
                   </div>
                 )}
               </div>
+              {snapshot.session && <RepCoach snapshot={snapshot} live={running} />}
               {snapshot.error && (
                 <div className="bento space-y-3 p-4 text-sm">
                   <p className="text-destructive">{snapshot.error}</p>
@@ -421,6 +433,114 @@ function RepScreen() {
 
         {!running && !!reps.data?.some((rep) => rep.scorecard) && <RepHistory reps={reps.data} />}
       </main>
+    </div>
+  );
+}
+
+const STANCE_LABEL: Record<Resistance, string> = {
+  guarded: "Guarded",
+  warming: "Warming",
+  open: "Open",
+};
+
+const STANCE_CHANGE: Record<StanceChange, string> = {
+  less_guarded: "Less guarded than the turn before.",
+  more_guarded: "More guarded than the turn before.",
+  unchanged: "Unchanged from the turn before.",
+};
+
+const WHISPER_STYLE: Record<Whisper["kind"], string> = {
+  warn: "bg-warning/10 text-warning ring-warning/30",
+  good: "bg-success/10 text-success ring-success/30",
+  tip: "bg-secondary/50 text-secondary-foreground ring-border",
+};
+
+// The same coaching the typed arena shows, on the session behind the rep:
+// Bob's stance, needs uncovered, feedback on the last turn and a next-move hint.
+function RepCoach({ snapshot, live }: { snapshot: RepSnapshot; live: boolean }) {
+  const session = snapshot.session!;
+  const chain = snapshot.chain;
+  const head = chain.at(-1);
+  const waiting = snapshot.phase === "bob_thinking";
+  const position = useMemo(
+    () => ({
+      branchId: session.active_branch_id,
+      headId: head?.id ?? null,
+      revision: session.revision,
+    }),
+    [session.active_branch_id, session.revision, head?.id],
+  );
+  const coach = useCoach({
+    sessionId: session.id,
+    position: live ? position : null,
+    stalled: live && isStalled(chain),
+    hold: waiting,
+  });
+  const progress = session.conversation_progress;
+  const change = stanceChange(chain);
+  const feedback = head?.coaching.whispers ?? [];
+
+  return (
+    <div className="bento space-y-4 p-4">
+      <h2 className="text-sm font-semibold">Coach</h2>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground">Bob's stance</p>
+          <p className="font-semibold">{STANCE_LABEL[progress?.stance ?? session.resistance]}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Needs uncovered</p>
+          <p className="font-semibold tabular-nums">
+            {session.score} of {session.total_needs}
+          </p>
+        </div>
+      </div>
+      {(change || progress?.explanation) && (
+        <p className="text-xs text-muted-foreground">
+          {change && <span className="text-foreground">{STANCE_CHANGE[change]} </span>}
+          {progress?.explanation}
+        </p>
+      )}
+      {feedback.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground">Your last turn</p>
+          {feedback.map((whisper, index) => (
+            <div
+              key={index}
+              className={`rounded-lg px-3 py-2 text-sm ring-1 ${WHISPER_STYLE[whisper.kind]}`}
+            >
+              {whisper.text}
+            </div>
+          ))}
+        </div>
+      )}
+      {live && (
+        <>
+          <CoachHint
+            hints={coach.hints}
+            earlier={coach.pending ? coach.earlier?.hint : undefined}
+            earlierLabel="From an earlier turn"
+            pending={coach.pending}
+            failure={coach.failure}
+          />
+          <button
+            type="button"
+            disabled={waiting || coach.pending || coach.exhausted}
+            onClick={coach.requestHelp}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40"
+          >
+            {coach.exhausted
+              ? "Two approaches saved for this turn"
+              : coach.pending
+                ? "Getting a hint…"
+                : coach.canRetry
+                  ? "Try again"
+                  : coach.hints.length
+                    ? "Try another approach"
+                    : "Get a hint"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
