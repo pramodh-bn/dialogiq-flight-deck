@@ -3,8 +3,11 @@
 Status: draft `v3-r1`, written by Claude on 2026-11-11 (Megillah CS-91) before
 the voice loop is built. It extends [`api_contract.md`](../api_contract.md);
 everything there (ports, idempotency, error envelope, session and tree shapes)
-still applies. Nothing here is implemented yet except the scorecard function
-(`backend/v3_score.py`).
+still applies.
+
+Implemented so far (CS-87, `backend/v3_reps.py`): create, streamed turn,
+events, finish and list. Not yet implemented: `/coach` (CS-88) and `/rewind`
+(CS-89); until then a retry uses the existing branch route.
 
 ## Scope
 
@@ -97,7 +100,7 @@ event: sentence
 data: {"index": 1, "text": "Design changed three times."}
 
 event: done
-data: {"node": { "...": "NodeResponse" }, "session": { "...": "SessionResponse" }, "turn": {"question_type": "open", "meaning": true, "deflection": true}}
+data: {"node": { "...": "NodeResponse" }, "session": { "...": "SessionResponse" }, "turn": {"question_type": "open", "leading": false, "meaning": true, "deflection": true}}
 ```
 
 The turn is saved once, after the model finishes, with the same checks as
@@ -113,12 +116,18 @@ data: {"code": "persona_unavailable", "retryable": true}
 
 and nothing is saved; the client discards the partial reply and may resend.
 A resend with the same `Idempotency-Key` after a saved turn replays the saved
-reply as a stream.
+reply as a stream. A failure while saving (for example `stale_revision`) also
+ends the stream with `event: error` and that code. Bob's saved text is the
+sentences joined by single spaces. `speech_start_ms` and `speech_end_ms` are
+checked (0 to 600000, end not before start) but not stored; timing comes from
+the event log. A turn on a finished rep returns `409 rep_finished`.
 
 ### `POST /api/v3/reps/{rep_id}/events`
 
-Request: `{ "events": [ ... ] }`, at most 200 per call. Response `200`:
-`{ "accepted": 14, "last_seq": 57 }`.
+Request: `{ "events": [ ... ] }`, 1 to 200 per call. Response `200`:
+`{ "accepted": 14, "last_seq": 57 }`. One malformed event rejects the whole
+batch with `422`. `t_ms` and `trigger_ms` are 0 to 600000. Events for a
+finished rep return `409 rep_finished`.
 
 ### `POST /api/v3/reps/{rep_id}/coach`
 
@@ -137,7 +146,9 @@ that turn. Response: `{ "branch": BranchResponse, "session": SessionResponse }`.
 
 Request: `{ "duration_ms": 180000 }`. Computes and stores the scorecard from
 the stored events and nodes. Response: `{ "rep": RepResponse }`. Finishing
-twice returns the stored result.
+twice returns the stored result. Rewind pairs are read from the tree: turns
+that share a parent are attempts at the same moment, the first being the
+original.
 
 ### `GET /api/v3/reps?scenario_id=2`
 
