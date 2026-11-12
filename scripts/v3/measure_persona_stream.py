@@ -28,7 +28,6 @@ JOURNEY = (
     "What made the deadlines hard to hit?",
     "That sounds frustrating. What would help you most this quarter?",
 )
-MAX_CALLS = len(MODELS) * len(JOURNEY)
 
 
 def load_env(path: str) -> None:
@@ -92,8 +91,6 @@ def main() -> None:
             {"role": "assistant", "content": config["persona"]["opening_message"]}
         ]
         for turn, line in enumerate(JOURNEY, start=1):
-            if calls >= MAX_CALLS:
-                break
             calls += 1
             state, _coaching, newly = evaluate(line, previous, config["needs"], ruleset)
             state = stance.apply_turn(state, previous, line)

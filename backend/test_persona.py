@@ -82,9 +82,23 @@ class FakeOpenAI:
     deltas: ClassVar[list] = []
     stream_error = None
 
+    stream_closed: ClassVar[list] = []
+
     @staticmethod
     def stream_chunks():
-        """Yield SDK-shaped chunks, then an optional mid-stream failure."""
+        """Return an SDK-shaped stream: iterable, with a recorded close()."""
+        return _FakeStream()
+
+    def __init__(self, base_url=None, api_key=None, max_retries=None):
+        self.base_url = base_url
+        self.api_key = api_key
+        self.max_retries = max_retries
+        self.chat = _FakeChat(FakeOpenAI.reply)
+        FakeOpenAI.instances.append(self)
+
+
+class _FakeStream:
+    def __iter__(self):
         for piece in FakeOpenAI.deltas:
             if piece is None:
                 yield SimpleNamespace(choices=[])
@@ -95,12 +109,8 @@ class FakeOpenAI:
         if FakeOpenAI.stream_error is not None:
             raise FakeOpenAI.stream_error
 
-    def __init__(self, base_url=None, api_key=None, max_retries=None):
-        self.base_url = base_url
-        self.api_key = api_key
-        self.max_retries = max_retries
-        self.chat = _FakeChat(FakeOpenAI.reply)
-        FakeOpenAI.instances.append(self)
+    def close(self):
+        FakeOpenAI.stream_closed.append(True)
 
 
 @pytest.fixture(autouse=True)
@@ -125,6 +135,7 @@ def _isolated(monkeypatch):
     FakeOpenAI.completion = None
     FakeOpenAI.deltas = []
     FakeOpenAI.stream_error = None
+    FakeOpenAI.stream_closed = []
     monkeypatch.setattr(persona, "OpenAI", FakeOpenAI)
 
 
@@ -793,13 +804,12 @@ def test_stream_yields_sentences_as_they_complete():
     assert call["messages"][0] == {"role": "system", "content": "You are Bob."}
 
 
-def test_stream_keeps_closing_quote_and_ellipsis_with_their_sentence():
+def test_stream_keeps_closing_quote_and_mid_sentence_ellipsis_together():
     FakeOpenAI.deltas = ['He said "fine." Then\u2026 nothing. ', "Q3 slipped."]
     client = BasetenPersonaClient(api_key="test-key")
     assert list(client.respond_stream(system_prompt="s", messages=[])) == [
         'He said "fine."',
-        "Then\u2026",
-        "nothing.",
+        "Then\u2026 nothing.",
         "Q3 slipped.",
     ]
 
@@ -844,3 +854,123 @@ def test_generate_stream_builds_the_same_prompt_as_generate():
     generate_persona_reply(client, _brief(), "How so?", **kwargs)
     streamed, plain = (i.chat.completions.calls[0] for i in FakeOpenAI.instances)
     assert streamed["messages"] == plain["messages"]
+
+
+# --- CS-91 fixes after independent validation -------------------------------
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("I asked Dr. Smith about it. Then I left.", 2),
+        ("Mr. Lee vs. the plan, etc. and so on. Fine.", 2),
+        ("Use tools, e.g. this one. Done.", 2),
+        ("The U.S. team slipped. Twice.", 2),
+        ("Meet at 9 a.m. tomorrow. Bring notes.", 2),
+        ("J. K. Rowling wrote it. Not me.", 2),
+        ("Two things: 1. specs moved. 2. Nobody listened.", 2),
+        ("It went... okay-ish, given the changes. Deadlines moved.", 2),
+        ("It took 3.5 days on v2.1. Too long.", 2),
+        ('"Really?" he asked. "Yes."', 2),
+        ("Wait... What changed? Everything!", 3),
+        (". Hello. ... ", 1),
+        ("no terminator at all", 1),
+    ],
+)
+def test_split_sentences_does_not_break_inside_a_sentence(text, expected):
+    sentences, rest = persona.split_sentences(text, final=True)
+    assert rest == ""
+    assert len(sentences) == expected
+    assert all(any(c.isalnum() for c in sentence) for sentence in sentences)
+
+
+def test_split_sentences_waits_for_the_next_character():
+    assert persona.split_sentences("It went... ") == ([], "It went... ")
+    assert persona.split_sentences("It went... okay. ") == ([], "It went... okay. ")
+    assert persona.split_sentences("Fine. N") == (["Fine."], "N")
+    assert persona.split_sentences("See Dr. ") == ([], "See Dr. ")
+
+
+def test_stream_splits_when_whitespace_arrives_in_a_later_delta():
+    FakeOpenAI.deltas = ["Hello.", " World.", " 3.", "5 days."]
+    client = BasetenPersonaClient(api_key="test-key")
+    assert list(client.respond_stream(system_prompt="s", messages=[])) == [
+        "Hello.",
+        "World.",
+        "3.5 days.",
+    ]
+
+
+def test_stream_is_closed_after_full_and_after_early_stop():
+    FakeOpenAI.deltas = ["One. ", "Two. ", "Three."]
+    client = BasetenPersonaClient(api_key="test-key")
+    assert len(list(client.respond_stream(system_prompt="s", messages=[]))) == 3
+    assert FakeOpenAI.stream_closed == [True]
+    stream = client.respond_stream(system_prompt="s", messages=[])
+    assert next(stream) == "One."
+    stream.close()
+    assert FakeOpenAI.stream_closed == [True, True]
+
+
+def test_stream_malformed_event_raises_typed_invalid_and_closes():
+    FakeOpenAI.deltas = ["First sentence. ", "Second"]
+    FakeOpenAI.stream_error = json.JSONDecodeError("bad event", "{", 0)
+    client = BasetenPersonaClient(api_key="test-key")
+    stream = client.respond_stream(system_prompt="s", messages=[])
+    assert next(stream) == "First sentence."
+    with pytest.raises(PersonaInvalidResponseError, match="malformed reply"):
+        next(stream)
+    assert FakeOpenAI.stream_closed == [True]
+
+
+def test_stream_error_at_create_is_typed():
+    FakeOpenAI.error = openai.APITimeoutError(
+        request=httpx2.Request("POST", "https://example.invalid/v1")
+    )
+    client = persona.FireworksPersonaClient(api_key="fw-test-key")
+    with pytest.raises(PersonaTimeoutError, match="FireworksPersonaClient"):
+        next(client.respond_stream(system_prompt="s", messages=[], timeout=5.0))
+
+
+def test_reasoning_setting_never_reaches_baseten(monkeypatch):
+    monkeypatch.setenv("PERSONA_REASONING_EFFORT", "medium")
+    monkeypatch.setenv("PERSONA_MODEL", "accounts/fireworks/models/ember-1")
+    monkeypatch.setenv("BASETEN_API_KEY", "baseten-test-key")
+    client = persona.persona_client()
+    assert type(client) is BasetenPersonaClient
+    client.respond(system_prompt="s", messages=[])
+    (call,) = FakeOpenAI.instances[0].chat.completions.calls
+    assert set(call) == {"model", "messages", "temperature", "timeout"}
+    assert call["model"] == "meta-models/muse-spark-open-1026"
+
+
+@pytest.mark.parametrize("value", ["off", "none", " OFF "])
+def test_fireworks_reasoning_can_be_switched_off(monkeypatch, value):
+    monkeypatch.setenv("PERSONA_REASONING_EFFORT", value)
+    client = persona.FireworksPersonaClient(api_key="fw-test-key")
+    client.respond(system_prompt="s", messages=[])
+    (call,) = FakeOpenAI.instances[0].chat.completions.calls
+    assert "reasoning_effort" not in call
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_blank_provider_means_baseten(monkeypatch, value):
+    monkeypatch.setenv("PERSONA_PROVIDER", value)
+    assert type(persona.persona_client()) is BasetenPersonaClient
+
+
+def test_practice_providers_follow_the_selected_provider(monkeypatch):
+    import practice
+
+    monkeypatch.setenv("PERSONA_PROVIDER", "fireworks")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-test-key")
+    FakeOpenAI.deltas = ["Fine. "]
+    assert practice.real_persona(brief=_brief(), user_text="Hi") == (
+        "Mocked persona reply."
+    )
+    assert list(practice.real_persona_stream(brief=_brief(), user_text="Hi")) == [
+        "Fine."
+    ]
+    assert [i.base_url for i in FakeOpenAI.instances] == [
+        "https://api.fireworks.ai/inference/v1"
+    ] * 2

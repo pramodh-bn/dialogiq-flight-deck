@@ -148,9 +148,12 @@ CS-91 adds `PERSONA_PROVIDER`: `baseten` (default, the settings above) or
 `fireworks`, which reads only `FIREWORKS_API_KEY`, optional
 `FIREWORKS_API_BASE`, `PERSONA_MODEL` (default
 `accounts/fireworks/models/muse-spark-open`; `FIREWORKS_MODEL` stays the
-coach's model) and `PERSONA_REASONING_EFFORT` (default `low` on Fireworks,
-unset on Baseten). Any other value returns `persona_unavailable` without a
-request. Wire responses are unchanged.
+coach's model) and `PERSONA_REASONING_EFFORT` (default `low`; `off` sends
+none). Baseten never reads `PERSONA_MODEL` or `PERSONA_REASONING_EFFORT`. An
+unset or blank `PERSONA_PROVIDER` means `baseten`; any other value returns
+`persona_unavailable` without a request. `scripts/start_demo.py` uses
+`fireworks` unless the shell or its env file names a provider. Wire
+responses are unchanged.
 No `VITE_*` key and no fallback to another provider's key. Local `.env` files
 are not automatically loaded by the current backend: load configuration into
 the backend process environment without printing values. Fireworks is CS-43

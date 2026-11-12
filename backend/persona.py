@@ -30,7 +30,8 @@ typed failures mapped from the SDK surface.
 CS-91 adds provider selection and streaming. ``PERSONA_PROVIDER`` picks the
 client: ``baseten`` (default, unchanged) or ``fireworks``
 (``FIREWORKS_API_KEY``, optional ``FIREWORKS_API_BASE``, ``PERSONA_MODEL``
-and ``PERSONA_REASONING_EFFORT``). Keys never cross providers.
+and ``PERSONA_REASONING_EFFORT``, read by Fireworks only). Keys never cross
+providers.
 ``respond_stream`` yields the reply one sentence at a time for voice.
 """
 
@@ -59,16 +60,77 @@ FIREWORKS_BASE_URL = "https://api.fireworks.ai/inference/v1"
 FIREWORKS_DEFAULT_MODEL = "accounts/fireworks/models/muse-spark-open"
 # Muse Spark Open on Fireworks reasons before answering; low keeps a turn short.
 FIREWORKS_DEFAULT_REASONING = "low"
-PERSONA_ENV_KEYS = (
-    ENV_PROVIDER,
-    "PERSONA_MODEL",
-    "PERSONA_REASONING_EFFORT",
-    "FIREWORKS_API_KEY",
-    "FIREWORKS_API_BASE",
+# PERSONA_REASONING_EFFORT values that mean: send no reasoning_effort at all.
+REASONING_OFF = ("off", "none")
+
+# A candidate sentence end: . ! ? or an ellipsis, optional closing quote, space.
+_SENTENCE_END = re.compile(r"[.!?\u2026]+[\"'\u201d\u2019)\]]*\s+")
+_ELLIPSIS = re.compile(r"(\.{2,}|\u2026)[\"'\u201d\u2019)\]]*\s+$")
+_LAST_WORD = re.compile(r"([A-Za-z0-9.]+)\.[\"'\u201d\u2019)\]]*\s+$")
+# Words whose trailing full stop does not end a sentence when spoken.
+_ABBREVIATIONS = frozenset(
+    [
+        "mr",
+        "mrs",
+        "ms",
+        "dr",
+        "prof",
+        "sr",
+        "jr",
+        "st",
+        "vs",
+        "etc",
+        "no",
+        "e.g",
+        "i.e",
+        "a.m",
+        "p.m",
+        "u.s",
+        "u.k",
+    ]
 )
 
-# A sentence ends at . ! ? or an ellipsis, optional closing quote, then space.
-_SENTENCE_END = re.compile(r"[.!?\u2026]+[\"'\u201d\u2019)\]]*\s+")
+
+def _is_sentence_end(head: str, following: str) -> bool:
+    """Decide whether ``head`` (ending at a candidate) really ends a sentence.
+
+    ``following`` is the first character after the whitespace. Text-to-speech
+    pauses at every chunk, so a split inside a sentence is audible.
+    """
+    if following.islower():
+        # "etc. and so on", "9 a.m. tomorrow", "It went... okay", '"Really?" he said'
+        return False
+    if _ELLIPSIS.search(head):
+        return True
+    word = _LAST_WORD.search(head)
+    if word is None:
+        return True
+    token = word.group(1).lower()
+    # "Dr. Smith", an initial such as "J. K. Rowling", or a list number "2. Next".
+    return not (token in _ABBREVIATIONS or len(token) == 1 or token.isdigit())
+
+
+def split_sentences(pending: str, *, final: bool = False) -> tuple[list[str], str]:
+    """Return the complete sentences in ``pending`` and the unfinished rest.
+
+    A sentence is released only once the character after it is known, unless
+    ``final`` says the text is complete. Chunks with no letter or digit are
+    dropped rather than spoken.
+    """
+    sentences: list[str] = []
+    begin = 0
+    for match in _SENTENCE_END.finditer(pending):
+        if match.end() >= len(pending):
+            break
+        if _is_sentence_end(pending[begin : match.end()], pending[match.end()]):
+            sentences.append(pending[begin : match.end()].strip())
+            begin = match.end()
+    rest = pending[begin:]
+    if final:
+        sentences.append(rest.strip())
+        rest = ""
+    return [s for s in sentences if any(c.isalnum() for c in s)], rest
+
 
 RESISTANCE_GUARDED = "guarded"
 RESISTANCE_WARMING = "warming"
@@ -322,6 +384,7 @@ class BasetenPersonaClient:
     env_model = "BASETEN_MODEL"
     default_base = DEFAULT_BASE_URL
     default_model = DEFAULT_MODEL
+    env_reasoning: str | None = None
     default_reasoning: str | None = None
 
     def __init__(
@@ -346,12 +409,17 @@ class BasetenPersonaClient:
         self.api_key = (
             api_key if api_key is not None else os.environ.get(self.env_key, "")
         )
-        # Sent only when set, so the Baseten request stays byte-identical.
+        # Only a class that names env_reasoning reads it, so no setting can
+        # change the Baseten request. "off" or "none" sends no value.
+        if reasoning_effort is None:
+            configured = (
+                os.environ.get(self.env_reasoning, "").strip().lower()
+                if self.env_reasoning
+                else ""
+            )
+            reasoning_effort = configured or self.default_reasoning
         self.reasoning_effort = (
-            reasoning_effort
-            if reasoning_effort is not None
-            else os.environ.get("PERSONA_REASONING_EFFORT", "").strip()
-            or self.default_reasoning
+            None if reasoning_effort in REASONING_OFF else reasoning_effort
         )
 
     @property
@@ -476,10 +544,13 @@ class BasetenPersonaClient:
         Reasoning deltas are ignored. A failure before or during the stream
         raises the same typed errors as ``respond``; sentences already
         yielded stay yielded, so callers decide whether to keep them.
+        Nothing is requested until the first ``next()``, so a route must
+        pull one sentence before it commits to a streaming response.
         """
         client, request = self._prepare(system_prompt, messages, temperature, timeout)
         pending = ""
         produced = False
+        stream = None
         try:
             stream = client.chat.completions.create(**request, stream=True)
             for chunk in stream:
@@ -490,17 +561,26 @@ class BasetenPersonaClient:
                 if not isinstance(piece, str) or not piece:
                     continue
                 pending += piece
-                while match := _SENTENCE_END.search(pending):
-                    sentence = pending[: match.end()].strip()
-                    pending = pending[match.end() :]
-                    if sentence:
-                        produced = True
-                        yield sentence
+                sentences, pending = split_sentences(pending)
+                for sentence in sentences:
+                    produced = True
+                    yield sentence
         except OpenAIError as exc:
             raise self._provider_error(exc, timeout) from exc
-        if pending.strip():
+        except ValueError as exc:
+            # The SDK raises a bare JSON error for a malformed stream event.
+            raise PersonaInvalidResponseError(
+                f"{self.label} received a malformed reply from model {self.model}."
+            ) from exc
+        finally:
+            # Runs when the caller stops early too (barge-in, disconnect), so
+            # the provider connection is released at once, not at collection.
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()
+        for sentence in split_sentences(pending, final=True)[0]:
             produced = True
-            yield pending.strip()
+            yield sentence
         if not produced:
             raise PersonaInvalidResponseError(
                 f"{self.label} received an empty reply from model {self.model}."
@@ -521,12 +601,13 @@ class FireworksPersonaClient(BasetenPersonaClient):
     env_model = "PERSONA_MODEL"
     default_base = FIREWORKS_BASE_URL
     default_model = FIREWORKS_DEFAULT_MODEL
+    env_reasoning = "PERSONA_REASONING_EFFORT"
     default_reasoning = FIREWORKS_DEFAULT_REASONING
 
 
 def selected_provider() -> str:
     """The persona provider named by PERSONA_PROVIDER (default baseten)."""
-    return os.environ.get(ENV_PROVIDER, PROVIDER_BASETEN).strip().lower()
+    return os.environ.get(ENV_PROVIDER, "").strip().lower() or PROVIDER_BASETEN
 
 
 def persona_client() -> BasetenPersonaClient:

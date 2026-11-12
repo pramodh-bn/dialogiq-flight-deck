@@ -14,7 +14,7 @@ It is rehearsal, not surveillance: nothing records or scores real conversations.
 | Persona                        | Plays the character, such as Bob, a guarded engineer behind on Q3                    | Fireworks `muse-spark-open` (`PERSONA_PROVIDER=fireworks`); Baseten optional |
 | Coach                          | Suggests one next move as approach, example line and reason                          | Fireworks, `accounts/fireworks/models/muse-spark-open` (Meta API optional) |
 | Legacy judge                   | Scores which of the character's 7 hidden needs your turns have uncovered             | Local code, deterministic and lexical, no model                            |
-| Semantic feedback (opt-in Bob) | Classifies the completed exchange and cites public evidence; server derives counters | Baseten Muse Spark by default; Fireworks GPT-OSS optional                  |
+| Semantic feedback (opt-in Bob) | Classifies the completed exchange and cites public evidence; server derives counters | Fireworks GPT-OSS (`FEEDBACK_PROVIDER=fireworks`); the Baseten default is deactivated |
 | Stance (Bob)                   | Tracks simulated guarded / warming / open states                                     | Server ledger; semantic sessions use evidence from the AI evaluator        |
 | Recorder                       | Keeps every turn as a tree so you can rewind and branch                              | FastAPI + SQLite                                                           |
 
@@ -54,7 +54,9 @@ ignored `.env` in the repository root, or use another private env-file path.
 backend process and never prints values. A complete Bob demo configuration is:
 
 ```sh
-PERSONA_PROVIDER=fireworks   # persona replies; the demo launcher sets this
+# Persona replies. The demo launcher uses fireworks unless this file or the
+# shell names a provider; scripts/run_backend.py alone defaults to baseten.
+PERSONA_PROVIDER=fireworks
 # PERSONA_MODEL=accounts/fireworks/models/muse-spark-open   (the default)
 COACH_PROVIDER=fireworks     # coach provider; meta is the code default
 FIREWORKS_API_KEY=...        # coach, model accounts/fireworks/models/muse-spark-open
@@ -164,6 +166,10 @@ FEEDBACK_PROVIDER=baseten
 # optional evaluator-only override:
 FEEDBACK_MODEL=meta-models/muse-spark-open-1026
 ```
+
+As of 2026-11-11 the Baseten hackathon model is deactivated, so this default
+cannot grade. Use `FEEDBACK_PROVIDER=fireworks` (below); that path was not
+re-run after the deactivation.
 
 The grader uses a separate prompt/request from Bob, even on the same provider.
 It reads the selected public conversation and evaluator-only rubric. The coach

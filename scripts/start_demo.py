@@ -80,8 +80,14 @@ def main() -> int:
             COACH_DEMO_WAIT="1",
         )
         # CS-91: the Baseten hackathon model was deactivated; Bob runs on Fireworks
-        # unless the shell already names another persona provider.
-        env.setdefault("PERSONA_PROVIDER", "fireworks")
+        # unless the shell or the env file names a persona provider.
+        named_in_file = any(
+            line.split("=", 1)[0].strip() == "PERSONA_PROVIDER"
+            for line in args.env_file.read_text(encoding="utf-8").splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        if not named_in_file:
+            env.setdefault("PERSONA_PROVIDER", "fireworks")
         print(f"Demo database: {database} (retained across restarts)", flush=True)
         run(
             [
