@@ -132,6 +132,13 @@ def main() -> None:
         "persona",
         persona.PersonaUnavailableError,
     )
+    # CS-91: a streamed reply is one persona call and spends the same budget.
+    persona.BasetenPersonaClient.respond_stream = bounded(
+        persona.BasetenPersonaClient.respond_stream,
+        budget,
+        "persona",
+        persona.PersonaUnavailableError,
+    )
     run_backend.main()
 
 

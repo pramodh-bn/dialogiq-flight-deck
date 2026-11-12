@@ -4,7 +4,7 @@ import copy
 import json
 import os
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from uuid import uuid4
 
@@ -18,7 +18,12 @@ from coach_context import NEXT_MOVE_REVISION
 from conversation_context import ancestor_chain, build_history
 from judge import evaluate
 from models import Branch, ConversationNode, IdempotencyRecord, Scenario, Session
-from persona import BasetenPersonaClient, PersonaBrief, generate_persona_reply
+from persona import (
+    PersonaBrief,
+    generate_persona_reply,
+    generate_persona_reply_stream,
+    persona_client,
+)
 from schemas import (
     BranchCreateRequest,
     BranchCreateResponse,
@@ -367,7 +372,12 @@ def turn_context(db: DbSession, payload: ChatTurnRequest) -> GenerationContext:
 
 def real_persona(**kwargs: object) -> str:
     """Production provider; tests override this callable via FastAPI dependency."""
-    return generate_persona_reply(BasetenPersonaClient(), **kwargs)
+    return generate_persona_reply(persona_client(), **kwargs)
+
+
+def real_persona_stream(**kwargs: object) -> Iterator[str]:
+    """Production sentence stream for voice turns (CS-91); same provider choice."""
+    return generate_persona_reply_stream(persona_client(), **kwargs)
 
 
 def send_turn(
