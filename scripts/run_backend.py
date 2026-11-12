@@ -21,6 +21,8 @@ META_ENV_KEYS = (
     "FIREWORKS_API_BASE",
     "FIREWORKS_MODEL",
 )
+# CS-91: persona provider choice; FIREWORKS_* keys are already listed above.
+PERSONA_ENV_KEYS = ("PERSONA_PROVIDER", "PERSONA_MODEL", "PERSONA_REASONING_EFFORT")
 COACH_DEMO_ENV_KEYS = (
     "COACH_DEMO_WAIT",
     "FEEDBACK_ENABLED",
@@ -86,7 +88,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     if args.env_file:
         values = parse_env_file(Path(args.env_file))
-        for key in ENV_KEYS + META_ENV_KEYS + COACH_DEMO_ENV_KEYS:
+        for key in ENV_KEYS + META_ENV_KEYS + PERSONA_ENV_KEYS + COACH_DEMO_ENV_KEYS:
             if key in values:
                 os.environ.setdefault(key, values[key])
     sys.path.insert(0, str(root / "backend"))

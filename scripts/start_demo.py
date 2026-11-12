@@ -79,6 +79,9 @@ def main() -> int:
             COACH_PROVIDER="fireworks",
             COACH_DEMO_WAIT="1",
         )
+        # CS-91: the Baseten hackathon model was deactivated; Bob runs on Fireworks
+        # unless the shell already names another persona provider.
+        env.setdefault("PERSONA_PROVIDER", "fireworks")
         print(f"Demo database: {database} (retained across restarts)", flush=True)
         run(
             [

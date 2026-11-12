@@ -11,7 +11,7 @@ It is rehearsal, not surveillance: nothing records or scores real conversations.
 
 | Part                           | What it does                                                                         | Runs on                                                                    |
 | ------------------------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Persona                        | Plays the character, such as Bob, a guarded engineer behind on Q3                    | Baseten, `meta-models/muse-spark-open-1026`                                |
+| Persona                        | Plays the character, such as Bob, a guarded engineer behind on Q3                    | Fireworks `muse-spark-open` (`PERSONA_PROVIDER=fireworks`); Baseten optional |
 | Coach                          | Suggests one next move as approach, example line and reason                          | Fireworks, `accounts/fireworks/models/muse-spark-open` (Meta API optional) |
 | Legacy judge                   | Scores which of the character's 7 hidden needs your turns have uncovered             | Local code, deterministic and lexical, no model                            |
 | Semantic feedback (opt-in Bob) | Classifies the completed exchange and cites public evidence; server derives counters | Baseten Muse Spark by default; Fireworks GPT-OSS optional                  |
@@ -54,12 +54,13 @@ ignored `.env` in the repository root, or use another private env-file path.
 backend process and never prints values. A complete Bob demo configuration is:
 
 ```sh
-BASETEN_API_KEY=...          # persona replies
+PERSONA_PROVIDER=fireworks   # persona replies; the demo launcher sets this
+# PERSONA_MODEL=accounts/fireworks/models/muse-spark-open   (the default)
 COACH_PROVIDER=fireworks     # coach provider; meta is the code default
 FIREWORKS_API_KEY=...        # coach, model accounts/fireworks/models/muse-spark-open
 COACH_DEMO_WAIT=1            # required for Fireworks: low reasoning, no cutoff
 FEEDBACK_ENABLED=1           # semantic feedback for new Bob sessions
-FEEDBACK_PROVIDER=baseten    # separate evaluator call after Bob replies
+FEEDBACK_PROVIDER=fireworks  # evaluator; the Baseten default is deactivated (see below)
 COACH_NEXT_MOVE_ENABLED=1    # concise next-move hints for new Bob sessions
 ```
 
@@ -98,8 +99,11 @@ another process.
 The demo database is retained across restarts. Pass `--database <path>` in the
 backend terminal for a separate disposable database. Direct use of
 `scripts/run_backend.py` defaults to `backend/dialogiq.db` and accepts
-`DIALOGIQ_DB_PATH`. Without `BASETEN_API_KEY`, sending a turn returns
-`persona_unavailable` (HTTP 503). Without a configured coach provider, hints
+`DIALOGIQ_DB_PATH`. Without a key for the selected persona provider, sending a
+turn returns `persona_unavailable` (HTTP 503). The persona provider defaults to
+Baseten (`BASETEN_API_KEY`) when `PERSONA_PROVIDER` is unset; on 2026-11-11 the
+hackathon Baseten model returned "Model version wpgy40e is deactivated", so use
+`PERSONA_PROVIDER=fireworks`. Without a configured coach provider, hints
 fall back to deterministic text. Each real turn, evaluator call and live hint
 can use paid provider credits.
 

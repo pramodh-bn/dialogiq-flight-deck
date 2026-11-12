@@ -26,11 +26,19 @@ unrevealed text or gates.
 Sprint 2 (CS-39, contract R2 04af9aa) adds ``newly_revealed_titles``
 (candidate labeling), ``timeout`` forwarding, and ``PersonaError``
 typed failures mapped from the SDK surface.
+
+CS-91 adds provider selection and streaming. ``PERSONA_PROVIDER`` picks the
+client: ``baseten`` (default, unchanged) or ``fireworks``
+(``FIREWORKS_API_KEY``, optional ``FIREWORKS_API_BASE``, ``PERSONA_MODEL``
+and ``PERSONA_REASONING_EFFORT``). Keys never cross providers.
+``respond_stream`` yields the reply one sentence at a time for voice.
 """
 
 from __future__ import annotations
 
 import os
+import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from openai import (
@@ -43,6 +51,24 @@ from openai import (
 
 DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
 DEFAULT_MODEL = "meta-models/muse-spark-open-1026"
+
+ENV_PROVIDER = "PERSONA_PROVIDER"
+PROVIDER_BASETEN = "baseten"
+PROVIDER_FIREWORKS = "fireworks"
+FIREWORKS_BASE_URL = "https://api.fireworks.ai/inference/v1"
+FIREWORKS_DEFAULT_MODEL = "accounts/fireworks/models/muse-spark-open"
+# Muse Spark Open on Fireworks reasons before answering; low keeps a turn short.
+FIREWORKS_DEFAULT_REASONING = "low"
+PERSONA_ENV_KEYS = (
+    ENV_PROVIDER,
+    "PERSONA_MODEL",
+    "PERSONA_REASONING_EFFORT",
+    "FIREWORKS_API_KEY",
+    "FIREWORKS_API_BASE",
+)
+
+# A sentence ends at . ! ? or an ellipsis, optional closing quote, then space.
+_SENTENCE_END = re.compile(r"[.!?\u2026]+[\"'\u201d\u2019)\]]*\s+")
 
 RESISTANCE_GUARDED = "guarded"
 RESISTANCE_WARMING = "warming"
@@ -261,23 +287,23 @@ def build_persona_system_prompt(
     return "\n\n".join(parts)
 
 
-def _status_error(model: str, exc: APIStatusError) -> PersonaError:
+def _status_error(
+    model: str, exc: APIStatusError, label: str = "BasetenPersonaClient"
+) -> PersonaError:
     """Map an upstream HTTP status failure to a typed persona error."""
     code = exc.status_code
     if code in (408, 504):
         return PersonaTimeoutError(
-            f"BasetenPersonaClient timed out (upstream status {code}) "
-            f"for model {model}."
+            f"{label} timed out (upstream status {code}) for model {model}."
         )
     if code in (401, 403, 429) or (
         isinstance(code, int) and code >= 500 and code != 504
     ):
         return PersonaUnavailableError(
-            f"BasetenPersonaClient is unavailable (upstream status {code}) "
-            f"for model {model}."
+            f"{label} is unavailable (upstream status {code}) for model {model}."
         )
     return PersonaInvalidResponseError(
-        f"BasetenPersonaClient received upstream status {code} for model {model}."
+        f"{label} received upstream status {code} for model {model}."
     )
 
 
@@ -289,26 +315,43 @@ class BasetenPersonaClient:
     stays inert even if ``META_MODEL_API_KEY`` is set.
     """
 
+    label = "BasetenPersonaClient"
+    provider = PROVIDER_BASETEN
+    env_key = "BASETEN_API_KEY"
+    env_base = "BASETEN_API_BASE"
+    env_model = "BASETEN_MODEL"
+    default_base = DEFAULT_BASE_URL
+    default_model = DEFAULT_MODEL
+    default_reasoning: str | None = None
+
     def __init__(
         self,
         base_url: str | None = None,
         model: str | None = None,
         api_key: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.base_url = (
             base_url
             if base_url is not None
-            else os.environ.get("BASETEN_API_BASE", DEFAULT_BASE_URL)
+            else os.environ.get(self.env_base, self.default_base)
         )
         self.model = (
             model
             if model is not None
-            else os.environ.get("BASETEN_MODEL", DEFAULT_MODEL)
+            else os.environ.get(self.env_model, self.default_model)
         )
         # Passing "" (not None) stops any fallback to another backend's
         # key when no Baseten key is set.
         self.api_key = (
-            api_key if api_key is not None else os.environ.get("BASETEN_API_KEY", "")
+            api_key if api_key is not None else os.environ.get(self.env_key, "")
+        )
+        # Sent only when set, so the Baseten request stays byte-identical.
+        self.reasoning_effort = (
+            reasoning_effort
+            if reasoning_effort is not None
+            else os.environ.get("PERSONA_REASONING_EFFORT", "").strip()
+            or self.default_reasoning
         )
 
     @property
@@ -331,14 +374,61 @@ class BasetenPersonaClient:
         before any network call when unconfigured, and when the backend
         returns an empty reply.
         """
+        client, request = self._prepare(system_prompt, messages, temperature, timeout)
+        try:
+            completion = client.chat.completions.create(**request)
+        except OpenAIError as exc:
+            raise self._provider_error(exc, timeout) from exc
+        try:
+            choices = completion.choices
+        except AttributeError:
+            choices = None
+        if not choices:
+            raise PersonaInvalidResponseError(
+                f"{self.label} received a malformed reply from model {self.model}."
+            )
+        try:
+            first_choice = choices[0]
+        except (IndexError, KeyError, TypeError):
+            raise PersonaInvalidResponseError(
+                f"{self.label} received a malformed reply from model {self.model}."
+            ) from None
+        message = getattr(first_choice, "message", None)
+        if message is None or not hasattr(message, "content"):
+            raise PersonaInvalidResponseError(
+                f"{self.label} received a malformed reply from model {self.model}."
+            )
+        content = message.content
+        if content is None:
+            raise PersonaInvalidResponseError(
+                f"{self.label} received an empty reply from model {self.model}."
+            )
+        if not isinstance(content, str):
+            raise PersonaInvalidResponseError(
+                f"{self.label} received a malformed reply from model {self.model}."
+            )
+        if not content.strip():
+            raise PersonaInvalidResponseError(
+                f"{self.label} received an empty reply from model {self.model}."
+            )
+        return content.strip()
+
+    def _prepare(
+        self,
+        system_prompt: str,
+        messages: list[dict],
+        temperature: float,
+        timeout: float,
+    ) -> tuple[OpenAI, dict]:
+        """Check configuration, then build the SDK client and request."""
         if not self.api_key:
             raise PersonaUnavailableError(
-                "BasetenPersonaClient needs BASETEN_API_KEY to be set; "
+                f"{self.label} needs {self.env_key} to be set; "
                 "no key is configured, so no request was made."
             )
         if not self.base_url:
             raise PersonaUnavailableError(
-                "BasetenPersonaClient needs BASETEN_API_BASE to be set; "
+                f"{self.label} needs {self.env_base} to be set; "
                 "no base URL is configured, so no request was made."
             )
         # Built only after the checks above, so an unconfigured client
@@ -346,62 +436,110 @@ class BasetenPersonaClient:
         # fall back to OPENAI_API_KEY). max_retries=0 keeps one request
         # per call.
         client = OpenAI(base_url=self.base_url, api_key=self.api_key, max_retries=0)
-        try:
-            completion = client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "system", "content": system_prompt}]
-                + list(messages),
-                temperature=temperature,
-                timeout=timeout,
-            )
-        except APITimeoutError as exc:
-            raise PersonaTimeoutError(
-                f"BasetenPersonaClient timed out after {timeout:g} seconds "
+        request: dict = {
+            "model": self.model,
+            "messages": [{"role": "system", "content": system_prompt}, *messages],
+            "temperature": temperature,
+            "timeout": timeout,
+        }
+        if self.reasoning_effort:
+            request["reasoning_effort"] = self.reasoning_effort
+        return client, request
+
+    def _provider_error(self, exc: OpenAIError, timeout: float) -> PersonaError:
+        """Map an SDK failure to a typed error with no prompt or key text."""
+        if isinstance(exc, APITimeoutError):
+            return PersonaTimeoutError(
+                f"{self.label} timed out after {timeout:g} seconds "
                 f"waiting for model {self.model}."
-            ) from exc
-        except APIConnectionError as exc:
-            raise PersonaUnavailableError(
-                f"BasetenPersonaClient could not reach {self.base_url}."
-            ) from exc
-        except APIStatusError as exc:
-            raise _status_error(self.model, exc) from exc
+            )
+        if isinstance(exc, APIConnectionError):
+            return PersonaUnavailableError(
+                f"{self.label} could not reach {self.base_url}."
+            )
+        if isinstance(exc, APIStatusError):
+            return _status_error(self.model, exc, self.label)
+        return PersonaInvalidResponseError(
+            f"{self.label} request to model {self.model} failed."
+        )
+
+    def respond_stream(
+        self,
+        *,
+        system_prompt: str,
+        messages: list[dict],
+        temperature: float = 0.7,
+        timeout: float = 30.0,
+    ) -> Iterator[str]:
+        """Yield the reply one sentence at a time as the model produces it.
+
+        Reasoning deltas are ignored. A failure before or during the stream
+        raises the same typed errors as ``respond``; sentences already
+        yielded stay yielded, so callers decide whether to keep them.
+        """
+        client, request = self._prepare(system_prompt, messages, temperature, timeout)
+        pending = ""
+        produced = False
+        try:
+            stream = client.chat.completions.create(**request, stream=True)
+            for chunk in stream:
+                choices = getattr(chunk, "choices", None)
+                if not choices:
+                    continue
+                piece = getattr(getattr(choices[0], "delta", None), "content", None)
+                if not isinstance(piece, str) or not piece:
+                    continue
+                pending += piece
+                while match := _SENTENCE_END.search(pending):
+                    sentence = pending[: match.end()].strip()
+                    pending = pending[match.end() :]
+                    if sentence:
+                        produced = True
+                        yield sentence
         except OpenAIError as exc:
+            raise self._provider_error(exc, timeout) from exc
+        if pending.strip():
+            produced = True
+            yield pending.strip()
+        if not produced:
             raise PersonaInvalidResponseError(
-                f"BasetenPersonaClient request to model {self.model} failed."
-            ) from exc
-        try:
-            choices = completion.choices
-        except AttributeError:
-            choices = None
-        if not choices:
-            raise PersonaInvalidResponseError(
-                f"BasetenPersonaClient received a malformed reply from model {self.model}."
+                f"{self.label} received an empty reply from model {self.model}."
             )
-        try:
-            first_choice = choices[0]
-        except (IndexError, KeyError, TypeError):
-            raise PersonaInvalidResponseError(
-                f"BasetenPersonaClient received a malformed reply from model {self.model}."
-            ) from None
-        message = getattr(first_choice, "message", None)
-        if message is None or not hasattr(message, "content"):
-            raise PersonaInvalidResponseError(
-                f"BasetenPersonaClient received a malformed reply from model {self.model}."
-            )
-        content = message.content
-        if content is None:
-            raise PersonaInvalidResponseError(
-                f"BasetenPersonaClient received an empty reply from model {self.model}."
-            )
-        if not isinstance(content, str):
-            raise PersonaInvalidResponseError(
-                f"BasetenPersonaClient received a malformed reply from model {self.model}."
-            )
-        if not content.strip():
-            raise PersonaInvalidResponseError(
-                f"BasetenPersonaClient received an empty reply from model {self.model}."
-            )
-        return content.strip()
+
+
+class FireworksPersonaClient(BasetenPersonaClient):
+    """The same persona client pointed at Fireworks (CS-91).
+
+    Reads only ``FIREWORKS_API_KEY``; the model comes from ``PERSONA_MODEL``
+    because ``FIREWORKS_MODEL`` already names the coach's model.
+    """
+
+    label = "FireworksPersonaClient"
+    provider = PROVIDER_FIREWORKS
+    env_key = "FIREWORKS_API_KEY"
+    env_base = "FIREWORKS_API_BASE"
+    env_model = "PERSONA_MODEL"
+    default_base = FIREWORKS_BASE_URL
+    default_model = FIREWORKS_DEFAULT_MODEL
+    default_reasoning = FIREWORKS_DEFAULT_REASONING
+
+
+def selected_provider() -> str:
+    """The persona provider named by PERSONA_PROVIDER (default baseten)."""
+    return os.environ.get(ENV_PROVIDER, PROVIDER_BASETEN).strip().lower()
+
+
+def persona_client() -> BasetenPersonaClient:
+    """Build the client for the configured provider; unknown names fail closed."""
+    provider = selected_provider()
+    if provider == PROVIDER_BASETEN:
+        return BasetenPersonaClient()
+    if provider == PROVIDER_FIREWORKS:
+        return FireworksPersonaClient()
+    raise PersonaUnavailableError(
+        f"{ENV_PROVIDER} must be {PROVIDER_BASETEN} or {PROVIDER_FIREWORKS}; "
+        "no request was made."
+    )
 
 
 def generate_persona_reply(
@@ -436,6 +574,40 @@ def generate_persona_reply(
     )
     messages = list(history or []) + [{"role": "user", "content": user_text}]
     return client.respond(
+        system_prompt=system_prompt,
+        messages=messages,
+        temperature=temperature,
+        timeout=timeout,
+    )
+
+
+def generate_persona_reply_stream(
+    client: BasetenPersonaClient,
+    brief: PersonaBrief,
+    user_text: str,
+    *,
+    revealed_titles: list[str] | tuple[str, ...] = (),
+    newly_revealed_titles: list[str] | tuple[str, ...] = (),
+    resistance: str = RESISTANCE_GUARDED,
+    history: list[dict] | None = None,
+    temperature: float = 0.7,
+    timeout: float = 30.0,
+    behavior_revision: str | None = None,
+    stance_signal: str | None = None,
+    feedback_revision: str | None = None,
+) -> Iterator[str]:
+    """Same prompt as ``generate_persona_reply``, yielded sentence by sentence."""
+    system_prompt = build_persona_system_prompt(
+        brief,
+        revealed_titles=revealed_titles,
+        newly_revealed_titles=newly_revealed_titles,
+        resistance=resistance,
+        behavior_revision=behavior_revision,
+        stance_signal=stance_signal,
+        feedback_revision=feedback_revision,
+    )
+    messages = [*(history or []), {"role": "user", "content": user_text}]
+    return client.respond_stream(
         system_prompt=system_prompt,
         messages=messages,
         temperature=temperature,

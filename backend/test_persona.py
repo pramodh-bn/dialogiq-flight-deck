@@ -60,6 +60,8 @@ class _FakeCompletionsEndpoint:
         self.calls.append(kwargs)
         if FakeOpenAI.error is not None:
             raise FakeOpenAI.error
+        if kwargs.get("stream"):
+            return FakeOpenAI.stream_chunks()
         if FakeOpenAI.completion is not None:
             return FakeOpenAI.completion
         return _FakeCompletion(self._reply)
@@ -77,6 +79,21 @@ class FakeOpenAI:
     reply = "Mocked persona reply."
     error = None
     completion = None
+    deltas: ClassVar[list] = []
+    stream_error = None
+
+    @staticmethod
+    def stream_chunks():
+        """Yield SDK-shaped chunks, then an optional mid-stream failure."""
+        for piece in FakeOpenAI.deltas:
+            if piece is None:
+                yield SimpleNamespace(choices=[])
+                continue
+            yield SimpleNamespace(
+                choices=[SimpleNamespace(delta=SimpleNamespace(content=piece))]
+            )
+        if FakeOpenAI.stream_error is not None:
+            raise FakeOpenAI.stream_error
 
     def __init__(self, base_url=None, api_key=None, max_retries=None):
         self.base_url = base_url
@@ -94,12 +111,20 @@ def _isolated(monkeypatch):
         "BASETEN_API_BASE",
         "BASETEN_MODEL",
         "META_MODEL_API_KEY",
+        "PERSONA_PROVIDER",
+        "PERSONA_MODEL",
+        "PERSONA_REASONING_EFFORT",
+        "FIREWORKS_API_KEY",
+        "FIREWORKS_API_BASE",
+        "FIREWORKS_MODEL",
     ):
         monkeypatch.delenv(var, raising=False)
     FakeOpenAI.instances.clear()
     FakeOpenAI.reply = "Mocked persona reply."
     FakeOpenAI.error = None
     FakeOpenAI.completion = None
+    FakeOpenAI.deltas = []
+    FakeOpenAI.stream_error = None
     monkeypatch.setattr(persona, "OpenAI", FakeOpenAI)
 
 
@@ -666,3 +691,156 @@ def test_bob_variant_levels_and_signals() -> None:
         )
     with pytest.raises(ValueError, match="unknown resistance level"):
         bob_stance_instruction("spicy")
+
+
+# --- CS-91: provider selection and sentence streaming -----------------------
+
+
+def test_default_provider_is_baseten_and_request_is_unchanged():
+    client = persona.persona_client()
+    assert type(client) is BasetenPersonaClient
+    assert client.reasoning_effort is None
+    BasetenPersonaClient(api_key="test-key").respond(system_prompt="s", messages=[])
+    (call,) = FakeOpenAI.instances[0].chat.completions.calls
+    assert set(call) == {"model", "messages", "temperature", "timeout"}
+
+
+def test_fireworks_provider_uses_only_fireworks_settings(monkeypatch):
+    monkeypatch.setenv("PERSONA_PROVIDER", " Fireworks ")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-test-key")
+    monkeypatch.setenv("BASETEN_API_KEY", "baseten-test-key")
+    monkeypatch.setenv("BASETEN_MODEL", "baseten-only-model")
+    monkeypatch.setenv("FIREWORKS_MODEL", "coach-only-model")
+    client = persona.persona_client()
+    assert type(client) is persona.FireworksPersonaClient
+    assert client.api_key == "fw-test-key"
+    assert client.base_url == "https://api.fireworks.ai/inference/v1"
+    assert client.model == "accounts/fireworks/models/muse-spark-open"
+    assert client.respond(system_prompt="s", messages=[]) == "Mocked persona reply."
+    fake = FakeOpenAI.instances[0]
+    assert fake.api_key == "fw-test-key"
+    (call,) = fake.chat.completions.calls
+    assert call["model"] == "accounts/fireworks/models/muse-spark-open"
+    assert call["reasoning_effort"] == "low"
+
+
+def test_fireworks_model_and_reasoning_overrides(monkeypatch):
+    monkeypatch.setenv("PERSONA_PROVIDER", "fireworks")
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fw-test-key")
+    monkeypatch.setenv("FIREWORKS_API_BASE", "https://relay.example/v1")
+    monkeypatch.setenv("PERSONA_MODEL", "accounts/fireworks/models/ember-1")
+    monkeypatch.setenv("PERSONA_REASONING_EFFORT", "medium")
+    client = persona.persona_client()
+    client.respond(system_prompt="s", messages=[])
+    fake = FakeOpenAI.instances[0]
+    assert fake.base_url == "https://relay.example/v1"
+    (call,) = fake.chat.completions.calls
+    assert call["model"] == "accounts/fireworks/models/ember-1"
+    assert call["reasoning_effort"] == "medium"
+
+
+def test_fireworks_provider_never_borrows_another_key(monkeypatch):
+    monkeypatch.setenv("PERSONA_PROVIDER", "fireworks")
+    monkeypatch.setenv("BASETEN_API_KEY", "baseten-test-key")
+    monkeypatch.setenv("META_MODEL_API_KEY", "meta-test-key")
+    client = persona.persona_client()
+    assert client.configured is False
+    with pytest.raises(PersonaUnavailableError, match="FIREWORKS_API_KEY"):
+        client.respond(system_prompt="s", messages=[])
+    assert FakeOpenAI.instances == []
+
+
+def test_unknown_provider_fails_closed_without_a_request(monkeypatch):
+    monkeypatch.setenv("PERSONA_PROVIDER", "elsewhere")
+    monkeypatch.setenv("BASETEN_API_KEY", "baseten-test-key")
+    with pytest.raises(PersonaUnavailableError, match="PERSONA_PROVIDER"):
+        persona.persona_client()
+    assert FakeOpenAI.instances == []
+
+
+def test_fireworks_status_errors_name_the_fireworks_client():
+    FakeOpenAI.error = _status_error(503)
+    client = persona.FireworksPersonaClient(api_key="fw-test-key")
+    with pytest.raises(PersonaUnavailableError, match="FireworksPersonaClient"):
+        client.respond(system_prompt="s", messages=[])
+
+
+def test_stream_yields_sentences_as_they_complete():
+    FakeOpenAI.deltas = [
+        "It\u2019s mostly",
+        " shifting specs. ",
+        None,
+        "I flagged it",
+        " in July! Nobody",
+        " listened",
+    ]
+    client = persona.FireworksPersonaClient(api_key="fw-test-key")
+    sentences = list(
+        client.respond_stream(
+            system_prompt="You are Bob.",
+            messages=[{"role": "user", "content": "What blocked you?"}],
+            timeout=12.0,
+        )
+    )
+    assert sentences == [
+        "It\u2019s mostly shifting specs.",
+        "I flagged it in July!",
+        "Nobody listened",
+    ]
+    (call,) = FakeOpenAI.instances[0].chat.completions.calls
+    assert call["stream"] is True
+    assert call["timeout"] == 12.0
+    assert call["messages"][0] == {"role": "system", "content": "You are Bob."}
+
+
+def test_stream_keeps_closing_quote_and_ellipsis_with_their_sentence():
+    FakeOpenAI.deltas = ['He said "fine." Then\u2026 nothing. ', "Q3 slipped."]
+    client = BasetenPersonaClient(api_key="test-key")
+    assert list(client.respond_stream(system_prompt="s", messages=[])) == [
+        'He said "fine."',
+        "Then\u2026",
+        "nothing.",
+        "Q3 slipped.",
+    ]
+
+
+def test_stream_with_no_text_raises_typed_invalid():
+    FakeOpenAI.deltas = [None, "", "   "]
+    client = BasetenPersonaClient(api_key="test-key")
+    with pytest.raises(PersonaInvalidResponseError, match="empty reply"):
+        list(client.respond_stream(system_prompt="s", messages=[]))
+
+
+def test_stream_inert_without_key():
+    client = persona.FireworksPersonaClient()
+    with pytest.raises(PersonaUnavailableError, match="FIREWORKS_API_KEY"):
+        list(client.respond_stream(system_prompt="s", messages=[]))
+    assert FakeOpenAI.instances == []
+
+
+def test_stream_failure_after_a_sentence_raises_typed_error():
+    FakeOpenAI.deltas = ["First sentence. ", "Second"]
+    FakeOpenAI.stream_error = _status_error(503)
+    client = persona.FireworksPersonaClient(api_key="fw-test-key")
+    stream = client.respond_stream(system_prompt="s", messages=[])
+    assert next(stream) == "First sentence."
+    with pytest.raises(PersonaUnavailableError, match="upstream status 503"):
+        next(stream)
+
+
+def test_generate_stream_builds_the_same_prompt_as_generate():
+    FakeOpenAI.deltas = ["Fine. "]
+    client = BasetenPersonaClient(api_key="test-key")
+    history = [{"role": "assistant", "content": "You wanted to see me?"}]
+    kwargs = {
+        "revealed_titles": ["Q3 deadlines"],
+        "history": history,
+        "behavior_revision": "s4-bob-r1",
+        "stance_signal": "support",
+    }
+    assert list(
+        persona.generate_persona_reply_stream(client, _brief(), "How so?", **kwargs)
+    ) == ["Fine."]
+    generate_persona_reply(client, _brief(), "How so?", **kwargs)
+    streamed, plain = (i.chat.completions.calls[0] for i in FakeOpenAI.instances)
+    assert streamed["messages"] == plain["messages"]
