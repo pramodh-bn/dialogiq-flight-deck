@@ -878,12 +878,12 @@ describe("CoachHint", () => {
   it("shows the move and the reason as labelled, readable blocks", () => {
     render(<CoachHint {...base} hints={[fixtures.success.hint]} />);
 
-    expect(screen.getByText("How to say it")).toBeInTheDocument();
+    expect(screen.getByText("Now say this")).toBeInTheDocument();
     expect(screen.getByText("The move")).toBeInTheDocument();
     expect(screen.getByText("Why this works")).toBeInTheDocument();
     expect(screen.getByTestId("hint-move")).toHaveTextContent(fixtures.success.hint.approach);
     expect(screen.getByTestId("hint-why")).toHaveTextContent(fixtures.success.hint.reason);
-    const how = screen.getByRole("region", { name: "How to say it" });
+    const how = screen.getByRole("region", { name: "Now say this" });
     expect(how).toHaveTextContent(fixtures.success.hint.example);
     expect(how).not.toHaveTextContent(fixtures.success.hint.reason);
     expect(screen.getByRole("region", { name: "Why it works" })).toHaveTextContent(

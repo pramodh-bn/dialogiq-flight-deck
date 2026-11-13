@@ -2,15 +2,25 @@ import type { Hint } from "@/lib/api";
 
 const sourceLabel = (hint: Hint) => (hint.source === "meta" ? "AI coach" : "Basic hint");
 
-// Two separate groups: how to say it (highlighted), then why it works (plain).
+// Two separate groups: why it works (plain) first, then what to say (highlighted).
 function HintBody({ hint }: { hint: Hint }) {
   return (
     <div className="space-y-4 text-sm">
       <section
-        aria-label="How to say it"
+        aria-label="Why it works"
+        data-testid="hint-why"
+        className="space-y-1 border-l-4 border-muted-foreground/40 pl-3"
+      >
+        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+          Why this works
+        </p>
+        <p className="leading-relaxed">{hint.reason}</p>
+      </section>
+      <section
+        aria-label="Now say this"
         className="space-y-3 rounded-lg bg-accent/10 p-3 ring-1 ring-accent/40"
       >
-        <p className="text-[11px] font-bold uppercase tracking-widest text-accent">How to say it</p>
+        <p className="text-[11px] font-bold uppercase tracking-widest text-accent">Now say this</p>
         <div className="space-y-1">
           <p className="text-xs font-semibold text-muted-foreground">Try saying</p>
           <p className="rounded-md bg-background/60 px-3 py-2 text-base font-semibold">
@@ -21,16 +31,6 @@ function HintBody({ hint }: { hint: Hint }) {
           <p className="text-xs font-semibold text-muted-foreground">The move</p>
           <p className="font-semibold leading-snug">{hint.approach}</p>
         </div>
-      </section>
-      <section
-        aria-label="Why it works"
-        data-testid="hint-why"
-        className="space-y-1 border-l-4 border-muted-foreground/40 pl-3"
-      >
-        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-          Why this works
-        </p>
-        <p className="leading-relaxed">{hint.reason}</p>
       </section>
     </div>
   );
