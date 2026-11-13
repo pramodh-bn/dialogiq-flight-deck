@@ -499,3 +499,60 @@ def test_opt_in_requires_advertised_capability(
             assert result.status_code == 422
     finally:
         engine.dispose()
+
+
+def test_turn_notes_name_what_was_done_revealed_and_left() -> None:
+    _, coaching = feedback.evaluate(
+        initial_state(),
+        LEARNER,
+        PERSONA,
+        [],
+        NEEDS,
+        lambda _: decision(
+            question_type="open", question_quote="Let's share the release work"
+        ),
+    )
+    texts = [note["text"] for note in coaching["whispers"]]
+    assert any("invited Bob to explain" in text for text in texts)
+    assert any("Ownership" in text and "no owner" in text for text in texts)
+    assert any("every concern" in text for text in texts)
+
+
+def test_pressure_is_a_dead_end_even_when_bob_discloses() -> None:
+    _, coaching = feedback.evaluate(
+        initial_state(),
+        LEARNER,
+        PERSONA,
+        [],
+        NEEDS,
+        lambda _: decision(
+            pressure=True,
+            pressure_quote="Let's share the release work",
+            stance_signal="pressure",
+            stance_change=-1,
+        ),
+    )
+    assert coaching["outcome"] == "deadend"
+    assert any("still told you" in n["text"] for n in coaching["whispers"])
+    assert any(n["kind"] == "warn" for n in coaching["whispers"])
+
+
+def test_no_disclosure_note_does_not_name_hidden_needs() -> None:
+    _, coaching = feedback.evaluate(
+        initial_state(),
+        LEARNER,
+        PERSONA,
+        [],
+        [*NEEDS, {"id": "n2", "title": "SecretTopic", "description": "x"}],
+        lambda _: decision(
+            revealed_need=None,
+            reaction_quote="",
+            stance_signal="none",
+            stance_change=0,
+            stance_quote="",
+        ),
+    )
+    joined = " ".join(n["text"] for n in coaching["whispers"])
+    assert "SecretTopic" not in joined
+    assert "nothing beyond what he had already shared" in joined
+    assert "2 of 2 concerns" in joined

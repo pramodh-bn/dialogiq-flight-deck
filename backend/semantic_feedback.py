@@ -30,6 +30,7 @@ DEFAULT_MODEL = "accounts/fireworks/models/gpt-oss-120b"
 TIMEOUT_SECONDS = 12.0
 SLOTS = threading.BoundedSemaphore(2)
 logger = logging.getLogger("dialogiq.feedback")
+SOURCE_ID_ERROR = "Unknown current-speaker evidence ID."
 
 
 class BasetenFeedbackClient(MetaCoachClient):
@@ -124,7 +125,10 @@ def resolve_evidence(model: ModelDecision, context: dict) -> Decision:
         if not identifier:
             return ""
         if identifier not in source:
-            raise ValueError("Unknown current-speaker evidence ID.")
+            logger.warning(
+                "feedback evidence id %r not among %s", identifier, sorted(source)
+            )
+            raise ValueError(SOURCE_ID_ERROR)
         return source[identifier]
 
     need = model.revealed_need
@@ -163,6 +167,12 @@ is closed. A mixed turn containing an open invitation is open. Useful practical
 answers, supportive offers, reflections and respectful pauses may be statements.
 An open/closed question requires question_evidence from learner_spans; statement
 requires the empty string. Evidence values are IDs such as L1, NEVER copied text.
+ID kinds are fixed per field. question_evidence, acknowledgment_evidence,
+pressure_evidence and stance_evidence take ONLY L IDs (the learner's words).
+reaction_evidence and revealed_need.persona_evidence take ONLY P IDs (Bob's
+words). Never put a P ID in a learner field: when Bob's reply shows the effect
+of a learner move, cite the learner's L ID in stance_evidence and Bob's P ID in
+reaction_evidence.
 Specific recognition of a concern/difficulty/perspective is acknowledgment;
 generic thanks/politeness alone is not. True acknowledgment requires a learner
 span ID; false requires empty acknowledgment_evidence. Sarcasm, blame, coerced
@@ -198,7 +208,7 @@ rewrite quotations, disclose the rubric, output private motives or award points.
 
 
 def real_provider(context: dict) -> Decision:
-    """One retry-free provider call, distinct from the coach prompt/context."""
+    """Evaluator call, distinct from the coach; retried once on a wrong evidence ID."""
     client = selected_client()
     started = time.monotonic()
     try:
@@ -207,28 +217,36 @@ def real_provider(context: dict) -> Decision:
             "learner_spans": evidence_spans(context["learner"], "L"),
             "persona_spans": evidence_spans(context["persona"], "P"),
         }
-        result = client.respond(
-            system_prompt=SYSTEM_PROMPT,
-            context_json=json.dumps(wire_context, ensure_ascii=False),
-            temperature=0.0,
-            max_tokens=4096,
-            timeout=TIMEOUT_SECONDS,
-            reasoning_effort="low",
-            response_format={"type": "json_object"},
-        )
-        logger.info(
-            "feedback completion provider=%s model=%s seconds=%.3f finish=%s "
-            "completion_tokens=%s reasoning_tokens=%s",
-            client.provider,
-            client.model,
-            time.monotonic() - started,
-            result.finish_reason,
-            result.completion_tokens,
-            result.reasoning_tokens,
-        )
-        return resolve_evidence(
-            ModelDecision.model_validate_json(result.content), context
-        )
+        for attempt in (1, 2):
+            result = client.respond(
+                system_prompt=SYSTEM_PROMPT,
+                context_json=json.dumps(wire_context, ensure_ascii=False),
+                temperature=0.0 if attempt == 1 else 0.4,
+                max_tokens=4096,
+                timeout=TIMEOUT_SECONDS,
+                reasoning_effort="low",
+                response_format={"type": "json_object"},
+            )
+            logger.info(
+                "feedback completion provider=%s model=%s seconds=%.3f finish=%s "
+                "completion_tokens=%s reasoning_tokens=%s",
+                client.provider,
+                client.model,
+                time.monotonic() - started,
+                result.finish_reason,
+                result.completion_tokens,
+                result.reasoning_tokens,
+            )
+            try:
+                return resolve_evidence(
+                    ModelDecision.model_validate_json(result.content), context
+                )
+            except ValueError as error:
+                # A wrong evidence ID is a one-off slip; ask once more.
+                if attempt == 2 or str(error) != SOURCE_ID_ERROR:
+                    raise
+                logger.info("feedback evidence id rejected; retrying once")
+        raise AssertionError("unreachable")
     except CoachError as error:
         logger.info(
             "feedback provider error provider=%s model=%s kind=%s finish=%s "
@@ -310,7 +328,7 @@ def validation_failure_code(error: Exception) -> str:
         "Stance reaction is not current persona evidence.": "reaction_evidence",
         "Unknown or already revealed need.": "need_identity",
         "Need has no current persona evidence.": "need_evidence",
-        "Unknown current-speaker evidence ID.": "source_id",
+        SOURCE_ID_ERROR: "source_id",
     }.get(str(error), "invalid_structure")
 
 
@@ -342,6 +360,76 @@ def bounded(provider: Provider, context: dict, timeout: float) -> Decision:
         raise error
     assert value is not None
     return value
+
+
+def short(quote: str, limit: int = 90) -> str:
+    """A quote trimmed for a note, at a word boundary."""
+    quote = " ".join(quote.split())
+    if len(quote) > limit:
+        return quote[:limit].rsplit(" ", 1)[0] + " ..."
+    return quote.rstrip(".!?")
+
+
+def explain(decision: Decision, needs: list[dict], revealed: int) -> list[dict]:
+    """Plain notes on one turn, built only from checked evidence and counts.
+
+    Says what the learner did, what Bob disclosed and what is still open. It never
+    names an undisclosed need and never claims a real person would react alike.
+    """
+    notes: list[dict] = []
+
+    def add(kind: str, text: str) -> None:
+        notes.append({"kind": kind, "text": text})
+
+    if decision.pressure:
+        add(
+            "warn",
+            f"You pressed Bob: “{short(decision.pressure_quote)}”. "
+            "Blame or demands usually close him down, even when he answers.",
+        )
+    if decision.question_type == "open" and not decision.pressure:
+        add(
+            "good",
+            f"You invited Bob to explain: “{short(decision.question_quote)}”.",
+        )
+    elif decision.question_type == "closed":
+        add(
+            "tip",
+            f"You asked a yes/no or fixed-answer question: "
+            f"“{short(decision.question_quote)}”. It checks a fact "
+            "but leaves Bob little room to add his own view.",
+        )
+    if decision.acknowledgment:
+        add(
+            "good",
+            f"You named his concern or difficulty: "
+            f"“{short(decision.acknowledgment_quote)}”.",
+        )
+    if decision.stance_signal == "repair":
+        add("good", "You repaired the exchange after a rough moment.")
+    if decision.revealed_need:
+        title = next(
+            (n["title"] for n in needs if n["id"] == decision.revealed_need.need_id),
+            "a concern",
+        )
+        verb = "still told you" if decision.pressure else "told you"
+        add(
+            "good",
+            f"Bob {verb} something new ({title}): "
+            f"“{short(decision.revealed_need.persona_quote)}”.",
+        )
+    else:
+        add("tip", "Bob said nothing beyond what he had already shared.")
+    left = len(needs) - revealed
+    if left:
+        add(
+            "tip",
+            f"Still unspoken: {left} of {len(needs)} concerns. Ask what matters to "
+            "him, then reflect what you heard before proposing a fix.",
+        )
+    else:
+        add("tip", "Bob has now shared every concern; move on to agreeing next steps.")
+    return notes
 
 
 def evaluate(
@@ -468,10 +556,12 @@ def evaluate(
         question_type=decision.question_type,
         empathy=decision.acknowledgment,
         leading=decision.pressure,
-        outcome="breakthrough"
-        if decision.revealed_need
-        else "deadend"
+        # Pressure is a dead end even when Bob answers; the note says what he shared.
+        outcome="deadend"
         if decision.pressure
+        else "breakthrough"
+        if decision.revealed_need
         else "neutral",
+        whispers=explain(decision, needs, len(state["revealed_needs"])),
     )
     return state, coaching
