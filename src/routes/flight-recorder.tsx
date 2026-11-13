@@ -15,6 +15,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { AttemptComparison } from "@/components/AttemptComparison";
 import {
   api,
   type Coaching,
@@ -608,6 +609,23 @@ function RecorderView({
                     ))}
                   </ul>
                 </section>
+                {selected.coaching.whispers.length > 0 && (
+                  <section data-testid="turn-notes">
+                    <h3 className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+                      What happened on this turn
+                    </h3>
+                    <ul className="space-y-1.5 text-sm">
+                      {selected.coaching.whispers.map((w, i) => (
+                        <li key={i} className="rounded-lg bg-muted/30 px-3 py-2">
+                          {w.text}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {viewed && tree.branches.length > 1 && (
+                  <AttemptComparison tree={tree} viewedBranchId={viewed.id} />
+                )}
                 {notice && (
                   <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning ring-1 ring-warning/30">
                     {notice}

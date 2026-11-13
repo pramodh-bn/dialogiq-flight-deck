@@ -144,6 +144,16 @@ it does not assert provider readiness.
 
 Baseline checks require no model credentials. Live persona configuration is
 server-only `BASETEN_API_KEY`, optional `BASETEN_API_BASE` and `BASETEN_MODEL`.
+CS-91 adds `PERSONA_PROVIDER`: `baseten` (default, the settings above) or
+`fireworks`, which reads only `FIREWORKS_API_KEY`, optional
+`FIREWORKS_API_BASE`, `PERSONA_MODEL` (default
+`accounts/fireworks/models/muse-spark-open`; `FIREWORKS_MODEL` stays the
+coach's model) and `PERSONA_REASONING_EFFORT` (default `low`; `off` sends
+none). Baseten never reads `PERSONA_MODEL` or `PERSONA_REASONING_EFFORT`. An
+unset or blank `PERSONA_PROVIDER` means `baseten`; any other value returns
+`persona_unavailable` without a request. `scripts/start_demo.py` uses
+`fireworks` unless the shell or its env file names a provider. Wire
+responses are unchanged.
 No `VITE_*` key and no fallback to another provider's key. Local `.env` files
 are not automatically loaded by the current backend: load configuration into
 the backend process environment without printing values. Fireworks is CS-43
@@ -875,4 +885,14 @@ The user-authorized, versioned Bob next-move candidate is documented in
 routes, payloads, port bindings, context privacy and provider/fallback behavior.
 New Bob sessions opt in through server-side `COACH_NEXT_MOVE_ENABLED=1` and pin
 the internal prompt revision; saved sessions/hints are not migrated.
+Since Nov 12 the same flag also pins `next-move-r1` on new sessions for the
+other personas; routes and payloads are unchanged.
 
+
+# V3 voice rep (draft, not yet served)
+
+The planned `/api/v3/reps` routes, the timed event log and the deterministic
+scorecard (`v3-score-r1`) are specified in
+[v3/voice-rep-contract.md](v3/voice-rep-contract.md). Served now: create,
+streamed turn, events, finish and list (`backend/v3_reps.py`), with two
+additive tables, `voice_reps` and `voice_events`. Nothing above changes.

@@ -28,6 +28,9 @@ HINT_FIELDS = ("approach", "example", "reason")
 BEHAVIOR_REVISION_BOB = "s4-bob-r1"
 PREVIOUS_NEXT_MOVE_REVISION = "bob-next-move-r1"
 NEXT_MOVE_REVISION = "bob-next-move-r2"
+# Every session that is not on the Bob behavior revision (Maya, Karen and
+# the other personas, and Bob sessions created without a behavior revision).
+GENERAL_NEXT_MOVE_REVISION = "next-move-r1"
 
 _BASELINE_MOVE_PARAGRAPH = (
     "Make the example line one short acknowledgment of what the "
@@ -145,6 +148,22 @@ _NEXT_MOVE_REQUEST_PARAGRAPH = (
 )
 
 
+# The persona-neutral part of _NEXT_MOVE_REQUEST_PARAGRAPH: no deadlines,
+# workload or priorities, which only Bob's scenario has.
+_GENERAL_REQUEST_PARAGRAPH = (
+    "When the other person asks the learner a direct question or asks them to "
+    "decide something, the example answers it or says plainly what the learner "
+    "would need to know first; it does not hand the same question back. If they "
+    "explain why something was hard to say, acknowledge that specific concern "
+    "rather than only thanking them for sharing. State the learner's own offered "
+    "action as a plain commitment or conditional offer, not a statement ending "
+    "in a question mark or an unnecessary request for permission. Do not open "
+    "with a stock phrase such as 'I hear you' or 'It sounds like': when the "
+    "example reflects something, it names the specific thing in the other "
+    "person's own words."
+)
+
+
 def build_coach_system_prompt(
     persona_name: str,
     persona_role: str,
@@ -166,6 +185,9 @@ def build_coach_system_prompt(
     Pinned bob-next-move-r1 keeps its exact prompt bytes; bob-next-move-r2
     adds targeted request-ownership and action guidance. Both require the
     Bob behavior revision. Unknown versions preserve the previous prompt.
+
+    Pinned next-move-r1 gives sessions that are not on the Bob behavior
+    revision the same next-move guidance without Bob's workload wording.
     """
     bob = behavior_revision == BEHAVIOR_REVISION_BOB
     move_paragraph = _BOB_MOVE_PARAGRAPH if bob else _BASELINE_MOVE_PARAGRAPH
@@ -178,6 +200,9 @@ def build_coach_system_prompt(
         repeat_paragraph = _NEXT_MOVE_REPEAT_PARAGRAPH
         if coach_prompt_revision == NEXT_MOVE_REVISION:
             move_paragraph += " " + _NEXT_MOVE_REQUEST_PARAGRAPH
+    if not bob and coach_prompt_revision == GENERAL_NEXT_MOVE_REVISION:
+        move_paragraph = _NEXT_MOVE_PARAGRAPH + " " + _GENERAL_REQUEST_PARAGRAPH
+        repeat_paragraph = _NEXT_MOVE_REPEAT_PARAGRAPH
     return "\n\n".join(
         [
             (

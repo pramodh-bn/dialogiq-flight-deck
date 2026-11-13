@@ -1,0 +1,38 @@
+[
+ {
+  "model": "accounts/fireworks/models/gpt-oss-120b",
+  "reasoning_effort": "low",
+  "turn": 1,
+  "first_sentence_s": 0.5,
+  "total_s": 1.2,
+  "sentences": 5,
+  "stance": "guarded",
+  "learner": "Thanks for coming in. I want to understand how Q3 went from your side.",
+  "bob": "Sure. The design kept shifting, so I was constantly re‑working sections that were already done. That threw the schedule off, and the downstream tasks got bumped. I’ve got a list of the changes, the current status of each deliverable, and the revised dates. Let me know which part you want to dive into first.",
+  "error": null
+ },
+ {
+  "model": "accounts/fireworks/models/gpt-oss-120b",
+  "reasoning_effort": "low",
+  "turn": 2,
+  "first_sentence_s": 0.82,
+  "total_s": 1.62,
+  "sentences": 4,
+  "stance": "guarded",
+  "learner": "What made the deadlines hard to hit?",
+  "bob": "The main thing was the cascade of design revisions. Every time the spec changed—sometimes after I’d already signed off on a module—I had to redo the work, re‑run the integration tests, and push the updated code through review. On top of that, a couple of other projects hit their own crunch windows, so resources that were supposed to be on my task got pulled for a week or two. The net effect was a lot of re‑planning, and the original dates just slipped.",
+  "error": null
+ },
+ {
+  "model": "accounts/fireworks/models/gpt-oss-120b",
+  "reasoning_effort": "low",
+  "turn": 3,
+  "first_sentence_s": 0.99,
+  "total_s": 2.03,
+  "sentences": 5,
+  "stance": "warming",
+  "learner": "That sounds frustrating. What would help you most this quarter?",
+  "bob": "Honestly, having a firm lock on the design before I start a chunk would cut a lot of the rework. If we could get a clear “this is the baseline” sign‑off and stick to it—maybe with a short change‑control window instead of ad‑hoc tweaks—that would let me plan the downstream work more reliably. On the logistics side, a quick check‑in when another team’s timeline shifts would help me re‑prioritize before I’m already deep into a sprint. I’m not asking for a miracle, just a bit more heads‑up and a defined process for any needed changes. That’s probably the most practical support I could use right now.",
+  "error": null
+ }
+]

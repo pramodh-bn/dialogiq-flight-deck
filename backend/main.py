@@ -20,6 +20,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 import coach_service
 import practice
 import semantic_feedback
+import v3_reps
 from api_errors import ApiError, not_found
 from database import engine
 from migrations import initialize_database
@@ -103,6 +104,7 @@ def create_app(
     provider: practice.Provider | None = None,
     coach_provider: coach_service.CoachProvider | None = None,
     feedback_provider: semantic_feedback.Provider | None = None,
+    stream_provider: v3_reps.StreamProvider | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -114,6 +116,7 @@ def create_app(
         bind=db_engine, expire_on_commit=False
     )
     application.state.provider = provider or practice.real_persona
+    application.state.stream_provider = stream_provider or practice.real_persona_stream
     application.state.feedback_provider = (
         feedback_provider or semantic_feedback.real_provider
     )
@@ -313,6 +316,8 @@ def create_app(
                 422, "validation_error", "This endpoint takes no query parameters."
             )
         return coach_service.list_hints(db, session_id, branch_id)
+
+    application.include_router(v3_reps.build_router(DbDep, KeyDep))
 
     # Outer CORS also decorates safe unexpected-failure responses.
     origins = [

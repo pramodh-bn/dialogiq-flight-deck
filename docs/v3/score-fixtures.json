@@ -1,0 +1,196 @@
+{
+  "ruleset": "v3-score-r1",
+  "note": "Authored by Claude on 2026-11-11 before backend/v3_score.py was written. 'human' is what a careful reader would call the line; 'rule' is what v3-score-r1 must return. Where they differ the case is a known miss of the lexical rules, kept so the miss stays visible. Lines are written as speech recognition tends to deliver them: little punctuation, fillers, restarts. These are shared development cases, not held-out ones.",
+  "utterances": [
+    {"id": "u01", "text": "what's been making delivery harder for you", "human": "meaning", "rule": {"type": "open", "meaning": true}},
+    {"id": "u02", "text": "your delivery is slipping", "human": "statement", "rule": {"type": "statement", "meaning": false}},
+    {"id": "u03", "text": "did you send the update", "human": "closed", "rule": {"type": "closed", "meaning": false}},
+    {"id": "u04", "text": "so um how did the quarter go", "human": "open", "rule": {"type": "open", "meaning": false}},
+    {"id": "u05", "text": "okay what do you need from me right now", "human": "meaning", "rule": {"type": "open", "meaning": true}},
+    {"id": "u06", "text": "how did that feel when the spec changed again", "human": "meaning", "rule": {"type": "open", "meaning": true}},
+    {"id": "u07", "text": "tell me what happened with the redesign", "human": "open", "rule": {"type": "open", "meaning": false}},
+    {"id": "u08", "text": "walk me through what mattered most to you in q3", "human": "meaning", "rule": {"type": "open", "meaning": true}},
+    {"id": "u09", "text": "is it the workload", "human": "closed", "rule": {"type": "closed", "meaning": false}},
+    {"id": "u10", "text": "are you finding it hard", "human": "closed", "rule": {"type": "closed", "meaning": false}},
+    {"id": "u11", "text": "why didn't you tell me it was hard", "human": "leading", "rule": {"type": "open", "meaning": false}},
+    {"id": "u12", "text": "what were you thinking when you felt that", "human": "leading", "rule": {"type": "open", "meaning": false}},
+    {"id": "u13", "text": "that sounds hard", "human": "statement", "rule": {"type": "statement", "meaning": false}},
+    {"id": "u14", "text": "i hear you. what would help", "human": "meaning", "rule": {"type": "open", "meaning": true}},
+    {"id": "u15", "text": "can you help me understand what's getting in the way", "human": "meaning", "rule": {"type": "closed", "meaning": false}},
+    {"id": "u16", "text": "which part was hardest for you", "human": "meaning", "rule": {"type": "statement", "meaning": false}},
+    {"id": "u17", "text": "where do you feel stuck", "human": "meaning", "rule": {"type": "statement", "meaning": false}},
+    {"id": "u18", "text": "what time is the review for you", "human": "open", "rule": {"type": "open", "meaning": true}},
+    {"id": "u19", "text": "what is the status of the helper service", "human": "open", "rule": {"type": "open", "meaning": true}},
+    {"id": "u20", "text": "i need this fixed by friday", "human": "statement", "rule": {"type": "statement", "meaning": false}},
+    {"id": "u21", "text": "how's the impact been on the rest of the team", "human": "meaning", "rule": {"type": "open", "meaning": true}},
+    {"id": "u22", "text": "what's hardening the deadline", "human": "open", "rule": {"type": "open", "meaning": true}},
+    {"id": "u23", "text": "do you want to pause here", "human": "closed", "rule": {"type": "closed", "meaning": false}},
+    {"id": "u24", "text": "how are you seeing this from your side", "human": "meaning", "rule": {"type": "open", "meaning": true}}
+  ],
+  "timelines": [
+    {
+      "id": "t01_talk_ratio_and_basic_counts",
+      "duration_ms": 60000,
+      "events": [
+        {"seq": 1, "t_ms": 1000, "kind": "bob_audio_start", "node_id": 0},
+        {"seq": 2, "t_ms": 4000, "kind": "bob_audio_end", "node_id": 0, "interrupted": false},
+        {"seq": 3, "t_ms": 5000, "kind": "learner_speech_start"},
+        {"seq": 4, "t_ms": 8000, "kind": "learner_speech_end"},
+        {"seq": 5, "t_ms": 9000, "kind": "bob_audio_start", "node_id": 1},
+        {"seq": 6, "t_ms": 15000, "kind": "bob_audio_end", "node_id": 1, "interrupted": false},
+        {"seq": 7, "t_ms": 17500, "kind": "learner_speech_start"},
+        {"seq": 8, "t_ms": 20500, "kind": "learner_speech_end"},
+        {"seq": 9, "t_ms": 21000, "kind": "bob_audio_start", "node_id": 2},
+        {"seq": 10, "t_ms": 24000, "kind": "bob_audio_end", "node_id": 2, "interrupted": false}
+      ],
+      "turns": [
+        {"node_id": 1, "parent_id": null, "text": "your delivery is slipping", "revealed_new": false, "stance_after": "guarded"},
+        {"node_id": 2, "parent_id": 1, "text": "what's been making delivery harder for you", "revealed_new": true, "stance_after": "guarded"}
+      ],
+      "rewinds": [],
+      "expected": {
+        "ruleset": "v3-score-r1",
+        "talk": {"learner_ms": 6000, "bob_ms": 12000, "learner_ratio": 0.33},
+        "questions": {"closed": 0, "open": 1, "meaning": 1, "statements": 1},
+        "pause_after_deflection": {"deflections": 1, "waited": 1, "median_gap_ms": 2500},
+        "interruptions": 0,
+        "rewind_recovery": {"rewinds": 0, "recovered": 0}
+      }
+    },
+    {
+      "id": "t02_pause_boundaries_1999_and_2000",
+      "duration_ms": 60000,
+      "events": [
+        {"seq": 1, "t_ms": 0, "kind": "learner_speech_start"},
+        {"seq": 2, "t_ms": 1000, "kind": "learner_speech_end"},
+        {"seq": 3, "t_ms": 2000, "kind": "bob_audio_start", "node_id": 1},
+        {"seq": 4, "t_ms": 4000, "kind": "bob_audio_end", "node_id": 1, "interrupted": false},
+        {"seq": 5, "t_ms": 5999, "kind": "learner_speech_start"},
+        {"seq": 6, "t_ms": 7000, "kind": "learner_speech_end"},
+        {"seq": 7, "t_ms": 8000, "kind": "bob_audio_start", "node_id": 2},
+        {"seq": 8, "t_ms": 10000, "kind": "bob_audio_end", "node_id": 2, "interrupted": false},
+        {"seq": 9, "t_ms": 12000, "kind": "learner_speech_start"},
+        {"seq": 10, "t_ms": 13000, "kind": "learner_speech_end"},
+        {"seq": 11, "t_ms": 14000, "kind": "bob_audio_start", "node_id": 3},
+        {"seq": 12, "t_ms": 16000, "kind": "bob_audio_end", "node_id": 3, "interrupted": false}
+      ],
+      "turns": [
+        {"node_id": 1, "parent_id": null, "text": "did you send the update", "revealed_new": false, "stance_after": "guarded"},
+        {"node_id": 2, "parent_id": 1, "text": "is it the workload", "revealed_new": false, "stance_after": "guarded"},
+        {"node_id": 3, "parent_id": 2, "text": "are you sure", "revealed_new": false, "stance_after": "guarded"}
+      ],
+      "rewinds": [],
+      "expected": {
+        "ruleset": "v3-score-r1",
+        "talk": {"learner_ms": 3001, "bob_ms": 6000, "learner_ratio": 0.33},
+        "questions": {"closed": 3, "open": 0, "meaning": 0, "statements": 0},
+        "pause_after_deflection": {"deflections": 2, "waited": 1, "median_gap_ms": 2000},
+        "interruptions": 0,
+        "rewind_recovery": {"rewinds": 0, "recovered": 0}
+      }
+    },
+    {
+      "id": "t03_interruption_boundaries_499_and_500",
+      "duration_ms": 60000,
+      "events": [
+        {"seq": 1, "t_ms": 0, "kind": "learner_speech_start"},
+        {"seq": 2, "t_ms": 1000, "kind": "learner_speech_end"},
+        {"seq": 3, "t_ms": 2000, "kind": "bob_audio_start", "node_id": 1},
+        {"seq": 4, "t_ms": 3000, "kind": "learner_speech_start"},
+        {"seq": 5, "t_ms": 3499, "kind": "learner_speech_end"},
+        {"seq": 6, "t_ms": 6000, "kind": "bob_audio_end", "node_id": 1, "interrupted": false},
+        {"seq": 7, "t_ms": 7000, "kind": "learner_speech_start"},
+        {"seq": 8, "t_ms": 8000, "kind": "learner_speech_end"},
+        {"seq": 9, "t_ms": 9000, "kind": "bob_audio_start", "node_id": 2},
+        {"seq": 10, "t_ms": 10000, "kind": "learner_speech_start"},
+        {"seq": 11, "t_ms": 10500, "kind": "bob_audio_end", "node_id": 2, "interrupted": true},
+        {"seq": 12, "t_ms": 12000, "kind": "learner_speech_end"}
+      ],
+      "turns": [
+        {"node_id": 1, "parent_id": null, "text": "how did the quarter go", "revealed_new": true, "stance_after": "guarded"},
+        {"node_id": 2, "parent_id": 1, "text": "tell me more about that", "revealed_new": false, "stance_after": "guarded"}
+      ],
+      "rewinds": [],
+      "expected": {
+        "ruleset": "v3-score-r1",
+        "talk": {"learner_ms": 4499, "bob_ms": 5500, "learner_ratio": 0.45},
+        "questions": {"closed": 0, "open": 2, "meaning": 0, "statements": 0},
+        "pause_after_deflection": {"deflections": 1, "waited": 0, "median_gap_ms": 0},
+        "interruptions": 1,
+        "rewind_recovery": {"rewinds": 0, "recovered": 0}
+      }
+    },
+    {
+      "id": "t04_rewind_recovery_and_selected_branch_only",
+      "duration_ms": 90000,
+      "events": [
+        {"seq": 1, "t_ms": 0, "kind": "learner_speech_start"},
+        {"seq": 2, "t_ms": 2000, "kind": "learner_speech_end"},
+        {"seq": 3, "t_ms": 3000, "kind": "bob_audio_start", "node_id": 1},
+        {"seq": 4, "t_ms": 5000, "kind": "bob_audio_end", "node_id": 1, "interrupted": false},
+        {"seq": 5, "t_ms": 6000, "kind": "learner_speech_start"},
+        {"seq": 6, "t_ms": 8000, "kind": "learner_speech_end"},
+        {"seq": 7, "t_ms": 9000, "kind": "bob_audio_start", "node_id": 2},
+        {"seq": 8, "t_ms": 11000, "kind": "bob_audio_end", "node_id": 2, "interrupted": false},
+        {"seq": 9, "t_ms": 20000, "kind": "learner_speech_start"},
+        {"seq": 10, "t_ms": 23000, "kind": "learner_speech_end"},
+        {"seq": 11, "t_ms": 24000, "kind": "bob_audio_start", "node_id": 3},
+        {"seq": 12, "t_ms": 29000, "kind": "bob_audio_end", "node_id": 3, "interrupted": false},
+        {"seq": 13, "t_ms": 40000, "kind": "learner_speech_start"},
+        {"seq": 14, "t_ms": 42000, "kind": "learner_speech_end"},
+        {"seq": 15, "t_ms": 43000, "kind": "bob_audio_start", "node_id": 4},
+        {"seq": 16, "t_ms": 45000, "kind": "bob_audio_end", "node_id": 4, "interrupted": false}
+      ],
+      "turns": [
+        {"node_id": 1, "parent_id": null, "text": "how did the quarter go", "revealed_new": true, "stance_after": "guarded"},
+        {"node_id": 2, "parent_id": 1, "text": "your delivery is slipping", "revealed_new": false, "stance_after": "guarded", "selected": false},
+        {"node_id": 3, "parent_id": 1, "text": "what's been making delivery harder for you", "revealed_new": true, "stance_after": "warming"},
+        {"node_id": 4, "parent_id": 1, "text": "you never hit your dates", "revealed_new": false, "stance_after": "guarded", "selected": false}
+      ],
+      "rewinds": [
+        {"original_node_id": 2, "retry_node_id": 3},
+        {"original_node_id": 2, "retry_node_id": 4}
+      ],
+      "expected": {
+        "ruleset": "v3-score-r1",
+        "talk": {"learner_ms": 9000, "bob_ms": 11000, "learner_ratio": 0.45},
+        "questions": {"closed": 0, "open": 2, "meaning": 1, "statements": 0},
+        "pause_after_deflection": {"deflections": 0, "waited": 0, "median_gap_ms": null},
+        "interruptions": 0,
+        "rewind_recovery": {"rewinds": 2, "recovered": 1}
+      }
+    },
+    {
+      "id": "t05_empty_rep_and_unclosed_segment",
+      "duration_ms": 10000,
+      "events": [
+        {"seq": 1, "t_ms": 7000, "kind": "learner_speech_start"}
+      ],
+      "turns": [],
+      "rewinds": [],
+      "expected": {
+        "ruleset": "v3-score-r1",
+        "talk": {"learner_ms": 3000, "bob_ms": 0, "learner_ratio": 1.0},
+        "questions": {"closed": 0, "open": 0, "meaning": 0, "statements": 0},
+        "pause_after_deflection": {"deflections": 0, "waited": 0, "median_gap_ms": null},
+        "interruptions": 0,
+        "rewind_recovery": {"rewinds": 0, "recovered": 0}
+      }
+    },
+    {
+      "id": "t06_nothing_recorded",
+      "duration_ms": 5000,
+      "events": [],
+      "turns": [],
+      "rewinds": [],
+      "expected": {
+        "ruleset": "v3-score-r1",
+        "talk": {"learner_ms": 0, "bob_ms": 0, "learner_ratio": null},
+        "questions": {"closed": 0, "open": 0, "meaning": 0, "statements": 0},
+        "pause_after_deflection": {"deflections": 0, "waited": 0, "median_gap_ms": null},
+        "interruptions": 0,
+        "rewind_recovery": {"rewinds": 0, "recovered": 0}
+      }
+    }
+  ]
+}

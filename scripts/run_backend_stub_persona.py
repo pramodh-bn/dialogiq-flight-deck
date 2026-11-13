@@ -8,6 +8,7 @@ deterministic fallback. Each persona call appends one line to --calls-file.
 
 import argparse
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import uvicorn
@@ -31,7 +32,11 @@ def main() -> None:
         number = len(calls.read_text(encoding="utf-8").splitlines())
         return f"Stand-in reply {number}."
 
+    def counted_stream(self: object, **kwargs: object) -> Iterator[str]:
+        yield counted_respond(self, **kwargs)
+
     persona.BasetenPersonaClient.respond = counted_respond  # type: ignore[method-assign]
+    persona.BasetenPersonaClient.respond_stream = counted_stream  # type: ignore[method-assign]
     uvicorn.run("main:app", host=args.host, port=args.port)
 
 
