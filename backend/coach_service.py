@@ -18,6 +18,7 @@ from uuid import uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session as DbSession
 
+import judge
 from api_errors import ApiError, conflict
 from coach import (
     COACH_DEMO_MAX_TOKENS,
@@ -32,6 +33,8 @@ from coach import (
 )
 from coach_context import (
     CONTRACT_REVISION,
+    GENERAL_OPEN_INVITATION_REVISION,
+    OPEN_INVITATION_REVISION,
     build_coach_context,
     build_coach_system_prompt,
     serialize_coach_context,
@@ -423,6 +426,11 @@ def _choice_timing(
     return min(LATENCY_SATURATION_MS, int(elapsed * 1000)), False
 
 
+def _is_closed_question(example: str) -> bool:
+    """True when the hint's example line is a yes/no question (judge rules)."""
+    return judge.classify(example)[0] == "closed"
+
+
 def _call_or_fallback(
     provider: CoachProvider,
     system_prompt: str,
@@ -434,8 +442,13 @@ def _call_or_fallback(
     demo_wait: bool = False,
     heartbeat: Callable[[], bool] | None = None,
     heartbeat_seconds: float = COACH_HEARTBEAT_SECONDS,
+    require_open: bool = False,
 ) -> tuple[dict[str, str], str, str | None, int]:
     """Run one provider call under a real wall-clock wait budget.
+
+    With ``require_open`` a hint whose example is a yes/no question is replaced
+    by the built-in fallback (reason invalid_response), so an open-invitation
+    session never shows one.
 
     The provider runs on a daemon worker holding no database resources
     while this thread joins only until ``started + wait_seconds``. A
@@ -475,6 +488,12 @@ def _call_or_fallback(
             try:
                 fields = parse_coach_output(completion.content)
             except CoachError:
+                fields = None
+            if (
+                fields is not None
+                and require_open
+                and _is_closed_question(fields["example"])
+            ):
                 fields = None
             if fields is not None:
                 latency_ms, over_total = _choice_timing(
@@ -552,6 +571,10 @@ def _generate(
     system_prompt, context_json, fallback_fields = _prepare_provider_input(
         db, session, branch, payload
     )
+    require_open = session.scenario_config.get("coach_prompt_revision") in (
+        OPEN_INVITATION_REVISION,
+        GENERAL_OPEN_INVITATION_REVISION,
+    )
     db.rollback()
 
     def heartbeat() -> bool:
@@ -576,6 +599,7 @@ def _generate(
         demo_wait=demo_wait,
         heartbeat=heartbeat,
         heartbeat_seconds=heartbeat_seconds,
+        require_open=require_open,
     )
     write_lock(db)
     session, branch = _validate_action(db, session_id, payload)

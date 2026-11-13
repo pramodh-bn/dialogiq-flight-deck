@@ -426,7 +426,11 @@ function RepScreen() {
 
         {phase === "finished" && snapshot?.result?.scorecard && (
           <>
-            <ScorecardView scorecard={snapshot.result.scorecard} timings={snapshot.timings} />
+            <ScorecardView
+              scorecard={snapshot.result.scorecard}
+              timings={snapshot.timings}
+              judge={snapshot.result.judge}
+            />
             <LatencyTable rows={snapshot.result.latency ?? []} />
             <WhisperLatencyCard latency={snapshot.result.whisper_latency} />
           </>
@@ -579,7 +583,15 @@ function Tile({ label, value, detail }: { label: string; value: string; detail: 
   );
 }
 
-function ScorecardView({ scorecard, timings }: { scorecard: Scorecard; timings: TurnTiming[] }) {
+function ScorecardView({
+  scorecard,
+  timings,
+  judge,
+}: {
+  scorecard: Scorecard;
+  timings: TurnTiming[];
+  judge: "semantic-r1" | "keywords" | undefined;
+}) {
   const { talk, questions, pause_after_deflection: pause } = scorecard;
   const waits = timings
     .filter((timing) => timing.audio_start_ms !== null)
@@ -620,6 +632,13 @@ function ScorecardView({ scorecard, timings }: { scorecard: Scorecard; timings: 
           {waits.length} {waits.length === 1 ? "turn" : "turns"}, slowest{" "}
           {seconds(Math.max(...waits))}
           ). Scored with {scorecard.ruleset}.
+        </p>
+      )}
+      {judge && (
+        <p className="text-xs text-muted-foreground" data-testid="judge">
+          {judge === "semantic-r1"
+            ? "Bob's needs were judged by meaning, from what he actually said."
+            : "Bob's needs were judged by keyword rules: only an open question using the right words unlocks one."}
         </p>
       )}
     </section>

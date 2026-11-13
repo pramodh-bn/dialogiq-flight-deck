@@ -63,6 +63,8 @@ export type RepResponse = {
   scorecard: Scorecard | null;
   latency: TurnLatency[];
   whisper_latency?: WhisperLatency;
+  // Which judge decided Bob's needs: the meaning judge or the keyword rules.
+  judge?: "semantic-r1" | "keywords";
 };
 
 export type RepCreated = {
@@ -72,6 +74,7 @@ export type RepCreated = {
   duration_limit_ms: number;
   score_ruleset: string;
   whisper_ruleset: string;
+  judge?: "semantic-r1" | "keywords";
   opening_message: string;
 };
 

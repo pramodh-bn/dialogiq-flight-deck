@@ -275,6 +275,21 @@ or when Bob's stance after the retry is higher than after the original
 (`guarded` < `warming` < `open`). When a turn is retried more than once, each
 retry is compared with the first attempt.
 
+## Judge (CS-102)
+
+`POST /api/v3/reps` pins `semantic-r1` when the server offers it for the
+scenario (`FEEDBACK_ENABLED=1`, complete Bob scenario); otherwise the keyword
+judge. The rep response reports `judge`: `semantic-r1` or `keywords`. With
+`semantic-r1` the judgment runs after Bob's last sentence, before the turn is
+saved, so `done` arrives later by one feedback call (a few seconds; Bob's audio
+is already playing). A failed judgment keeps the turn and reports feedback
+status `unavailable`. `done.turn.deflection` is computed from the needs the
+judge revealed on that turn.
+
+`POST /api/v3/classify` takes `{"user_message"}` and returns the question type,
+`leading` and `meaning` without a model call or saving anything; the browser
+calls it in parallel with the turn so whispers appear fast.
+
 ## Whisper rules, ruleset `v3-whisper-r1`
 
 Evaluated in the browser so they appear without a network call. At most one

@@ -35,7 +35,9 @@ from coach import (
 )
 from coach_context import (
     GENERAL_NEXT_MOVE_REVISION,
+    GENERAL_OPEN_INVITATION_REVISION,
     NEXT_MOVE_REVISION,
+    OPEN_INVITATION_REVISION,
     build_coach_system_prompt,
 )
 from database import create_sqlite_engine
@@ -1118,9 +1120,9 @@ def test_next_move_is_pinned_at_creation_not_hint_time(
     cases = [
         (old, "s4-bob-r1", None),
         (other_old, None, None),
-        (new, "s4-bob-r1", NEXT_MOVE_REVISION),
-        (legacy, None, GENERAL_NEXT_MOVE_REVISION),
-        (other, None, GENERAL_NEXT_MOVE_REVISION),
+        (new, "s4-bob-r1", OPEN_INVITATION_REVISION),
+        (legacy, None, GENERAL_OPEN_INVITATION_REVISION),
+        (other, None, GENERAL_OPEN_INVITATION_REVISION),
     ]
     for session, behavior, pinned in cases:
         with sessionmaker(bind=engine)() as db:
@@ -1200,3 +1202,69 @@ def test_first_next_move_revision_keeps_owner_reviewed_prompt_bytes() -> None:
         behavior_revision="s4-bob-r1",
         coach_prompt_revision=NEXT_MOVE_REVISION,
     )
+
+
+def test_open_invitation_revisions_add_one_rule_and_keep_older_prompts() -> None:
+    r2 = build_coach_system_prompt(
+        "Bob",
+        "Engineer",
+        behavior_revision="s4-bob-r1",
+        coach_prompt_revision=NEXT_MOVE_REVISION,
+    )
+    r3 = build_coach_system_prompt(
+        "Bob",
+        "Engineer",
+        behavior_revision="s4-bob-r1",
+        coach_prompt_revision=OPEN_INVITATION_REVISION,
+    )
+    assert "Never write a yes/no question" not in r2
+    assert "Never write a yes/no question" in r3
+    assert r3.replace(" Never write", "|Never write").startswith(r2[:200])
+    general_r1 = build_coach_system_prompt(
+        "Maya", "Daughter", coach_prompt_revision=GENERAL_NEXT_MOVE_REVISION
+    )
+    general_r2 = build_coach_system_prompt(
+        "Maya", "Daughter", coach_prompt_revision=GENERAL_OPEN_INVITATION_REVISION
+    )
+    assert "Never write a yes/no question" not in general_r1
+    assert "Never write a yes/no question" in general_r2
+
+
+def closed_hint() -> CoachCompletion:
+    return CoachCompletion(
+        content=json.dumps(
+            {
+                "approach": "Check the priority.",
+                "example": "Is that fair?",
+                "reason": "It confirms what he said.",
+            }
+        ),
+        finish_reason="stop",
+    )
+
+
+def test_closed_question_hint_is_replaced_on_open_invitation_sessions(
+    coach_harness: CoachHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _, _, coach = coach_harness
+    monkeypatch.setenv("COACH_NEXT_MOVE_ENABLED", "1")
+    coach.result = closed_hint()
+    session = start(client, title="Teenage Daughter:")
+    response = ask(client, session["id"], hint_payload(session))
+    assert response.status_code == 200, response.text
+    hint = response.json()["hint"]
+    assert hint["source"] == "deterministic"
+    assert hint["fallback_reason"] == "invalid_response"
+    assert "Is that fair?" not in hint["example"]
+
+
+def test_closed_question_hint_is_kept_on_sessions_without_the_rule(
+    coach_harness: CoachHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _, _, coach = coach_harness
+    monkeypatch.delenv("COACH_NEXT_MOVE_ENABLED", raising=False)
+    coach.result = closed_hint()
+    session = start(client, title="Teenage Daughter:")
+    hint = ask(client, session["id"], hint_payload(session)).json()["hint"]
+    assert hint["source"] == "meta"
+    assert hint["example"] == "Is that fair?"

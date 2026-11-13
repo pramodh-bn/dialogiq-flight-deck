@@ -28,9 +28,13 @@ HINT_FIELDS = ("approach", "example", "reason")
 BEHAVIOR_REVISION_BOB = "s4-bob-r1"
 PREVIOUS_NEXT_MOVE_REVISION = "bob-next-move-r1"
 NEXT_MOVE_REVISION = "bob-next-move-r2"
+# r3 = r2 plus the open-invitation rule below (CS-102).
+OPEN_INVITATION_REVISION = "bob-next-move-r3"
 # Every session that is not on the Bob behavior revision (Maya, Karen and
 # the other personas, and Bob sessions created without a behavior revision).
 GENERAL_NEXT_MOVE_REVISION = "next-move-r1"
+# next-move-r2 = r1 plus the open-invitation rule (CS-102).
+GENERAL_OPEN_INVITATION_REVISION = "next-move-r2"
 
 _BASELINE_MOVE_PARAGRAPH = (
     "Make the example line one short acknowledgment of what the "
@@ -164,6 +168,19 @@ _GENERAL_REQUEST_PARAGRAPH = (
 )
 
 
+# Bob's seven hidden needs only surface when the learner invites his own view,
+# so a yes/no example can never help. Added in bob-next-move-r3.
+_OPEN_INVITATION_PARAGRAPH = (
+    "When the example is a question, it must be an open invitation that "
+    "starts with what or how and asks about the other person's own "
+    "experience, difficulty, feelings, what matters to them, or what would "
+    "help. Never write a yes/no question or one that offers a single answer "
+    "to agree with, such as 'Is that fair?' or 'Would it help if...?'. "
+    "Exceptions: the other person asked a direct question that needs an "
+    "answer, asked for a decision, or asked to pause or stop."
+)
+
+
 def build_coach_system_prompt(
     persona_name: str,
     persona_role: str,
@@ -195,13 +212,21 @@ def build_coach_system_prompt(
     if bob and coach_prompt_revision in (
         PREVIOUS_NEXT_MOVE_REVISION,
         NEXT_MOVE_REVISION,
+        OPEN_INVITATION_REVISION,
     ):
         move_paragraph = _NEXT_MOVE_PARAGRAPH
         repeat_paragraph = _NEXT_MOVE_REPEAT_PARAGRAPH
-        if coach_prompt_revision == NEXT_MOVE_REVISION:
+        if coach_prompt_revision in (NEXT_MOVE_REVISION, OPEN_INVITATION_REVISION):
             move_paragraph += " " + _NEXT_MOVE_REQUEST_PARAGRAPH
-    if not bob and coach_prompt_revision == GENERAL_NEXT_MOVE_REVISION:
+        if coach_prompt_revision == OPEN_INVITATION_REVISION:
+            move_paragraph += " " + _OPEN_INVITATION_PARAGRAPH
+    if not bob and coach_prompt_revision in (
+        GENERAL_NEXT_MOVE_REVISION,
+        GENERAL_OPEN_INVITATION_REVISION,
+    ):
         move_paragraph = _NEXT_MOVE_PARAGRAPH + " " + _GENERAL_REQUEST_PARAGRAPH
+        if coach_prompt_revision == GENERAL_OPEN_INVITATION_REVISION:
+            move_paragraph += " " + _OPEN_INVITATION_PARAGRAPH
         repeat_paragraph = _NEXT_MOVE_REPEAT_PARAGRAPH
     return "\n\n".join(
         [

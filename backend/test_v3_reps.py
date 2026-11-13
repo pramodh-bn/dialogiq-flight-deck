@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session as DbSession
 
+import semantic_feedback
 from database import create_sqlite_engine
 from main import create_app
 from models import ConversationNode, IdempotencyRecord, VoiceEvent, VoiceTurnLatency
@@ -583,3 +584,63 @@ def test_whisper_latency_is_empty_without_whispers(harness: Harness):
     )
     assert done.json()["rep"]["whisper_latency"]["shown"] == 0
     assert done.json()["rep"]["whisper_latency"]["median_ms"] is None
+
+
+LEARNER_LINE = "what has been taking up your time lately"
+
+
+def meaning_judgment(_context: dict) -> semantic_feedback.Decision:
+    """A mocked judgment: Bob's reply disclosed a need; no keyword was needed."""
+    return semantic_feedback.Decision.model_validate(
+        {
+            "question_type": "open",
+            "question_quote": LEARNER_LINE,
+            "acknowledgment": False,
+            "acknowledgment_quote": "",
+            "pressure": False,
+            "pressure_quote": "",
+            "stance_signal": "clarity",
+            "stance_change": 0,
+            "stance_quote": LEARNER_LINE,
+            "reaction_quote": "",
+            "revealed_need": {
+                "need_id": "n2",
+                "persona_quote": "Design changed twice.",
+            },
+        }
+    )
+
+
+def test_rep_judges_by_meaning_when_the_server_offers_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("FEEDBACK_ENABLED", "1")
+    engine = create_sqlite_engine(f"sqlite:///{tmp_path / 'sem.db'}")
+    stream = FakeStream()
+    application = create_app(
+        engine,
+        lambda **_kwargs: "Typed reply.",
+        stream_provider=stream,
+        feedback_provider=meaning_judgment,
+    )
+    with TestClient(application) as client:
+        rep = new_rep(client)
+        assert rep["judge"] == "semantic-r1"
+        done = say(client, rep, rep["session"], LEARNER_LINE)
+        assert done["node"]["coaching"]["source"] == "semantic"
+        assert done["session"]["score"] == 1
+        assert done["turn"]["deflection"] is False
+        listed = client.get(f"/api/v3/reps?scenario_id={rep['session']['scenario_id']}")
+        assert listed.json()[0]["judge"] == "semantic-r1"
+    engine.dispose()
+
+
+def test_rep_uses_the_keyword_judge_when_semantic_is_not_offered(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.delenv("FEEDBACK_ENABLED", raising=False)
+    client, _engine, _stream = harness
+    rep = new_rep(client)
+    assert rep["judge"] == "keywords"
+    done = say(client, rep, rep["session"], LEARNER_LINE)
+    assert done["node"]["coaching"]["source"] == "deterministic"
