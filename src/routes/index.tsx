@@ -178,6 +178,12 @@ function Dashboard() {
             )}
           </nav>
           <div className="ml-auto flex items-center gap-3 md:ml-0">
+            <Link
+              to="/prepare"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:border-brand hover:text-foreground"
+            >
+              Prepare
+            </Link>
             <button className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground glow transition-transform hover:-translate-y-0.5">
               + New Scenario
             </button>
