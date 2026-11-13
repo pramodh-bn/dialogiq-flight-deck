@@ -158,6 +158,9 @@ export type RepDeps = {
   // Quiet time before Bob's opening line, so the audio device and microphone
   // settle and the first words are not clipped. Zero in tests.
   openingDelayMs?: number;
+  // Called about 400 ms before the opening line, for example to wake the audio
+  // output once more after the microphone has opened.
+  beforeOpening?: () => void;
 };
 
 type BobSegment = {
@@ -271,7 +274,10 @@ export class RepController {
     // events: the contract's Bob events need a node_id.
     this.setPhase("listening");
     const delay = this.deps.openingDelayMs ?? 0;
-    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    const lead = Math.min(400, delay);
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay - lead));
+    this.deps.beforeOpening?.();
+    if (lead > 0) await new Promise((resolve) => setTimeout(resolve, lead));
     if (!this.running()) return;
     this.openingPlaying = true;
     this.setPhase("bob_speaking");

@@ -62,6 +62,7 @@ export function harness(options: { bargeIn?: boolean; openingDelayMs?: number } 
   let release: (() => void) | null = null;
   let gate: Promise<void> | null = null;
   const finished = vi.fn();
+  const warmedUp = vi.fn();
   const classified = { question_type: "open", leading: false, meaning: true } as Classified;
   const api: RepApi = {
     classify: async () => ({ ...classified }),
@@ -125,6 +126,7 @@ export function harness(options: { bargeIn?: boolean; openingDelayMs?: number } 
     onChange: (snapshot) => (last = snapshot),
     bargeIn: options.bargeIn ?? true,
     ...(options.openingDelayMs ? { openingDelayMs: options.openingDelayMs } : {}),
+    beforeOpening: warmedUp,
   });
   return {
     controller,
@@ -133,6 +135,7 @@ export function harness(options: { bargeIn?: boolean; openingDelayMs?: number } 
     posted,
     requests,
     finished,
+    warmedUp,
     classified,
     at: (ms: number) => (clock = ms),
     snap: () => last!,

@@ -81,6 +81,7 @@ describe("opening line", () => {
       await vi.advanceTimersByTimeAsync(600);
       await starting;
       expect(h.speaker.said).toEqual(["You wanted to see me?"]);
+      expect(h.warmedUp).toHaveBeenCalledTimes(1);
       expect(h.snap().phase).toBe("bob_speaking");
     } finally {
       vi.useRealTimers();

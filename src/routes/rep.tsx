@@ -40,7 +40,7 @@ import { createVad, openMic, type Mic } from "@/lib/voice/vad";
 import { WHISPER_WINDOW_MS, type Whisper as WhisperNote } from "@/lib/voice/whispers";
 
 // Quiet time before Bob's first words, so the first sentence is not clipped.
-const OPENING_DELAY_MS = 1000;
+const OPENING_DELAY_MS = 2000;
 
 export const Route = createFileRoute("/rep")({
   head: () => ({
@@ -171,6 +171,7 @@ function RepScreen() {
       onChange: setSnapshot,
       bargeIn: headphones,
       openingDelayMs: OPENING_DELAY_MS,
+      beforeOpening: warmUpSpeech,
     });
     const vad = createVad(
       (tMs) => controller.speechStarted(tMs),
