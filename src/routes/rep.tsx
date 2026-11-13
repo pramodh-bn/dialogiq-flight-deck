@@ -33,10 +33,14 @@ import {
   createSilentSpeaker,
   speechRecognitionSupported,
   speechSynthesisSupported,
+  warmUpSpeech,
   type Recognizer,
 } from "@/lib/voice/speech";
 import { createVad, openMic, type Mic } from "@/lib/voice/vad";
 import { WHISPER_WINDOW_MS, type Whisper as WhisperNote } from "@/lib/voice/whispers";
+
+// Quiet time before Bob's first words, so the first sentence is not clipped.
+const OPENING_DELAY_MS = 1000;
 
 export const Route = createFileRoute("/rep")({
   head: () => ({
@@ -157,6 +161,7 @@ function RepScreen() {
     if (!repApi || !bob || rig.current) return;
     setMicProblem(null);
     setSnapshot(null);
+    warmUpSpeech();
     const speaker = speechSynthesisSupported() ? createBrowserSpeaker() : createSilentSpeaker();
     const controller = new RepController({
       api: repApi,
@@ -165,6 +170,7 @@ function RepScreen() {
       newKey: () => crypto.randomUUID(),
       onChange: setSnapshot,
       bargeIn: headphones,
+      openingDelayMs: OPENING_DELAY_MS,
     });
     const vad = createVad(
       (tMs) => controller.speechStarted(tMs),

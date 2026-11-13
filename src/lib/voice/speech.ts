@@ -119,6 +119,20 @@ export function createBrowserSpeaker(): Speaker {
   });
 }
 
+// Wake the audio output with a silent utterance. The first thing a browser says
+// is often clipped while the device wakes or a headset switches mode when the
+// microphone opens. Call it from the click that starts the rep.
+export function warmUpSpeech(): void {
+  if (!speechSynthesisSupported()) return;
+  try {
+    const utterance = new SpeechSynthesisUtterance(" ");
+    utterance.volume = 0;
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    // Nothing to warm up.
+  }
+}
+
 // When speech synthesis is unavailable Bob's reply is text only. Each sentence
 // is held for a reading time so the rep still has a Bob segment to time.
 export function createSilentSpeaker(msPerChar = 55): Speaker {

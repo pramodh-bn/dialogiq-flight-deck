@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   endsUnfinished,
@@ -7,7 +7,7 @@ import {
   UNFINISHED_GAP_MS,
 } from "@/lib/voice/repController";
 
-import { settle, started } from "./rep-harness";
+import { harness, settle, started } from "./rep-harness";
 
 describe("end of turn", () => {
   it("treats a trailing connector or filler as an unfinished thought", () => {
@@ -67,5 +67,23 @@ describe("end of turn", () => {
     h.controller.tick();
     await settle();
     expect(h.requests).toHaveLength(1);
+  });
+});
+
+describe("opening line", () => {
+  it("waits for the audio to settle before Bob speaks", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness({ openingDelayMs: 1000 });
+      const starting = h.controller.start(2);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(h.speaker.said).toEqual([]);
+      await vi.advanceTimersByTimeAsync(600);
+      await starting;
+      expect(h.speaker.said).toEqual(["You wanted to see me?"]);
+      expect(h.snap().phase).toBe("bob_speaking");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

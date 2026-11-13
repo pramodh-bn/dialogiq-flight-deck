@@ -53,7 +53,7 @@ const session = (revision: number, head: number | null) =>
 
 type Turn = { sentences: string[]; fail?: RepStreamError; nodeId: number; deflection?: boolean };
 
-export function harness(options: { bargeIn?: boolean } = {}) {
+export function harness(options: { bargeIn?: boolean; openingDelayMs?: number } = {}) {
   let clock = 0;
   let keys = 0;
   const turns: Turn[] = [];
@@ -124,6 +124,7 @@ export function harness(options: { bargeIn?: boolean } = {}) {
     newKey: () => `key-${(keys += 1)}`,
     onChange: (snapshot) => (last = snapshot),
     bargeIn: options.bargeIn ?? true,
+    ...(options.openingDelayMs ? { openingDelayMs: options.openingDelayMs } : {}),
   });
   return {
     controller,

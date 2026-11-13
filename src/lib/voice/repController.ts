@@ -155,6 +155,9 @@ export type RepDeps = {
   // False when the learner uses loudspeakers: Bob's audio would be heard by
   // the microphone, so nothing the microphone hears while Bob speaks counts.
   bargeIn: boolean;
+  // Quiet time before Bob's opening line, so the audio device and microphone
+  // settle and the first words are not clipped. Zero in tests.
+  openingDelayMs?: number;
 };
 
 type BobSegment = {
@@ -266,6 +269,10 @@ export class RepController {
     this.lines = [{ who: "bob", text: this.rep.opening_message }];
     // The opening line is not a saved turn, so it has no node and no timing
     // events: the contract's Bob events need a node_id.
+    this.setPhase("listening");
+    const delay = this.deps.openingDelayMs ?? 0;
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    if (!this.running()) return;
     this.openingPlaying = true;
     this.setPhase("bob_speaking");
     this.deps.speaker.say(this.rep.opening_message);
