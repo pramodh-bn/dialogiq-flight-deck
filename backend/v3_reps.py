@@ -131,6 +131,10 @@ class EventsRequest(WireModel):
     events: list[EventIn] = Field(min_length=1, max_length=MAX_EVENTS_PER_CALL)
 
 
+class ClassifyRequest(WireModel):
+    user_message: str = Field(min_length=1, max_length=4000)
+
+
 class FinishRequest(WireModel):
     duration_ms: int = Field(strict=True, ge=1, le=MAX_REP_MS)
 
@@ -178,6 +182,34 @@ def latency_rows(db: DbSession, rep: VoiceRep) -> list[dict]:
     return rows
 
 
+WHISPER_LIMIT_MS = 2000
+
+
+def whisper_latency(db: DbSession, rep: VoiceRep) -> dict:
+    """How long whispers took to appear, from their trigger to being visible.
+
+    The launch blocker (contract v3-r1) is that at least 90% of whispers appear
+    within 2000 ms of their trigger. ``within_limit`` is null with no whispers.
+    """
+    gaps = sorted(
+        max(0, event.t_ms - event.data["trigger_ms"])
+        for event in db.scalars(
+            select(VoiceEvent).where(
+                VoiceEvent.rep_id == rep.id, VoiceEvent.kind == "whisper_shown"
+            )
+        )
+        if isinstance(event.data.get("trigger_ms"), int)
+    )
+    within = sum(1 for gap in gaps if gap <= WHISPER_LIMIT_MS)
+    return {
+        "shown": len(gaps),
+        "within_limit": within,
+        "limit_ms": WHISPER_LIMIT_MS,
+        "median_ms": gaps[len(gaps) // 2] if gaps else None,
+        "max_ms": gaps[-1] if gaps else None,
+    }
+
+
 def rep_dto(db: DbSession, rep: VoiceRep) -> dict:
     return {
         "rep_id": rep.id,
@@ -190,6 +222,7 @@ def rep_dto(db: DbSession, rep: VoiceRep) -> dict:
         "score_ruleset": rep.score_ruleset,
         "scorecard": rep.scorecard,
         "latency": latency_rows(db, rep),
+        "whisper_latency": whisper_latency(db, rep),
     }
 
 
@@ -550,6 +583,21 @@ def build_router(db_dep: object, key_dep: object) -> APIRouter:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @router.post("/classify")
+    def classify(payload: ClassifyRequest) -> dict:
+        """Question type of one utterance, with no model call and nothing saved.
+
+        The browser asks this in parallel with the turn so a whisper can appear
+        long before Bob's reply (contract v3-r1, whisper latency).
+        """
+        found = v3_score.classify_spoken(payload.user_message)
+        return {
+            "question_type": found["type"],
+            "leading": found["leading"],
+            "meaning": found["meaning"],
+            "ruleset": found["ruleset"],
+        }
 
     @router.post("/reps/{rep_id}/events")
     def events(

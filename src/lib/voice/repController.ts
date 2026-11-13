@@ -16,11 +16,81 @@ import {
   type VoiceTurnRequest,
 } from "./repApi";
 import type { Speaker } from "./speech";
+import {
+  MONOLOGUE_MS,
+  offer,
+  ruleForTurn,
+  startedTooSoon,
+  type Whisper,
+  type WhisperRule,
+} from "./whispers";
 
 // Contract: Bob's audio is cut once the learner has spoken over it this long.
 export const BARGE_IN_MS = 500;
 // Quiet time after the learner's last word before their turn is sent.
-export const TURN_GAP_MS = 700;
+// People pause mid-thought for a second or more, so this is generous.
+export const TURN_GAP_MS = 1200;
+// Wait longer when the last words sound unfinished ("and", "so", "um").
+export const UNFINISHED_GAP_MS = 2400;
+
+const UNFINISHED_ENDINGS = new Set([
+  "and",
+  "but",
+  "so",
+  "or",
+  "because",
+  "cause",
+  "if",
+  "when",
+  "while",
+  "that",
+  "which",
+  "to",
+  "the",
+  "a",
+  "an",
+  "of",
+  "for",
+  "with",
+  "about",
+  "like",
+  "um",
+  "uh",
+  "erm",
+  "hmm",
+  "well",
+  "then",
+  "also",
+  "my",
+  "your",
+  "i",
+  "you",
+  "is",
+  "was",
+  "are",
+  "were",
+  "what",
+  "how",
+  "why",
+]);
+
+// True when a transcript stops where a sentence is unlikely to end. Speech
+// recognition often omits punctuation, so the last word decides.
+export function endsUnfinished(text: string): boolean {
+  const last = text
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .pop()
+    ?.replace(/[^a-z']/g, "");
+  if (/[,;:]$/.test(text.trim())) return true;
+  return !!last && UNFINISHED_ENDINGS.has(last);
+}
+
+// How long the learner must be quiet before this transcript is sent.
+export function turnGapFor(text: string): number {
+  return endsUnfinished(text) ? UNFINISHED_GAP_MS : TURN_GAP_MS;
+}
 // A turn that fails in a way the server calls retryable is resent this many
 // times before the learner is asked. In a spoken rep a button is a long stop.
 export const AUTO_RETRIES = 2;
@@ -71,6 +141,8 @@ export type RepSnapshot = {
   // for the coach panel: stance, needs uncovered, turn feedback and hints.
   session: PracticeSession | null;
   chain: TurnNode[];
+  // The latest coach whisper; the screen hides it once its window has passed.
+  whisper: Whisper | null;
 };
 
 export type RepDeps = {
@@ -130,6 +202,16 @@ export class RepController {
   private flight: Flight | null = null;
   private abort: AbortController | null = null;
 
+  private whisper: Whisper | null = null;
+  private lastWhisperMs: number | null = null;
+  // End of Bob's audio when his last reply deflected; cleared once used.
+  private deflectionEnd: number | null = null;
+  private replyDeflects = false;
+  private lastBobEnd: number | null = null;
+  // Learner speech since Bob last spoke or a question was asked, for monologues.
+  private spokenMs = 0;
+  private monologueShown = false;
+
   private seq = 0;
   private queue: VoiceEvent[] = [];
   private flushing: Promise<void> | null = null;
@@ -154,6 +236,7 @@ export class RepController {
       timings: this.timings.map((timing) => ({ ...timing })),
       session: this.session,
       chain: this.chain,
+      whisper: this.whisper,
     };
   }
 
@@ -197,12 +280,15 @@ export class RepController {
     this.speechStart = tMs;
     this.pendingStart ??= tMs;
     this.record("learner_speech_start", tMs);
+    if (startedTooSoon(tMs, this.deflectionEnd)) this.showWhisper("no_pause", tMs);
+    this.deflectionEnd = null;
     this.emit();
   }
 
   speechEnded(tMs: number): void {
     if (!this.learnerSpeaking) return;
     this.learnerSpeaking = false;
+    if (this.speechStart !== null) this.spokenMs += Math.max(0, tMs - this.speechStart);
     this.speechStart = null;
     this.lastSpeechEnd = tMs;
     this.record("learner_speech_end", tMs);
@@ -248,7 +334,17 @@ export class RepController {
       this.speechStart !== null &&
       now - this.speechStart >= BARGE_IN_MS
     ) {
+      // Only the learner talking over Bob is an interruption; when Bob began
+      // while the learner was already speaking, Bob cut in, so no whisper.
+      if (this.bob && this.speechStart > this.bob.start) this.showWhisper("interruption", now);
       this.deps.speaker.cancel();
+    }
+    if (this.learnerSpeaking && this.speechStart !== null && !this.monologueShown) {
+      const spoken = this.spokenMs + (now - this.speechStart);
+      if (spoken >= MONOLOGUE_MS) {
+        this.monologueShown = true;
+        this.showWhisper("monologue", now - (spoken - MONOLOGUE_MS));
+      }
     }
     if (
       this.pending &&
@@ -256,7 +352,7 @@ export class RepController {
       !this.flight &&
       !this.bobPlaying &&
       this.phase !== "turn_failed" &&
-      now - this.lastSpeechEnd >= TURN_GAP_MS
+      now - this.lastSpeechEnd >= turnGapFor(this.pending)
     ) {
       this.send();
     }
@@ -338,7 +434,36 @@ export class RepController {
     };
     this.lines.push(line);
     this.timings.push(flight.timing);
+    void this.classifyForWhisper(text, this.lastSpeechEnd);
     void this.run(flight);
+  }
+
+  // Ask the server what kind of question this was while Bob's reply is still
+  // being written, so a whisper can appear within seconds of the learner's last
+  // word. A failure only means no whisper for this turn.
+  private async classifyForWhisper(text: string, triggerMs: number): Promise<void> {
+    try {
+      const facts = await this.deps.api.classify(text);
+      if (!this.running()) return;
+      if (facts.question_type === "open" || facts.question_type === "closed") {
+        this.spokenMs = 0;
+        this.monologueShown = false;
+      }
+      const rule = ruleForTurn(facts);
+      if (rule) this.showWhisper(rule, triggerMs);
+    } catch {
+      // No whisper for this turn.
+    }
+  }
+
+  private showWhisper(rule: WhisperRule, triggerMs: number): void {
+    const now = this.t();
+    const shown = offer(rule, Math.min(triggerMs, now), now, this.lastWhisperMs);
+    if (!shown) return;
+    this.lastWhisperMs = now;
+    this.whisper = shown;
+    this.record("whisper_shown", now, { rule, trigger_ms: shown.triggerMs });
+    this.emit();
   }
 
   private async run(flight: Flight): Promise<void> {
@@ -371,6 +496,12 @@ export class RepController {
       reply.text = done.node.character_text;
       reply.partial = false;
       flight.line.facts = done.turn;
+      this.replyDeflects = done.turn.deflection;
+      // Bob's audio can end before `done` arrives; then the deflection ended then.
+      if (this.replyDeflects && !this.bobPlaying && this.lastBobEnd !== null) {
+        this.deflectionEnd = this.lastBobEnd;
+        this.replyDeflects = false;
+      }
       this.branchId = done.session.active_branch_id;
       this.headNodeId = done.node.id;
       this.revision = done.session.revision;
@@ -416,6 +547,8 @@ export class RepController {
       return;
     }
     const now = this.t();
+    this.spokenMs = 0;
+    this.monologueShown = false;
     this.bob = { start: now, end: null, interrupted: false, nodeId: this.audioNodeId };
     this.audioNodeId = null;
     this.replyAudioSeen = true;
@@ -431,6 +564,9 @@ export class RepController {
     if (!wasOpening && this.bob) {
       this.bob.end = this.t();
       this.bob.interrupted = interrupted;
+      this.lastBobEnd = this.bob.end;
+      if (this.replyDeflects && !interrupted) this.deflectionEnd = this.bob.end;
+      this.replyDeflects = false;
       this.logBob();
     }
     if (this.phase === "bob_speaking") this.setPhase(this.flight ? "bob_thinking" : "listening");

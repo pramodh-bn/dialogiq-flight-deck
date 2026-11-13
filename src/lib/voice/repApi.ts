@@ -42,6 +42,15 @@ export type TurnLatency = {
   voice_round_trip_ms: number | null;
 };
 
+// How long whispers took to appear after their trigger (launch blocker: 90% within limit).
+export type WhisperLatency = {
+  shown: number;
+  within_limit: number;
+  limit_ms: number;
+  median_ms: number | null;
+  max_ms: number | null;
+};
+
 export type RepResponse = {
   rep_id: number;
   rep_number: number;
@@ -53,6 +62,7 @@ export type RepResponse = {
   score_ruleset: string;
   scorecard: Scorecard | null;
   latency: TurnLatency[];
+  whisper_latency?: WhisperLatency;
 };
 
 export type RepCreated = {
@@ -81,6 +91,9 @@ export type TurnFacts = {
   deflection: boolean;
 };
 
+// What /api/v3/classify says about one utterance, with no model call.
+export type Classified = { question_type: QuestionType; leading: boolean; meaning: boolean };
+
 export type TurnDone = { node: TurnNode; session: PracticeSession; turn: TurnFacts };
 
 // The stream ended with `event: error`, or closed before `done`. Nothing was saved.
@@ -103,6 +116,7 @@ export type RepApi = {
     onSentence: (index: number, text: string) => void,
     signal?: AbortSignal,
   ): Promise<TurnDone>;
+  classify(text: string): Promise<Classified>;
   postEvents(
     repId: number,
     events: VoiceEvent[],
@@ -137,6 +151,16 @@ export function createRepApi(baseUrl: string, fetchImpl: typeof fetch = fetch): 
 
   return {
     createRep: (scenarioId, key) => post("/api/v3/reps", { scenario_id: scenarioId }, key),
+    classify: async (text) => {
+      const path = "/api/v3/classify";
+      const res = await fetchImpl(`${root}${path}`, {
+        method: "POST",
+        body: JSON.stringify({ user_message: text }),
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+      });
+      if (!res.ok) throw new ApiError(res.status, path, await res.text());
+      return (await res.json()) as Classified;
+    },
     postEvents: (repId, events, key) => post(`/api/v3/reps/${repId}/events`, { events }, key),
     finish: (repId, durationMs, key) =>
       post(`/api/v3/reps/${repId}/finish`, { duration_ms: durationMs }, key),

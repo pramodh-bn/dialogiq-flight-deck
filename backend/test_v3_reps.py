@@ -511,3 +511,75 @@ def test_failed_turn_records_no_latency(harness: Harness):
         headers=key(),
     )
     assert count(engine, VoiceTurnLatency) == 0
+
+
+def test_classify_answers_without_a_model_call_or_saving(harness: Harness):
+    client, engine, stream = harness
+    before = count(engine, ConversationNode)
+    response = client.post(
+        "/api/v3/classify", json={"user_message": "what's been hard for you"}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["question_type"] == "open"
+    assert body["meaning"] is True
+    assert body["ruleset"].startswith("v3-score-r1")
+    assert stream.calls == []
+    assert count(engine, ConversationNode) == before
+
+
+def test_classify_refuses_empty_and_unknown_fields(harness: Harness):
+    client, _engine, _stream = harness
+    assert client.post("/api/v3/classify", json={"user_message": ""}).status_code == 422
+    bad = {"user_message": "hi", "extra": 1}
+    assert client.post("/api/v3/classify", json=bad).status_code == 422
+
+
+def test_finish_reports_whisper_latency_from_trigger_to_shown(harness: Harness):
+    client, _engine, _stream = harness
+    rep = new_rep(client)
+    events = [
+        {
+            "seq": 1,
+            "t_ms": 5000,
+            "kind": "whisper_shown",
+            "rule": "leading",
+            "trigger_ms": 4200,
+        },
+        {
+            "seq": 2,
+            "t_ms": 20_000,
+            "kind": "whisper_shown",
+            "rule": "no_pause",
+            "trigger_ms": 17_000,
+        },
+    ]
+    response = client.post(
+        f"/api/v3/reps/{rep['rep_id']}/events", json={"events": events}, headers=key()
+    )
+    assert response.status_code == 200, response.text
+    done = client.post(
+        f"/api/v3/reps/{rep['rep_id']}/finish",
+        json={"duration_ms": 60_000},
+        headers=key(),
+    )
+    assert done.status_code == 200, done.text
+    assert done.json()["rep"]["whisper_latency"] == {
+        "shown": 2,
+        "within_limit": 1,
+        "limit_ms": 2000,
+        "median_ms": 3000,
+        "max_ms": 3000,
+    }
+
+
+def test_whisper_latency_is_empty_without_whispers(harness: Harness):
+    client, _engine, _stream = harness
+    rep = new_rep(client)
+    done = client.post(
+        f"/api/v3/reps/{rep['rep_id']}/finish",
+        json={"duration_ms": 1000},
+        headers=key(),
+    )
+    assert done.json()["rep"]["whisper_latency"]["shown"] == 0
+    assert done.json()["rep"]["whisper_latency"]["median_ms"] is None

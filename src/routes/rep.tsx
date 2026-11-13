@@ -19,6 +19,7 @@ import {
   type RepResponse,
   type Scorecard,
   type TurnLatency,
+  type WhisperLatency,
 } from "@/lib/voice/repApi";
 import {
   RepController,
@@ -35,6 +36,7 @@ import {
   type Recognizer,
 } from "@/lib/voice/speech";
 import { createVad, openMic, type Mic } from "@/lib/voice/vad";
+import { WHISPER_WINDOW_MS, type Whisper as WhisperNote } from "@/lib/voice/whispers";
 
 export const Route = createFileRoute("/rep")({
   head: () => ({
@@ -365,6 +367,7 @@ function RepScreen() {
             </section>
 
             <aside className="space-y-4">
+              <WhisperBanner whisper={snapshot.whisper} elapsedMs={snapshot.elapsedMs} />
               <div className="bento p-5 text-center">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   {running ? "Time left" : "Rep length"}
@@ -418,6 +421,7 @@ function RepScreen() {
           <>
             <ScorecardView scorecard={snapshot.result.scorecard} timings={snapshot.timings} />
             <LatencyTable rows={snapshot.result.latency ?? []} />
+            <WhisperLatencyCard latency={snapshot.result.whisper_latency} />
           </>
         )}
 
@@ -625,6 +629,44 @@ function ms(value: number | null): string {
   return value === null ? "—" : `${value.toLocaleString()} ms`;
 }
 
+// The live coach whisper, shown for the length of its window, then gone.
+function WhisperBanner({ whisper, elapsedMs }: { whisper: WhisperNote | null; elapsedMs: number }) {
+  const visible = whisper !== null && elapsedMs - whisper.shownMs < WHISPER_WINDOW_MS;
+  return (
+    <div role="status" aria-live="polite" className="min-h-0">
+      {visible && (
+        <p
+          data-testid="whisper"
+          className="rounded-lg bg-accent/10 px-4 py-3 text-sm font-medium ring-1 ring-accent/40"
+        >
+          <span className="mb-0.5 block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Coach
+          </span>
+          {whisper.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function WhisperLatencyCard({ latency }: { latency: WhisperLatency | undefined }) {
+  if (!latency || latency.shown === 0) return null;
+  const share = Math.round((latency.within_limit / latency.shown) * 100);
+  return (
+    <section className="bento p-4 text-sm" aria-label="Whisper timing">
+      <h2 className="mb-1 text-sm font-semibold">How fast the coach whispered</h2>
+      <p className="text-xs text-muted-foreground">
+        From the moment of the mistake to the whisper showing. The launch target is 90% within{" "}
+        {seconds(latency.limit_ms)}.
+      </p>
+      <p className="mt-2 tabular-nums">
+        {latency.within_limit} of {latency.shown} within {seconds(latency.limit_ms)} ({share}%) ·
+        median {ms(latency.median_ms)} · slowest {ms(latency.max_ms)}
+      </p>
+    </section>
+  );
+}
+
 function LatencyTable({ rows }: { rows: TurnLatency[] }) {
   if (!rows.length) return null;
   const columns = [
@@ -641,7 +683,8 @@ function LatencyTable({ rows }: { rows: TurnLatency[] }) {
       <p className="mb-3 text-xs text-muted-foreground">
         Model times are measured on the server, from asking the model to its first full sentence and
         to its last. The round trip is from your last word to Bob's voice starting; it includes the{" "}
-        {seconds(TURN_GAP_MS)} wait that confirms you have finished.
+        {seconds(TURN_GAP_MS)} wait (longer after an unfinished sentence) that confirms you have
+        finished.
       </p>
       <table className="w-full min-w-[460px] text-left text-sm tabular-nums">
         <thead className="text-xs text-muted-foreground">
