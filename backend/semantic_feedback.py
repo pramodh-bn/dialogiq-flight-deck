@@ -362,6 +362,76 @@ def bounded(provider: Provider, context: dict, timeout: float) -> Decision:
     return value
 
 
+def short(quote: str, limit: int = 90) -> str:
+    """A quote trimmed for a note, at a word boundary."""
+    quote = " ".join(quote.split())
+    if len(quote) > limit:
+        return quote[:limit].rsplit(" ", 1)[0] + " ..."
+    return quote.rstrip(".!?")
+
+
+def explain(decision: Decision, needs: list[dict], revealed: int) -> list[dict]:
+    """Plain notes on one turn, built only from checked evidence and counts.
+
+    Says what the learner did, what Bob disclosed and what is still open. It never
+    names an undisclosed need and never claims a real person would react alike.
+    """
+    notes: list[dict] = []
+
+    def add(kind: str, text: str) -> None:
+        notes.append({"kind": kind, "text": text})
+
+    if decision.pressure:
+        add(
+            "warn",
+            f"You pressed Bob: “{short(decision.pressure_quote)}”. "
+            "Blame or demands usually close him down, even when he answers.",
+        )
+    if decision.question_type == "open" and not decision.pressure:
+        add(
+            "good",
+            f"You invited Bob to explain: “{short(decision.question_quote)}”.",
+        )
+    elif decision.question_type == "closed":
+        add(
+            "tip",
+            f"You asked a yes/no or fixed-answer question: "
+            f"“{short(decision.question_quote)}”. It checks a fact "
+            "but leaves Bob little room to add his own view.",
+        )
+    if decision.acknowledgment:
+        add(
+            "good",
+            f"You named his concern or difficulty: "
+            f"“{short(decision.acknowledgment_quote)}”.",
+        )
+    if decision.stance_signal == "repair":
+        add("good", "You repaired the exchange after a rough moment.")
+    if decision.revealed_need:
+        title = next(
+            (n["title"] for n in needs if n["id"] == decision.revealed_need.need_id),
+            "a concern",
+        )
+        verb = "still told you" if decision.pressure else "told you"
+        add(
+            "good",
+            f"Bob {verb} something new ({title}): "
+            f"“{short(decision.revealed_need.persona_quote)}”.",
+        )
+    else:
+        add("tip", "Bob said nothing beyond what he had already shared.")
+    left = len(needs) - revealed
+    if left:
+        add(
+            "tip",
+            f"Still unspoken: {left} of {len(needs)} concerns. Ask what matters to "
+            "him, then reflect what you heard before proposing a fix.",
+        )
+    else:
+        add("tip", "Bob has now shared every concern; move on to agreeing next steps.")
+    return notes
+
+
 def evaluate(
     previous: dict,
     learner: str,
@@ -486,10 +556,12 @@ def evaluate(
         question_type=decision.question_type,
         empathy=decision.acknowledgment,
         leading=decision.pressure,
-        outcome="breakthrough"
-        if decision.revealed_need
-        else "deadend"
+        # Pressure is a dead end even when Bob answers; the note says what he shared.
+        outcome="deadend"
         if decision.pressure
+        else "breakthrough"
+        if decision.revealed_need
         else "neutral",
+        whispers=explain(decision, needs, len(state["revealed_needs"])),
     )
     return state, coaching
