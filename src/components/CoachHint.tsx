@@ -4,12 +4,19 @@ const sourceLabel = (hint: Hint) => (hint.source === "meta" ? "AI coach" : "Basi
 
 function HintBody({ hint }: { hint: Hint }) {
   return (
-    <div className="space-y-2 text-sm">
-      <p className="text-xs font-semibold text-muted-foreground">Try saying</p>
-      <p className="rounded-md bg-secondary/50 px-3 py-2 font-medium">{hint.example}</p>
-      <p className="text-xs text-muted-foreground">
-        <span className="font-semibold">{hint.approach}</span> — {hint.reason}
-      </p>
+    <div className="space-y-3 text-sm">
+      <div className="space-y-1">
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Try saying</p>
+        <p className="rounded-md bg-secondary/50 px-3 py-2 font-medium">{hint.example}</p>
+      </div>
+      <div className="space-y-1" data-testid="hint-move">
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">The move</p>
+        <p className="font-semibold leading-snug">{hint.approach}</p>
+      </div>
+      <div className="space-y-1" data-testid="hint-why">
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Why this works</p>
+        <p className="leading-relaxed">{hint.reason}</p>
+      </div>
     </div>
   );
 }

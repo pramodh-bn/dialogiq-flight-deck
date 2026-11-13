@@ -875,6 +875,19 @@ describe("CoachHint", () => {
     expect(screen.queryByText(fixtures.success.hint.example)).not.toBeInTheDocument();
   });
 
+  it("shows the move and the reason as labelled, readable blocks", () => {
+    render(<CoachHint {...base} hints={[fixtures.success.hint]} />);
+
+    expect(screen.getByText("The move")).toBeInTheDocument();
+    expect(screen.getByText("Why this works")).toBeInTheDocument();
+    expect(screen.getByTestId("hint-move")).toHaveTextContent(fixtures.success.hint.approach);
+    expect(screen.getByTestId("hint-why")).toHaveTextContent(fixtures.success.hint.reason);
+    expect(screen.getByTestId("hint-why").querySelector("p:last-child")).not.toHaveClass(
+      "text-xs",
+      "text-muted-foreground",
+    );
+  });
+
   it("shows the hint, not the spinner, once it has arrived", () => {
     render(<CoachHint {...base} hints={[fixtures.success.hint]} />);
 
