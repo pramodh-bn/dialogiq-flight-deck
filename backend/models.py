@@ -242,3 +242,20 @@ class VoiceEvent(Base):
     t_ms: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(32))
     data: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class VoiceTurnLatency(Base):
+    """How long Bob's model took on one saved voice turn, timed by the server."""
+
+    __tablename__ = "voice_turn_latency"
+    __table_args__: ClassVar[dict[str, bool]] = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rep_id: Mapped[int] = mapped_column(ForeignKey("voice_reps.id"), index=True)
+    node_id: Mapped[int] = mapped_column(
+        ForeignKey("conversation_nodes.id"), unique=True
+    )
+    # Browser time the learner stopped speaking, ms since the rep started.
+    speech_end_ms: Mapped[int] = mapped_column(Integer)
+    model_first_sentence_ms: Mapped[int] = mapped_column(Integer)
+    model_total_ms: Mapped[int] = mapped_column(Integer)

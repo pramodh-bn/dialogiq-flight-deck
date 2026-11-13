@@ -284,6 +284,14 @@ function Dashboard() {
                       </>
                     )}
                   </div>
+                  {s.name.startsWith("Bob:") && (
+                    <Link
+                      to="/rep"
+                      className="mt-2 block rounded-lg border border-accent/40 px-3 py-2 text-center text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+                    >
+                      Three-minute voice rep
+                    </Link>
+                  )}
                 </article>
               ))}
             </div>

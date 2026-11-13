@@ -166,9 +166,29 @@ Returns `RepResponse[]` oldest first, for the rep 1 to rep 9 trend.
   "duration_ms": 180000,
   "finished": true,
   "score_ruleset": "v3-score-r1",
-  "scorecard": { "...": "Scorecard, null until finished" }
+  "scorecard": { "...": "Scorecard, null until finished" },
+  "latency": [
+    {
+      "node_id": 88,
+      "model_first_sentence_ms": 640,
+      "model_total_ms": 1480,
+      "voice_round_trip_ms": 1650
+    }
+  ]
 }
 ```
+
+`latency` has one row per saved turn, oldest first, and is filled in as turns
+are saved, before the rep is finished. It is a measurement, not part of the
+scorecard.
+
+- `model_first_sentence_ms` and `model_total_ms` are timed by the server, from
+  asking Bob's model to its first complete sentence and to the end of its
+  reply. A replayed turn keeps the times of its first run.
+- `voice_round_trip_ms` is the first `bob_audio_start` event for that node
+  minus the turn's `speech_end_ms`, both on the browser's clock. It includes
+  the client's end-of-turn wait. It is `null` when that audio never started,
+  its event was not logged, or the difference is negative.
 
 ## Scorecard, ruleset `v3-score-r1`
 

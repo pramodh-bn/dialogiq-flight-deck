@@ -26,6 +26,11 @@ def create_sqlite_engine(url: str, **options: object) -> Engine:
         cursor = connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA busy_timeout=30000")
+        # Write-ahead logging: a reader never blocks a writer or the reverse.
+        # Without it one idle read transaction, such as an abandoned voice
+        # stream, made every write wait 30 seconds and fail as "locked".
+        # In-memory databases ignore the request.
+        cursor.execute("PRAGMA journal_mode=WAL")
         cursor.close()
 
     return sqlite_engine
