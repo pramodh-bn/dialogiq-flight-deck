@@ -9,11 +9,13 @@ import json
 import logging
 import re
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
+import anyio
 from fastapi import APIRouter, Path, Request
+from fastapi.concurrency import iterate_in_threadpool, run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import Field, field_validator, model_validator
 from sqlalchemy import func, select
@@ -487,6 +489,27 @@ def open_turn(
     return stream()
 
 
+async def closing_stream(events: Iterator[str]) -> AsyncIterator[str]:
+    """Send a turn's events and close its generator as soon as sending stops.
+
+    When the learner speaks over Bob or leaves, the response is cancelled
+    mid-stream. Left alone, the generator would keep its idempotency lease
+    and database session until garbage collection got to it.
+    """
+    try:
+        async for chunk in iterate_in_threadpool(events):
+            yield chunk
+    finally:
+        close = getattr(events, "close", None)
+        if callable(close):
+            with anyio.CancelScope(shield=True):
+                try:
+                    await run_in_threadpool(close)
+                except ValueError:
+                    # Still running in a worker thread; it ends on its own.
+                    pass
+
+
 def build_router(db_dep: object, key_dep: object) -> APIRouter:
     """Routes under ``/api/v3``, using the application's own dependencies."""
     router = APIRouter(prefix="/api/v3")
@@ -523,7 +546,7 @@ def build_router(db_dep: object, key_dep: object) -> APIRouter:
             state.session_factory, rep_id, payload, key, state.stream_provider
         )
         return StreamingResponse(
-            events,
+            closing_stream(events),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
