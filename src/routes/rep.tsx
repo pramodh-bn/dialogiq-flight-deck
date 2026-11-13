@@ -520,13 +520,7 @@ function RepCoach({ snapshot, live }: { snapshot: RepSnapshot; live: boolean }) 
       )}
       {live && (
         <>
-          <CoachHint
-            hints={coach.hints}
-            earlier={coach.pending ? coach.earlier?.hint : undefined}
-            earlierLabel="From an earlier turn"
-            pending={coach.pending}
-            failure={coach.failure}
-          />
+          <CoachHint hints={coach.hints} pending={coach.pending} failure={coach.failure} />
           <button
             type="button"
             disabled={waiting || coach.pending || coach.exhausted}

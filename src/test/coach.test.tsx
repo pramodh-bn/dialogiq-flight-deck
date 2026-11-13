@@ -834,7 +834,7 @@ describe("useCoach", () => {
 });
 
 describe("CoachHint", () => {
-  const base = { hints: [], earlierLabel: "From turn 2", pending: false, failure: null };
+  const base = { hints: [], pending: false, failure: null };
 
   it("labels provider and fallback hints honestly", () => {
     const { rerender } = render(<CoachHint {...base} hints={[fixtures.success.hint]} />);
@@ -861,25 +861,24 @@ describe("CoachHint", () => {
     expect(screen.getByText("<img src=x onerror=alert(1)>")).toBeInTheDocument();
   });
 
-  it("labels an earlier hint for its turn while the next one loads", () => {
-    render(<CoachHint {...base} pending earlier={fixtures.success.hint} />);
+  it("shows a spinner message while a hint loads", () => {
+    render(<CoachHint {...base} pending />);
 
-    expect(screen.getByText("From turn 2")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Getting a hint…");
+    expect(screen.getByTestId("hint-loading")).toBeInTheDocument();
   });
 
-  it("does not present an earlier hint as the current one", () => {
-    render(<CoachHint {...base} pending hints={[]} earlier={fixtures.success.hint} />);
+  it("hides the previous hint while the next one loads", () => {
+    render(<CoachHint {...base} pending hints={[fixtures.success.hint]} />);
 
-    expect(screen.getByRole("status")).not.toHaveTextContent(fixtures.success.hint.approach);
-  });
-
-  it("removes the old suggestion once the learner has moved on and no replacement is loading", () => {
-    const { rerender } = render(<CoachHint {...base} pending earlier={fixtures.success.hint} />);
-    expect(screen.getByText(fixtures.success.hint.example)).toBeInTheDocument();
-
-    rerender(<CoachHint {...base} earlier={fixtures.success.hint} />);
+    expect(screen.getByTestId("hint-loading")).toBeInTheDocument();
     expect(screen.queryByText(fixtures.success.hint.example)).not.toBeInTheDocument();
-    expect(screen.getByText(/Ask for a hint at any point/)).toBeInTheDocument();
+  });
+
+  it("shows the hint, not the spinner, once it has arrived", () => {
+    render(<CoachHint {...base} hints={[fixtures.success.hint]} />);
+
+    expect(screen.queryByTestId("hint-loading")).not.toBeInTheDocument();
+    expect(screen.getByText(fixtures.success.hint.example)).toBeInTheDocument();
   });
 });

@@ -22,18 +22,30 @@ function SourceLabel({ hint }: { hint: Hint }) {
   );
 }
 
+// A hint is on its way. The old hint is hidden meanwhile so nobody reads it as
+// the answer to the turn they just played.
+function Loading() {
+  return (
+    <div
+      data-testid="hint-loading"
+      className="flex items-center gap-3 rounded-lg bg-accent/10 p-3 ring-1 ring-accent/40"
+    >
+      <span
+        aria-hidden="true"
+        className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"
+      />
+      <p className="text-sm font-semibold">Getting a hint…</p>
+    </div>
+  );
+}
+
 export function CoachHint({
   hints,
-  earlier,
-  earlierLabel,
   pending,
   failure,
 }: {
   // Saved hints at the current head, attempt 1 first.
   hints: Hint[];
-  // A hint from before this turn, shown only while its replacement is loading.
-  earlier?: Hint | undefined;
-  earlierLabel: string;
   pending: boolean;
   failure: string | null;
 }) {
@@ -43,9 +55,9 @@ export function CoachHint({
   return (
     <div className="space-y-3">
       <div role="status" aria-live="polite" className="space-y-3">
-        {pending && <p className="text-sm text-muted-foreground">Getting a hint…</p>}
+        {pending && <Loading />}
         {failure && <p className="text-sm text-warning">{failure}</p>}
-        {current && (
+        {current && !pending && (
           <div className="space-y-2 rounded-lg p-3 ring-1 ring-accent/30">
             <SourceLabel hint={current} />
             <HintBody hint={current} />
@@ -57,7 +69,7 @@ export function CoachHint({
           Stuck on what to say next? Ask for a hint at any point.
         </p>
       )}
-      {first && (
+      {first && !pending && (
         <details className="rounded-lg p-3 text-sm ring-1 ring-border">
           <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
             First approach
@@ -67,13 +79,6 @@ export function CoachHint({
             <HintBody hint={first} />
           </div>
         </details>
-      )}
-      {!current && earlier && pending && (
-        <div className="space-y-2 rounded-lg p-3 opacity-70 ring-1 ring-border">
-          <p className="text-xs font-semibold text-muted-foreground">{earlierLabel}</p>
-          <SourceLabel hint={earlier} />
-          <HintBody hint={earlier} />
-        </div>
       )}
     </div>
   );
