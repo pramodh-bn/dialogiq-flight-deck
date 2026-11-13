@@ -885,6 +885,8 @@ The user-authorized, versioned Bob next-move candidate is documented in
 routes, payloads, port bindings, context privacy and provider/fallback behavior.
 New Bob sessions opt in through server-side `COACH_NEXT_MOVE_ENABLED=1` and pin
 the internal prompt revision; saved sessions/hints are not migrated.
+Since Nov 12 the same flag also pins `next-move-r1` on new sessions for the
+other personas; routes and payloads are unchanged.
 
 
 # V3 voice rep (draft, not yet served)
