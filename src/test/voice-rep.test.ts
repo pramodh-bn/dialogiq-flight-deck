@@ -5,14 +5,16 @@ import type { PracticeSession, TurnNode } from "@/lib/api/types";
 import {
   createRepApi,
   RepStreamError,
+  type Classified,
   type RepApi,
   type RepCreated,
   type TurnDone,
   type VoiceEvent,
 } from "@/lib/voice/repApi";
-import { RepController, type RepSnapshot } from "@/lib/voice/repController";
 import { readSse } from "@/lib/voice/sse";
-import { createQueuedSpeaker, type Speaker } from "@/lib/voice/speech";
+import { createQueuedSpeaker } from "@/lib/voice/speech";
+
+import { fakeSpeaker, harness, settle, started } from "./rep-harness";
 import { createVad } from "@/lib/voice/vad";
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
@@ -141,148 +143,6 @@ describe("createVad", () => {
   });
 });
 
-// A speaker whose audio the test starts and ends by hand.
-function fakeSpeaker() {
-  const said: string[] = [];
-  let playing = false;
-  let open = false;
-  const speaker: Speaker & { said: string[]; end(): void; playing(): boolean } = {
-    said,
-    onStart: null,
-    onEnd: null,
-    say(text) {
-      said.push(text);
-      open = true;
-      if (!playing) {
-        playing = true;
-        speaker.onStart?.();
-      }
-    },
-    close() {
-      open = false;
-    },
-    cancel() {
-      open = false;
-      if (!playing) return;
-      playing = false;
-      speaker.onEnd?.(true);
-    },
-    end() {
-      expect(open).toBe(false);
-      playing = false;
-      speaker.onEnd?.(false);
-    },
-    playing: () => playing,
-  };
-  return speaker;
-}
-
-const session = (revision: number, head: number | null) =>
-  ({ id: 3, active_branch_id: 9, active_head_node_id: head, revision }) as PracticeSession;
-
-type Turn = { sentences: string[]; fail?: RepStreamError; nodeId: number; deflection?: boolean };
-
-function harness(options: { bargeIn?: boolean } = {}) {
-  let clock = 0;
-  let keys = 0;
-  const turns: Turn[] = [];
-  const posted: VoiceEvent[] = [];
-  const requests: { body: unknown; key: string }[] = [];
-  let release: (() => void) | null = null;
-  let gate: Promise<void> | null = null;
-  const finished = vi.fn();
-  const api: RepApi = {
-    createRep: async () =>
-      ({
-        rep_id: 7,
-        rep_number: 2,
-        session: session(0, null),
-        duration_limit_ms: 180_000,
-        score_ruleset: "v3-score-r1",
-        whisper_ruleset: "v3-whisper-r1",
-        opening_message: "You wanted to see me?",
-      }) as RepCreated,
-    streamTurn: async (_rep, body, key, onSentence) => {
-      requests.push({ body, key });
-      const turn = turns.shift()!;
-      turn.sentences.forEach((text, index) => onSentence(index, text));
-      if (gate) await gate;
-      if (turn.fail) throw turn.fail;
-      return {
-        node: { id: turn.nodeId, character_text: turn.sentences.join(" ") } as TurnNode,
-        session: session(requests.length, turn.nodeId),
-        turn: {
-          question_type: "open",
-          leading: false,
-          meaning: true,
-          deflection: !!turn.deflection,
-        },
-      } as TurnDone;
-    },
-    postEvents: async (_rep, events) => {
-      posted.push(...events);
-      return { accepted: events.length, last_seq: events[events.length - 1]!.seq };
-    },
-    finish: async (_rep, durationMs) => {
-      finished(durationMs);
-      return {
-        rep: {
-          rep_id: 7,
-          rep_number: 2,
-          session_id: 3,
-          scenario_id: 2,
-          started_at: "",
-          duration_ms: durationMs,
-          finished: true,
-          score_ruleset: "v3-score-r1",
-          scorecard: null,
-          latency: [],
-        },
-      };
-    },
-    list: async () => [],
-  };
-  const speaker = fakeSpeaker();
-  let last: RepSnapshot | null = null;
-  const controller = new RepController({
-    api,
-    speaker,
-    now: () => clock,
-    newKey: () => `key-${(keys += 1)}`,
-    onChange: (snapshot) => (last = snapshot),
-    bargeIn: options.bargeIn ?? true,
-  });
-  return {
-    controller,
-    speaker,
-    turns,
-    posted,
-    requests,
-    finished,
-    at: (ms: number) => (clock = ms),
-    snap: () => last!,
-    hold() {
-      gate = new Promise((resolve) => (release = resolve));
-    },
-    release() {
-      release?.();
-      gate = null;
-    },
-  };
-}
-
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-async function started(options: { bargeIn?: boolean } = {}) {
-  const h = harness(options);
-  await h.controller.start(2);
-  expect(h.snap().phase).toBe("bob_speaking");
-  h.at(2000);
-  h.speaker.end();
-  expect(h.snap().phase).toBe("listening");
-  return h;
-}
-
 describe("RepController", () => {
   it("sends a spoken turn after the quiet gap and logs timing for both speakers", async () => {
     const h = await started();
@@ -300,7 +160,7 @@ describe("RepController", () => {
     h.controller.tick();
     expect(h.requests).toHaveLength(0);
 
-    h.at(4800);
+    h.at(5300);
     h.controller.tick();
     await settle();
     expect(h.requests[0]!.body).toMatchObject({
@@ -325,16 +185,16 @@ describe("RepController", () => {
     expect(h.snap().lines[1]!.facts?.deflection).toBe(true);
     expect(h.snap().timings[0]).toEqual({
       speech_end_ms: 4100,
-      sent_ms: 4800,
-      first_sentence_ms: 4800,
-      audio_start_ms: 4800,
+      sent_ms: 5300,
+      first_sentence_ms: 5300,
+      audio_start_ms: 5300,
     });
 
     await h.controller.finish();
     expect(h.posted.map(({ seq: _seq, ...event }) => event)).toEqual([
       { t_ms: 3000, kind: "learner_speech_start" },
       { t_ms: 4100, kind: "learner_speech_end" },
-      { t_ms: 4800, kind: "bob_audio_start", node_id: 31 },
+      { t_ms: 5300, kind: "bob_audio_start", node_id: 31 },
       { t_ms: 7000, kind: "bob_audio_end", node_id: 31 },
     ]);
     expect(h.posted.map((event) => event.seq)).toEqual([1, 2, 3, 4]);

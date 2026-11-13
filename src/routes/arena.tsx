@@ -332,8 +332,6 @@ function ArenaSession({
 
   const change = stanceChange(chain);
   const turnFeedback: Whisper[] = chain.at(-1)?.coaching.whispers ?? [];
-  const earlierHint = coach.pending ? coach.earlier : undefined;
-  const earlierTurn = chain.find((n) => n.id === earlierHint?.head_node_id)?.turn_number;
 
   return (
     <div className="flex h-screen flex-col bg-background bg-ambient">
@@ -471,13 +469,7 @@ function ArenaSession({
             <h2 className="font-semibold">Conversation coach</h2>
           </div>
           <div className="space-y-3 border-b border-border p-4">
-            <CoachHint
-              hints={coach.hints}
-              earlier={earlierHint?.hint}
-              earlierLabel={earlierTurn ? `From turn ${earlierTurn}` : "From the opening"}
-              pending={coach.pending}
-              failure={coach.failure}
-            />
+            <CoachHint hints={coach.hints} pending={coach.pending} failure={coach.failure} />
             {turnFeedback.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground">Turn feedback</p>

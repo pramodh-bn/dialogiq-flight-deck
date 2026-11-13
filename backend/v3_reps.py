@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 import practice
+import semantic_feedback
 import stance
 import v3_score
 from api_errors import ApiError, conflict, not_found
@@ -131,6 +132,10 @@ class EventsRequest(WireModel):
     events: list[EventIn] = Field(min_length=1, max_length=MAX_EVENTS_PER_CALL)
 
 
+class ClassifyRequest(WireModel):
+    user_message: str = Field(min_length=1, max_length=4000)
+
+
 class FinishRequest(WireModel):
     duration_ms: int = Field(strict=True, ge=1, le=MAX_REP_MS)
 
@@ -178,8 +183,43 @@ def latency_rows(db: DbSession, rep: VoiceRep) -> list[dict]:
     return rows
 
 
+WHISPER_LIMIT_MS = 2000
+
+
+def whisper_latency(db: DbSession, rep: VoiceRep) -> dict:
+    """How long whispers took to appear, from their trigger to being visible.
+
+    The launch blocker (contract v3-r1) is that at least 90% of whispers appear
+    within 2000 ms of their trigger. ``within_limit`` is null with no whispers.
+    """
+    gaps = sorted(
+        max(0, event.t_ms - event.data["trigger_ms"])
+        for event in db.scalars(
+            select(VoiceEvent).where(
+                VoiceEvent.rep_id == rep.id, VoiceEvent.kind == "whisper_shown"
+            )
+        )
+        if isinstance(event.data.get("trigger_ms"), int)
+    )
+    within = sum(1 for gap in gaps if gap <= WHISPER_LIMIT_MS)
+    return {
+        "shown": len(gaps),
+        "within_limit": within,
+        "limit_ms": WHISPER_LIMIT_MS,
+        "median_ms": gaps[len(gaps) // 2] if gaps else None,
+        "max_ms": gaps[-1] if gaps else None,
+    }
+
+
+def judge_name(db: DbSession, rep: VoiceRep) -> str:
+    """Which judge decides needs on this rep: ``semantic-r1`` or ``keywords``."""
+    config = practice.get_session(db, rep.session_id).scenario_config
+    return config.get("feedback_revision") or "keywords"
+
+
 def rep_dto(db: DbSession, rep: VoiceRep) -> dict:
     return {
+        "judge": judge_name(db, rep),
         "rep_id": rep.id,
         "rep_number": rep.rep_number,
         "session_id": rep.session_id,
@@ -190,15 +230,24 @@ def rep_dto(db: DbSession, rep: VoiceRep) -> dict:
         "score_ruleset": rep.score_ruleset,
         "scorecard": rep.scorecard,
         "latency": latency_rows(db, rep),
+        "whisper_latency": whisper_latency(db, rep),
     }
 
 
 def create_rep(db: DbSession, payload: RepCreateRequest, key: str) -> tuple[int, dict]:
     def operation(owner: str) -> tuple[int, dict]:
         practice.write_lock(db)
-        # Always the deterministic judge and rule-based stance; never semantic.
+        # Judge by meaning (semantic-r1) when the server offers it for this
+        # scenario; otherwise the keyword judge and rule-based stance.
+        scenario = db.get(Scenario, payload.scenario_id)
+        semantic = (
+            semantic_feedback.REVISION
+            if scenario is not None
+            and semantic_feedback.REVISION in practice.feedback_revisions(scenario)
+            else None
+        )
         session = practice.new_session(
-            db, payload.scenario_id, stance.BEHAVIOR_REVISION
+            db, payload.scenario_id, stance.BEHAVIOR_REVISION, semantic
         )
         earlier = db.scalar(
             select(func.count(VoiceRep.id)).where(
@@ -224,6 +273,7 @@ def create_rep(db: DbSession, payload: RepCreateRequest, key: str) -> tuple[int,
             "duration_limit_ms": DURATION_LIMIT_MS,
             "score_ruleset": rep.score_ruleset,
             "whisper_ruleset": rep.whisper_ruleset,
+            "judge": judge_name(db, rep),
             "opening_message": session.scenario_config["persona"]["opening_message"],
         }
         return practice.finish(db, key, owner, 201, result)
@@ -380,6 +430,7 @@ def open_turn(
     payload: VoiceTurnRequest,
     key: str,
     provider: StreamProvider,
+    feedback_provider: semantic_feedback.Provider = semantic_feedback.real_provider,
 ) -> Iterator[str]:
     """Start one streamed voice turn and return its event stream.
 
@@ -434,13 +485,22 @@ def open_turn(
                 spoken.append(text)
                 yield sse("sentence", {"index": len(spoken) - 1, "text": text})
             total_ms = round((time.monotonic() - asked) * 1000)
+            state, coaching, newly = prepared.state, prepared.coaching, prepared.newly
+            if prepared.semantic:
+                # Judge by meaning once Bob's whole reply exists; Bob's audio is
+                # already playing, and a failure keeps the turn (status unavailable).
+                before = {n["id"] for n in prepared.context.previous["revealed_needs"]}
+                state, coaching = semantic_feedback.evaluate(
+                    prepared.context.previous,
+                    chat.user_message,
+                    " ".join(spoken),
+                    prepared.context.history,
+                    prepared.context.config["needs"],
+                    feedback_provider,
+                )
+                newly = [n for n in state["revealed_needs"] if n["id"] not in before]
             node, session = practice.save_turn(
-                db,
-                chat,
-                prepared.context,
-                prepared.state,
-                prepared.coaching,
-                " ".join(spoken),
+                db, chat, prepared.context, state, coaching, " ".join(spoken)
             )
             db.add(
                 VoiceTurnLatency(
@@ -459,8 +519,7 @@ def open_turn(
                     "question_type": spoken_type["type"],
                     "leading": spoken_type["leading"],
                     "meaning": spoken_type["meaning"],
-                    "deflection": not prepared.newly
-                    and prepared.state["resistance"] == "guarded",
+                    "deflection": not newly and state["resistance"] == "guarded",
                 },
             }
             practice.finish(db, key, owner, 200, done)
@@ -543,13 +602,33 @@ def build_router(db_dep: object, key_dep: object) -> APIRouter:
     ) -> StreamingResponse:
         state = request.app.state
         events = open_turn(
-            state.session_factory, rep_id, payload, key, state.stream_provider
+            state.session_factory,
+            rep_id,
+            payload,
+            key,
+            state.stream_provider,
+            state.feedback_provider,
         )
         return StreamingResponse(
             closing_stream(events),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @router.post("/classify")
+    def classify(payload: ClassifyRequest) -> dict:
+        """Question type of one utterance, with no model call and nothing saved.
+
+        The browser asks this in parallel with the turn so a whisper can appear
+        long before Bob's reply (contract v3-r1, whisper latency).
+        """
+        found = v3_score.classify_spoken(payload.user_message)
+        return {
+            "question_type": found["type"],
+            "leading": found["leading"],
+            "meaning": found["meaning"],
+            "ruleset": found["ruleset"],
+        }
 
     @router.post("/reps/{rep_id}/events")
     def events(
