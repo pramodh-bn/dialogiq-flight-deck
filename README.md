@@ -21,6 +21,53 @@ It is rehearsal, not surveillance: nothing records or scores real conversations.
 The coach never sees the character's hidden needs or private prompt, and the
 persona never sees the coach's hints.
 
+## Prepare: a research agent that brings its sources
+
+Before you rehearse a conversation you can research it. On `/prepare` you say
+who you will talk to, what happened and what you want. An agent then:
+
+1. plans three to five questions that public sources can answer (market rates,
+   published policies, the law, standard practice), and never researches a
+   private person;
+2. searches the live web for each with **Tavily** and reads the pages;
+3. extracts facts with **Nebius Token Factory**, and for each fact must copy the
+   words from the page that support it;
+4. has plain code, not the model, check that those words are on the fetched page
+   and that every figure in the fact is in them; facts that fail are rejected;
+5. searches once more, with a new query, for any question left without a fact;
+6. writes talking points that may cite only facts that passed, plus questions
+   to ask the other person, your own unverified assumptions and what is still
+   unknown.
+
+The page shows every step as it happens, each fact beside its quote and source
+link, the claims that were thrown out and why, and the model, call counts and
+time for the run. The contract and the exact check are in
+[docs/research-brief-contract.md](docs/research-brief-contract.md).
+
+To run it, do the one-time setup under "Run the real app" below and add two keys
+to the env file:
+
+```sh
+NEBIUS_API_KEY=...        # https://tokenfactory.nebius.com
+TAVILY_API_KEY=...        # https://app.tavily.com
+# NEBIUS_MODEL=meta-llama/Llama-3.3-70B-Instruct   (the default)
+```
+
+Start the two servers (PowerShell, from the repository root), then open
+`http://127.0.0.1:5173/prepare`:
+
+```powershell
+# Terminal 1
+backend/.venv/Scripts/python.exe scripts/run_backend.py --env-file .env
+# Terminal 2
+$env:VITE_API_BASE_URL = 'http://127.0.0.1:8080'; npm.cmd run dev -- --host 127.0.0.1
+```
+
+One brief makes at most 10 Tavily advanced searches and 13 model calls. The
+check proves a quote was on the page; it does not prove the page is right, so
+read the source before you lean on a fact. This feature was built with Claude
+Code.
+
 ## Quick start (UI mock, no keys)
 
 Needs Node 26.13.0 and npm 11.20.0.

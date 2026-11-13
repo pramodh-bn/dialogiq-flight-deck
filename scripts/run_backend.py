@@ -32,6 +32,15 @@ COACH_DEMO_ENV_KEYS = (
 )
 
 
+# CS-93: research brief providers (Nebius Token Factory and Tavily).
+RESEARCH_ENV_KEYS = (
+    "NEBIUS_API_KEY",
+    "NEBIUS_API_BASE",
+    "NEBIUS_MODEL",
+    "TAVILY_API_KEY",
+)
+
+
 def record_coach_calls(log_path: str) -> None:
     """Append what each coach call really sent and got back, without any of its text."""
     import coach
@@ -88,7 +97,13 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     if args.env_file:
         values = parse_env_file(Path(args.env_file))
-        for key in ENV_KEYS + META_ENV_KEYS + PERSONA_ENV_KEYS + COACH_DEMO_ENV_KEYS:
+        for key in (
+            ENV_KEYS
+            + META_ENV_KEYS
+            + PERSONA_ENV_KEYS
+            + COACH_DEMO_ENV_KEYS
+            + RESEARCH_ENV_KEYS
+        ):
             if key in values:
                 os.environ.setdefault(key, values[key])
     sys.path.insert(0, str(root / "backend"))

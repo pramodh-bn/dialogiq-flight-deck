@@ -19,6 +19,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 import coach_service
 import practice
+import research
 import semantic_feedback
 import v3_reps
 from api_errors import ApiError, not_found
@@ -105,6 +106,8 @@ def create_app(
     coach_provider: coach_service.CoachProvider | None = None,
     feedback_provider: semantic_feedback.Provider | None = None,
     stream_provider: v3_reps.StreamProvider | None = None,
+    research_llm: research.LlmCall | None = None,
+    research_search: research.SearchCall | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -123,6 +126,8 @@ def create_app(
     application.state.coach_provider = (
         coach_provider or coach_service.real_coach_provider
     )
+    application.state.research_llm = research_llm or research.nebius_llm
+    application.state.research_search = research_search or research.tavily_search
 
     @application.middleware("http")
     async def safe_failures(
@@ -318,6 +323,7 @@ def create_app(
         return coach_service.list_hints(db, session_id, branch_id)
 
     application.include_router(v3_reps.build_router(DbDep, KeyDep))
+    application.include_router(research.build_router(DbDep))
 
     # Outer CORS also decorates safe unexpected-failure responses.
     origins = [

@@ -242,3 +242,16 @@ class VoiceEvent(Base):
     t_ms: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(32))
     data: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ResearchBrief(Base):
+    """One conversation-prep research run and its cited brief (research-r1)."""
+
+    __tablename__ = "research_briefs"
+    __table_args__: ClassVar[dict[str, bool]] = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(16))
+    request: Mapped[dict] = mapped_column(JSON)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
