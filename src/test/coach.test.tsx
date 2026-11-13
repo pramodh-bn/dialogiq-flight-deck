@@ -885,6 +885,7 @@ describe("CoachHint", () => {
     expect(screen.getByTestId("hint-why")).toHaveTextContent(fixtures.success.hint.reason);
     const how = screen.getByRole("region", { name: "Now say this" });
     expect(how).toHaveTextContent(fixtures.success.hint.example);
+    expect(how).toHaveTextContent("Put it in your own words");
     expect(how).not.toHaveTextContent(fixtures.success.hint.reason);
     expect(screen.getByRole("region", { name: "Why it works" })).toHaveTextContent(
       fixtures.success.hint.reason,

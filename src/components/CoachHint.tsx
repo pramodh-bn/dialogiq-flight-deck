@@ -22,7 +22,7 @@ function HintBody({ hint }: { hint: Hint }) {
       >
         <p className="text-[11px] font-bold uppercase tracking-widest text-accent">Now say this</p>
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground">Try saying</p>
+          <p className="text-xs font-semibold text-muted-foreground">For example</p>
           <p className="rounded-md bg-background/60 px-3 py-2 text-base font-semibold">
             {hint.example}
           </p>
@@ -31,6 +31,9 @@ function HintBody({ hint }: { hint: Hint }) {
           <p className="text-xs font-semibold text-muted-foreground">The move</p>
           <p className="font-semibold leading-snug">{hint.approach}</p>
         </div>
+        <p className="text-xs italic text-muted-foreground">
+          Put it in your own words, for your own situation.
+        </p>
       </section>
     </div>
   );
