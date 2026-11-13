@@ -2,21 +2,36 @@ import type { Hint } from "@/lib/api";
 
 const sourceLabel = (hint: Hint) => (hint.source === "meta" ? "AI coach" : "Basic hint");
 
+// Two separate groups: how to say it (highlighted), then why it works (plain).
 function HintBody({ hint }: { hint: Hint }) {
   return (
-    <div className="space-y-3 text-sm">
-      <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Try saying</p>
-        <p className="rounded-md bg-secondary/50 px-3 py-2 font-medium">{hint.example}</p>
-      </div>
-      <div className="space-y-1" data-testid="hint-move">
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent">The move</p>
-        <p className="font-semibold leading-snug">{hint.approach}</p>
-      </div>
-      <div className="space-y-1" data-testid="hint-why">
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Why this works</p>
+    <div className="space-y-4 text-sm">
+      <section
+        aria-label="How to say it"
+        className="space-y-3 rounded-lg bg-accent/10 p-3 ring-1 ring-accent/40"
+      >
+        <p className="text-[11px] font-bold uppercase tracking-widest text-accent">How to say it</p>
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground">Try saying</p>
+          <p className="rounded-md bg-background/60 px-3 py-2 text-base font-semibold">
+            {hint.example}
+          </p>
+        </div>
+        <div className="space-y-1" data-testid="hint-move">
+          <p className="text-xs font-semibold text-muted-foreground">The move</p>
+          <p className="font-semibold leading-snug">{hint.approach}</p>
+        </div>
+      </section>
+      <section
+        aria-label="Why it works"
+        data-testid="hint-why"
+        className="space-y-1 border-l-4 border-muted-foreground/40 pl-3"
+      >
+        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+          Why this works
+        </p>
         <p className="leading-relaxed">{hint.reason}</p>
-      </div>
+      </section>
     </div>
   );
 }
