@@ -168,3 +168,9 @@ All agents must strictly adhere to the project's shared coding conventions to pr
   Agent: Codex
   Megillah-Task: CS-27
   ```
+
+## Sprint practices
+
+The Sprint 6 retrospective produced working rules and a real-device listening
+checklist. Read [docs/v3/sprint-practices.md](docs/v3/sprint-practices.md)
+before delivering any voice task.
