@@ -260,10 +260,10 @@ build passes G0 to G6.
 
 ## 11. Open decisions and things to re-check
 
-1. Start from an empty repository, using the existing DialogIQ implementation only
-   as an oracle to prove the suite (recommended, and it matches "software from
-   specifications"), or let the factory extend the existing code. The event rules
-   may decide this; check them when published.
+1. DECIDED by Pramodh, 2026-11-12: the factory starts from an empty repository.
+   The existing DialogIQ implementation is used only as an oracle to prove the
+   acceptance suite, and is never shown to the Builders. Re-check against the
+   event rules when published.
 2. Event rules, judging criteria, submission format, remote schedule: not
    published on 2026-11-12. Re-read the Luma page and the BAND hacker guide.
 3. BAND Desktop is not set up yet and the Luma ticket is awaiting approval; the
